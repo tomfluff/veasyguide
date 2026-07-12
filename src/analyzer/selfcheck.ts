@@ -6,6 +6,7 @@ import { StreamingClusterer } from "./graph.ts";
 import { selectActivity } from "./select.ts";
 import { addRange, coverage, isAnalyzed, nextGap } from "./ranges.ts";
 import { cropRect, snippetTimestamps, SNIPPET_MAX_FRAMES } from "./snippets.ts";
+import { zoomTransform } from "../player/zoom.ts";
 import type { Activity, Node } from "./types.ts";
 
 function assert(cond: boolean, msg: string) {
@@ -218,6 +219,42 @@ const lShape = (x0: number, y0: number, s: number) => (mask: Uint8Array) => {
   const edge = cropRect({ ...mk(0, 1), box: { x: 470, y: 260, w: 10, h: 10 } }, meta);
   assert(edge.x + edge.w <= meta.videoWidth && edge.y + edge.h <= meta.videoHeight,
     "crop never exceeds the frame bounds");
+}
+
+// 10. Magnification pan: continuous across the frame, saturating (not stepping) at edges.
+{
+  const frame = { width: 1280, height: 720 };
+  const box = (x: number, y: number) => ({ x, y, width: 120, height: 80 });
+  const f = 2.5;
+
+  // Centred activity -> its centre lands in the middle of the frame.
+  const mid = zoomTransform(box(640 - 60, 360 - 40), frame, f);
+  const centreX = f * 640 + mid.tx;
+  assert(Math.abs(centreX - frame.width / 2) < 1e-6, "centred activity lands mid-frame");
+
+  // Never pan past an edge: the scaled image always covers the frame.
+  for (const [x, y] of [[0, 0], [1160, 640], [0, 640], [1160, 0], [600, 300]] as const) {
+    const { tx, ty } = zoomTransform(box(x, y), frame, f);
+    assert(tx <= 1e-9 && tx >= frame.width * (1 - f) - 1e-9, `tx within bounds at x=${x}`);
+    assert(ty <= 1e-9 && ty >= frame.height * (1 - f) - 1e-9, `ty within bounds at y=${y}`);
+  }
+
+  // THE bug: sweep an activity from the middle to the left edge in 1px steps and assert
+  // the pan never jumps. A discontinuity here is exactly the "small jump near the edge".
+  let prev = zoomTransform(box(600, 300), frame, f).tx;
+  let maxStep = 0;
+  for (let x = 599; x >= 0; x--) {
+    const tx = zoomTransform(box(x, 300), frame, f).tx;
+    maxStep = Math.max(maxStep, Math.abs(tx - prev));
+    prev = tx;
+  }
+  // A 1px move of the activity may move the pan by at most `f` px — never more.
+  assert(maxStep <= f + 1e-9, `pan is continuous approaching the edge (max step ${maxStep.toFixed(3)}px <= ${f})`);
+
+  // And once clamped, it stops moving entirely rather than overshooting.
+  const atEdge = zoomTransform(box(0, 300), frame, f).tx;
+  const pastEdge = zoomTransform(box(-50, 300), frame, f).tx;
+  assert(atEdge === 0 && pastEdge === 0, "pan saturates at the edge instead of overshooting");
 }
 
 console.log("\nALL PASS");

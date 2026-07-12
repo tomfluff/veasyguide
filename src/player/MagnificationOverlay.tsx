@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
 import { sanitizeFilters } from "../stores/HighlightSettingsStore";
+import { zoomTransform } from "./zoom";
 import type { PlayerActivity } from "./types";
 
 type Pos = { x: number; y: number };
@@ -25,8 +26,7 @@ const MagnificationOverlay = (props: Props) => {
   const settings = useMagnificationSettingsStore();
   const animationSpeeds = useMemo(
     () => ({
-      origin: 150 / settings.zoom_speed,
-      transform: 200 / settings.zoom_speed,
+      transform: 250 / settings.zoom_speed,
       opacity: 150 / settings.zoom_speed,
     }),
     [settings.zoom_speed]
@@ -36,7 +36,6 @@ const MagnificationOverlay = (props: Props) => {
   const pausedByZoomRef = useRef(false);
 
   const [zoomFactor, setZoomFactor] = useState(1);
-  const [zoomOrigin, setZoomOrigin] = useState<Pos>({ x: 0, y: 0 });
   const [zoomShift, setZoomShift] = useState<Pos>({ x: 0, y: 0 });
   const [opacityLevel, setOpacityLevel] = useState(0);
 
@@ -67,16 +66,17 @@ const MagnificationOverlay = (props: Props) => {
   const setZoom = () => {
     const canvas = canvasRef.current;
     const video = props.videoRef.current;
-    if (!video || !canvas) return;
+    if (!video || !canvas || !canvas.width || !canvas.height) return;
 
     const activity = props.activity;
     if (!activity) return;
 
-    // Calculate the center of the activity (scaled)
-    const activityCenter = {
-      x: props.scaleRatio * (activity.pos.x + activity.dim.width / 2),
-      y: props.scaleRatio * (activity.pos.y + activity.dim.height / 2),
-    };
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Centre of the activity, in canvas pixels.
+    const cx = props.scaleRatio * (activity.pos.x + activity.dim.width / 2);
+    const cy = props.scaleRatio * (activity.pos.y + activity.dim.height / 2);
 
     let videoWidth = video.videoWidth;
     // If the aspect ratio is not 16:9, adjust the width accordingly
@@ -84,9 +84,9 @@ const MagnificationOverlay = (props: Props) => {
     if (videoWidth / video.videoHeight !== 16 / 9) {
       videoWidth = video.videoHeight * (16 / 9);
     }
-    // Calculate the zoom factor based on the activity's position and dimensions
+    // How far to zoom: enough to fill the frame with the activity, capped.
     const zoomStrength = useMagnificationSettingsStore.getState().zoom_strength;
-    const factor =
+    const f =
       1 +
       zoomStrength *
         Math.min(
@@ -94,27 +94,22 @@ const MagnificationOverlay = (props: Props) => {
           video.videoHeight / activity.dim.height - 1,
           3
         );
-    const zoomedDim = {
-      width: canvas.width / factor,
-      height: canvas.height / factor,
-    };
 
-    // Padding needed to center the activity on the canvas after zooming
-    // (without going out of bounds of the canvas)
-    const paddingLeft = activityCenter.x - zoomedDim.width / 2;
-    const paddingRight = activityCenter.x - (canvas.width - zoomedDim.width / 2);
-    const paddingTop = activityCenter.y - zoomedDim.height / 2;
-    const paddingBottom = activityCenter.y - (canvas.height - zoomedDim.height / 2);
+    // Transform-origin is pinned at 0 0 and everything lives in one transform.
+    //
+    // The old code animated transform-origin (150ms) and transform (200ms) together.
+    // A point's rendered position depends on BOTH, so mid-tween the two disagreed:
+    // correct at the endpoints, wrong in between — and visibly wrong exactly where the
+    // edge clamp was active, since the clamp term is zero in the middle of the frame
+    // and non-zero near an edge. One animated property, one duration, fixes it.
+    const { tx, ty } = zoomTransform(
+      { x: cx - 0.5, y: cy - 0.5, width: 1, height: 1 }, // centre-only; box size is in `f`
+      { width: W, height: H },
+      f
+    );
 
-    const paddingX = (Math.min(paddingLeft, 0) + Math.max(paddingRight, 0)) * factor;
-    const paddingY = (Math.min(paddingTop, 0) + Math.max(paddingBottom, 0)) * factor;
-
-    setZoomOrigin(activityCenter);
-    setZoomShift({
-      x: Math.round(canvas.width / 2 - activityCenter.x + paddingX),
-      y: Math.round(canvas.height / 2 - activityCenter.y + paddingY),
-    });
-    setZoomFactor(factor);
+    setZoomShift({ x: tx, y: ty });
+    setZoomFactor(f);
   };
 
   // Zoom state machine: enter, retarget on activity change, exit.
@@ -143,10 +138,10 @@ const MagnificationOverlay = (props: Props) => {
     transition: `opacity ${animationSpeeds.opacity}ms ease-in-out`,
   };
 
+  // Only `transform` animates — see setZoom(). Animating transform-origin alongside it
+  // (as the original did, at a different duration) is what made the motion jump.
   const zoomTransitionPosition = {
-    transition: `
-    transform-origin ${animationSpeeds.origin}ms ease-in-out,
-    transform ${animationSpeeds.transform}ms ease-in-out`,
+    transition: `transform ${animationSpeeds.transform}ms ease-in-out`,
   };
 
   return (
@@ -171,7 +166,7 @@ const MagnificationOverlay = (props: Props) => {
         <canvas
           ref={canvasRef}
           style={{
-            transformOrigin: `${zoomOrigin.x}px ${zoomOrigin.y}px`,
+            transformOrigin: "0 0",
             transform: `translate(${zoomShift.x}px, ${zoomShift.y}px) scale(${zoomFactor})`,
             ...zoomTransitionPosition,
             filter: `contrast(${settings.contrast})`,
