@@ -9,10 +9,11 @@
 // ranges, not one frontier.
 
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from "mediabunny";
-import { componentBoxes, contentScore, diffMask, dilate, toGray } from "./pipeline";
+import { componentRegions, contentScore, diffMask, dilate, toGray } from "./pipeline";
+import { computeFeatures } from "./features";
 import { StreamingClusterer, type RawActivity } from "./graph";
 import { addRange, isAnalyzed, nextGap } from "./ranges";
-import type { Activity, AnalysisMeta, Box, InMsg, Range, WorkerMsg } from "./types";
+import type { Activity, AnalysisMeta, InMsg, Range, WorkerMsg } from "./types";
 
 const post = (m: WorkerMsg) => (self as unknown as Worker).postMessage(m);
 
@@ -33,7 +34,7 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
   }
 };
 
-async function run({ file, params, debug }: Extract<InMsg, { type: "start" }>) {
+async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type: "start" }>) {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   const track = await input.getPrimaryVideoTrack();
   if (!track) throw new Error("No video track found");
@@ -60,13 +61,23 @@ async function run({ file, params, debug }: Extract<InMsg, { type: "start" }>) {
 
   const distTh = params.distRatio * Math.sqrt(aw * aw + ah * ah);
 
-  // Size-based validity (Python RoIActivity._is_valid, c3/c4).
-  const validate = (a: RawActivity): Activity => ({
-    ...a,
-    isValid:
-      a.box.w >= params.minSizeFrac * aw && a.box.w <= params.maxSizeFrac * aw &&
-      a.box.h >= params.minSizeFrac * ah && a.box.h <= params.maxSizeFrac * ah,
-  });
+  // Enrich a raw cluster into an Activity: validity heuristic (Python
+  // RoIActivity._is_valid, c3/c4), always-on feature vector, opt-in node log.
+  const finalize = (a: RawActivity): Activity => {
+    const detailed = a.log.map((n) => ({ t: n.t, region: n.detail! }));
+    return {
+      id: a.id,
+      start: a.start,
+      end: a.end,
+      box: a.box,
+      nodeCount: a.nodeCount,
+      isValid:
+        a.box.w >= params.minSizeFrac * aw && a.box.w <= params.maxSizeFrac * aw &&
+        a.box.h >= params.minSizeFrac * ah && a.box.h <= params.maxSizeFrac * ah,
+      features: computeFeatures(detailed),
+      ...(collectNodes ? { nodes: detailed } : {}),
+    };
+  };
 
   let ranges: Range[] = [];
   const coverageOf = (rs: Range[]) => rs.reduce((s, r) => s + (r.end - r.start), 0);
@@ -90,7 +101,7 @@ async function run({ file, params, debug }: Extract<InMsg, { type: "start" }>) {
     for (let t = from; t < duration; t += params.sampleInterval) timestamps.push(t);
 
     const flushSegment = () => {
-      for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
+      for (const act of clusterer.flush()) post({ type: "activity", activity: finalize(act) });
       if (segEnd > sceneStart) post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: segEnd } });
       ranges = addRange(ranges, { start: from, end: segEnd });
     };
@@ -122,16 +133,20 @@ async function run({ file, params, debug }: Extract<InMsg, { type: "start" }>) {
           sceneStart = t;
           // Activities must not span a cut: the Python analyzer generated frame pairs
           // per scene, so no diff ever crossed a boundary. Close everything open.
-          for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
+          for (const act of clusterer.flush()) post({ type: "activity", activity: finalize(act) });
         }
       }
 
       // A cut's own frame pair is a whole-frame change, not instructor activity — skip it.
       if (prevGray && !isCut) {
-        const mask = dilate(diffMask(prevGray, gray, aw, ah, params.diffThresh), aw, ah, params.dilateIters);
-        const boxes: Box[] = componentBoxes(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac);
-        for (const box of boxes) {
-          for (const act of clusterer.add({ t, box })) post({ type: "activity", activity: validate(act) });
+        const { mask: rawMask, mag } = diffMask(prevGray, gray, aw, ah, params.diffThresh);
+        const mask = dilate(rawMask, aw, ah, params.dilateIters);
+        const regions = componentRegions(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac, mag);
+        const boxes = regions.map((r) => r.box);
+        for (const r of regions) {
+          for (const act of clusterer.add({ t, box: r.box, detail: r })) {
+            post({ type: "activity", activity: finalize(act) });
+          }
         }
 
         if (debugCanvas && debugCtx) {

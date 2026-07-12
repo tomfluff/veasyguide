@@ -1,6 +1,7 @@
 // Runnable self-check for the pure pipeline + clusterer logic (no browser needed).
 // Run: node --experimental-strip-types src/analyzer/selfcheck.ts
-import { componentBoxes, contentScore, diffMask, dilate, toGray } from "./pipeline.ts";
+import { componentRegions, contentScore, diffMask, dilate, toGray, type Region } from "./pipeline.ts";
+import { computeFeatures, shapeDiff, type DetailedNode } from "./features.ts";
 import { StreamingClusterer } from "./graph.ts";
 import { selectActivity } from "./select.ts";
 import { addRange, coverage, isAnalyzed, nextGap } from "./ranges.ts";
@@ -31,19 +32,24 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
 {
   const a = toGray(frameWithBox(20, 20, 12, 12), W, H);
   const b = toGray(frameWithBox(40, 40, 12, 12), W, H);
-  const mask = dilate(diffMask(a, b, W, H), W, H);
-  const boxes = componentBoxes(mask, W, H);
-  assert(boxes.length >= 1, `motion produces >=1 component (got ${boxes.length})`);
+  const { mask: raw, mag } = diffMask(a, b, W, H);
+  const mask = dilate(raw, W, H);
+  const regions = componentRegions(mask, W, H, 0.00015, 0.5, mag);
+  assert(regions.length >= 1, `motion produces >=1 component (got ${regions.length})`);
   // The changed region spans roughly x:20..52, y:20..52
-  const b0 = boxes[0];
-  assert(b0.x < 40 && b0.x + b0.w > 30, `component overlaps the motion region (x=${b0.x},w=${b0.w})`);
+  const r0 = regions[0];
+  assert(r0.box.x < 40 && r0.box.x + r0.box.w > 30, `component overlaps the motion region (x=${r0.box.x},w=${r0.box.w})`);
+  assert(r0.mass > 0 && r0.mass <= r0.box.w * r0.box.h, "mass is positive and bounded by bbox area");
+  assert(r0.cx >= r0.box.x && r0.cx <= r0.box.x + r0.box.w, "centroid inside bbox");
+  assert(r0.meanDiff > 25, `region meanDiff above threshold (${r0.meanDiff.toFixed(1)})`);
 }
 
 // 2. Identical frames produce no components.
 {
   const a = toGray(frameWithBox(30, 30, 12, 12), W, H);
-  const mask = dilate(diffMask(a, a, W, H), W, H);
-  assert(componentBoxes(mask, W, H).length === 0, "identical frames -> 0 components");
+  const { mask: raw } = diffMask(a, a, W, H);
+  const mask = dilate(raw, W, H);
+  assert(componentRegions(mask, W, H).length === 0, "identical frames -> 0 components");
 }
 
 // 3. Clusterer: two nodes within spanTh + distTh merge; a far-future node finalizes them.
@@ -66,6 +72,7 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
 {
   const act = (id: number, start: number, end: number): Activity => ({
     id, start, end, box: { x: 0, y: 0, w: 10, h: 10 }, nodeCount: 1, isValid: true,
+    features: computeFeatures([]),
   });
   const opts = { lead: 1.0, linger: 0.5, minDuration: 0 };
   const A = act(0, 10, 20); // long, active during most tests
@@ -118,6 +125,54 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
   // Fully covered -> no gaps left.
   r = addRange(r, { start: 50, end: 60 });
   assert(nextGap(r, 60, 0) === null, "no gap when fully covered");
+}
+
+// Extract a single region from a hand-built mask.
+function regionOfMask(paint: (mask: Uint8Array) => void): Region {
+  const mask = new Uint8Array(W * H);
+  paint(mask);
+  const rs = componentRegions(mask, W, H, 0, 1);
+  assert(rs.length === 1, `mask yields exactly one region (got ${rs.length})`);
+  return rs[0];
+}
+const rect = (x0: number, y0: number, w: number, h: number) => (mask: Uint8Array) => {
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) mask[y * W + x] = 1;
+};
+const lShape = (x0: number, y0: number, s: number) => (mask: Uint8Array) => {
+  rect(x0, y0, s, Math.floor(s / 3))(mask); // horizontal bar
+  rect(x0, y0, Math.floor(s / 3), s)(mask); // vertical bar
+};
+
+// 7. Hu moments: invariant under translation and scale, discriminative across shapes.
+{
+  const bar = regionOfMask(rect(10, 10, 24, 8));
+  const barMoved = regionOfMask(rect(60, 70, 24, 8));
+  const barScaled = regionOfMask(rect(10, 30, 48, 16));
+  const ell = regionOfMask(lShape(10, 50, 24));
+
+  const dTranslate = shapeDiff(bar.hu, barMoved.hu);
+  const dScale = shapeDiff(bar.hu, barScaled.hu);
+  const dShape = shapeDiff(bar.hu, ell.hu);
+  assert(dTranslate < 0.01, `Hu invariant under translation (d=${dTranslate.toFixed(4)})`);
+  assert(dScale < 0.3, `Hu ~invariant under scale (d=${dScale.toFixed(4)})`);
+  assert(dShape > dScale * 3, `Hu separates bar vs L-shape (d=${dShape.toFixed(3)} vs ${dScale.toFixed(3)})`);
+}
+
+// 8. Activity features: pointing-like (static) vs sketching-like (drifting) logs.
+{
+  const regionAt = (x: number, y: number): Region =>
+    regionOfMask(rect(x, y, 10, 6));
+  const pointing: DetailedNode[] = [0, 0.2, 0.4, 0.6].map((t) => ({ t, region: regionAt(30, 30) }));
+  const sketching: DetailedNode[] = [0, 0.2, 0.4, 0.6].map((t, i) => ({ t, region: regionAt(20 + i * 12, 30 + i * 8) }));
+
+  const fp = computeFeatures(pointing);
+  const fs = computeFeatures(sketching);
+  assert(fp.meanConsecIoU === 1, `static activity has IoU 1 (got ${fp.meanConsecIoU})`);
+  assert(fp.pathLength < 1e-9 && fp.displacement < 1e-9, "static activity has no trajectory");
+  assert(fs.meanConsecIoU < 0.5, `drifting activity has low IoU (got ${fs.meanConsecIoU.toFixed(2)})`);
+  assert(fs.displacement > 20, `drifting activity displaces (got ${fs.displacement.toFixed(1)})`);
+  assert(fs.growth > fp.growth, "drifting activity's union bbox grows more than static's");
+  assert(fp.nodeCount === 4 && Math.abs(fp.duration - 0.6) < 1e-9, "count/duration recorded");
 }
 
 console.log("\nALL PASS");

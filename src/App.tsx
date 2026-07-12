@@ -2,13 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Range, type Scene, type WorkerMsg } from "./analyzer/types";
 import { coverage, isAnalyzed } from "./analyzer/ranges";
 import VideoPlayer from "./player/VideoPlayer";
+import ActivityGallery from "./ActivityGallery";
 import "./App.css";
 
 const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
 
 // Debug tooling is for us, and it is OFF unless asked for — in dev too, so that a dev
 // run measures the same thing a production run does. `?debug=1` turns it on.
-const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+const QUERY = new URLSearchParams(location.search);
+const DEBUG = QUERY.get("debug") === "1";
+// Research mode: collect per-node region logs + show the activity gallery.
+const RESEARCH = QUERY.get("research") === "1";
+// Preset the gallery's snippet toggle (visual crops of each activity).
+const SNIPPETS = QUERY.get("snippets") === "1";
 // In-memory cap for stored analyzer frames (~25 KB each => ~150 MB worst case).
 const MAX_DEBUG_FRAMES = 6000;
 
@@ -211,7 +217,7 @@ export default function App() {
         }
       }
     };
-    worker.postMessage({ type: "start", file, params: p, debug: cap });
+    worker.postMessage({ type: "start", file, params: p, debug: cap, collectNodes: RESEARCH });
     workerRef.current = worker;
   }
 
@@ -416,6 +422,21 @@ export default function App() {
           </div>
           )}
         </div>
+      )}
+
+      {RESEARCH && meta && videoUrl && fileRef.current && (
+        <ActivityGallery
+          key={videoUrl}
+          activitiesRef={activitiesRef}
+          version={activityCount}
+          meta={meta}
+          videoUrl={videoUrl}
+          fileName={fileRef.current.name}
+          params={params}
+          collectNodes={RESEARCH}
+          snippetsDefault={SNIPPETS}
+          seekTo={(t) => seekFnRef.current(t)}
+        />
       )}
 
       {DEBUG && capture && (

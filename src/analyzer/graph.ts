@@ -4,10 +4,18 @@
 // whose latest node is older than (frontier - spanTh) can never gain a new member —
 // so we finalize and emit it immediately. This is what makes analysis streaming.
 
-import type { Activity, Box, Node } from "./types";
+import type { Box, Node } from "./types";
 
-// The clusterer knows nothing about validity heuristics; the worker adds `isValid`.
-export type RawActivity = Omit<Activity, "isValid">;
+// The clusterer knows nothing about validity heuristics or feature computation;
+// it emits the raw cluster with its full node log and the worker enriches it.
+export type RawActivity = {
+  id: number;
+  start: number;
+  end: number;
+  box: Box;
+  nodeCount: number;
+  log: Node[]; // every member node, in insertion order
+};
 
 function rectGap(a: Box, b: Box): number {
   const aRight = a.x + a.w, bRight = b.x + b.w;
@@ -29,7 +37,8 @@ function union(a: Box, b: Box): Box {
 // `recent` holds member nodes still within spanTh of the frontier — the only ones a
 // new node can link to. Linking is node-to-node (faithful to roi.py edges), NOT
 // node-to-cluster-bbox, which would grow ever more aggressive as clusters merge.
-type Cluster = { box: Box; start: number; end: number; nodeCount: number; recent: Node[] };
+// `log` keeps ALL member nodes for feature computation at finalization.
+type Cluster = { box: Box; start: number; end: number; nodeCount: number; recent: Node[]; log: Node[] };
 
 export class StreamingClusterer {
   private open: Cluster[] = [];
@@ -60,6 +69,7 @@ export class StreamingClusterer {
         c.start = Math.min(c.start, node.t);
         c.nodeCount++;
         c.recent.push(node);
+        c.log.push(node);
         merged = c;
         survivors.push(c);
       } else {
@@ -68,10 +78,11 @@ export class StreamingClusterer {
         merged.end = Math.max(merged.end, c.end);
         merged.nodeCount += c.nodeCount;
         merged.recent.push(...c.recent);
+        merged.log.push(...c.log);
       }
     }
     if (!merged) {
-      survivors.push({ box: node.box, start: node.t, end: node.t, nodeCount: 1, recent: [node] });
+      survivors.push({ box: node.box, start: node.t, end: node.t, nodeCount: 1, recent: [node], log: [node] });
     }
     this.open = survivors;
     return finalized;
@@ -101,6 +112,6 @@ export class StreamingClusterer {
   }
 
   private emit(c: Cluster): RawActivity {
-    return { id: this.nextId++, start: c.start, end: c.end, box: c.box, nodeCount: c.nodeCount };
+    return { id: this.nextId++, start: c.start, end: c.end, box: c.box, nodeCount: c.nodeCount, log: c.log };
   }
 }

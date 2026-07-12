@@ -1,9 +1,14 @@
 // Shared analysis types. Framework-free (no React imports) — keep it that way.
 
+import type { Region } from "./pipeline";
+import type { ActivityFeatures } from "./features";
+
 export type Box = { x: number; y: number; w: number; h: number };
 
 // A detected contour box at a moment in time, in ANALYSIS-resolution pixels.
-export type Node = { t: number; box: Box };
+// `detail` carries the region stats captured during flood fill (always present when
+// produced by the worker; optional so tests can build bare nodes).
+export type Node = { t: number; box: Box; detail?: Region };
 
 // A finalized activity: connected group of nodes. Coordinates in analysis-res pixels;
 // scale by `scale` to reach video display pixels.
@@ -19,6 +24,12 @@ export type Activity = {
   // [minSizeFrac, maxSizeFrac] of the frame w/h. Invalid activities are kept but
   // filtered from display by default.
   isValid: boolean;
+  // Always computed at finalization: compact aggregates intended for later ML
+  // (clustering activities to learn types). See features.ts.
+  features: ActivityFeatures;
+  // Research detail (opt-in via StartMsg.collectNodes): the full per-node log with
+  // region stats, enough for future models to derive their own features.
+  nodes?: { t: number; region: Region }[];
 };
 
 // Tunable analysis parameters. Defaults = the study's values (VeasyGuide analyzer.py).
@@ -85,6 +96,13 @@ export type WorkerMsg =
 export type Range = { start: number; end: number };
 
 // Main -> worker
-export type StartMsg = { type: "start"; file: File; params: AnalysisParams; debug: boolean };
+export type StartMsg = {
+  type: "start";
+  file: File;
+  params: AnalysisParams;
+  debug: boolean;
+  // Research mode: include the per-node region logs on emitted activities.
+  collectNodes?: boolean;
+};
 export type SeekMsg = { type: "seek"; t: number }; // analyze from here next, abandoning current segment
 export type InMsg = StartMsg | SeekMsg;
