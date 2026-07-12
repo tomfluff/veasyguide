@@ -6,6 +6,9 @@
 
 import type { Activity, Box, Node } from "./types";
 
+// The clusterer knows nothing about validity heuristics; the worker adds `isValid`.
+export type RawActivity = Omit<Activity, "isValid">;
+
 function rectGap(a: Box, b: Box): number {
   const aRight = a.x + a.w, bRight = b.x + b.w;
   const aBot = a.y + a.h, bBot = b.y + b.h;
@@ -38,7 +41,7 @@ export class StreamingClusterer {
   }
 
   // Feed one node. Returns any activities finalized as a result of the advancing frontier.
-  add(node: Node): Activity[] {
+  add(node: Node): RawActivity[] {
     const finalized = this.reap(node.t);
     // Merge into every open cluster this node links to (may bridge several).
     let merged: Cluster | null = null;
@@ -68,8 +71,8 @@ export class StreamingClusterer {
   }
 
   // Finalize clusters that can no longer grow (frontier passed end + spanTh).
-  private reap(frontier: number): Activity[] {
-    const out: Activity[] = [];
+  private reap(frontier: number): RawActivity[] {
+    const out: RawActivity[] = [];
     const still: Cluster[] = [];
     for (const c of this.open) {
       if (frontier - c.end > this.spanTh) out.push(this.emit(c));
@@ -80,13 +83,13 @@ export class StreamingClusterer {
   }
 
   // Flush everything at end of stream.
-  flush(): Activity[] {
+  flush(): RawActivity[] {
     const out = this.open.map((c) => this.emit(c));
     this.open = [];
     return out;
   }
 
-  private emit(c: Cluster): Activity {
+  private emit(c: Cluster): RawActivity {
     return { id: this.nextId++, start: c.start, end: c.end, box: c.box, nodeCount: c.nodeCount };
   }
 }

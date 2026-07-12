@@ -1,21 +1,38 @@
 import { useEffect, useRef, useState } from "react";
-import type { Activity, AnalysisMeta, WorkerMsg } from "./analyzer/types";
+import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type WorkerMsg } from "./analyzer/types";
 import "./App.css";
 
-const ANALYSIS_WIDTH = 480; // downscale for analysis (design: ~480p fast path)
-const SAMPLE_INTERVAL = 0.2; // seconds (study: sample_fps_ratio 0.2)
 const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
+
+// label, key, step, hint
+const PARAM_FIELDS: [string, keyof AnalysisParams, number, string][] = [
+  ["Analysis width (px)", "analysisWidth", 40, "downscale target; lower = faster, coarser"],
+  ["Sample interval (s)", "sampleInterval", 0.05, "time between compared frames"],
+  ["Diff threshold", "diffThresh", 1, "min pixel change to count as motion (0-255)"],
+  ["Dilate iterations", "dilateIters", 1, "mask growth passes; higher merges nearby specks"],
+  ["Min region area (frac)", "contourAreaLowFrac", 0.00005, "drop changed regions smaller than this fraction of frame"],
+  ["Max region area (frac)", "contourAreaHighFrac", 0.05, "drop changed regions larger than this fraction of frame"],
+  ["Link time gap (s)", "spanTh", 0.1, "max time between nodes of one activity"],
+  ["Link distance (frac diag)", "distRatio", 0.005, "max spatial gap between nodes of one activity"],
+  ["Min activity size (frac)", "minSizeFrac", 0.005, "validity: activity w/h at least this fraction of frame"],
+  ["Max activity size (frac)", "maxSizeFrac", 0.05, "validity: activity w/h at most this fraction of frame"],
+  ["Min duration (s)", "minDuration", 0.1, "hide activities shorter than this"],
+];
 
 export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const magCanvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const activitiesRef = useRef<Activity[]>([]);
+  const fileRef = useRef<File | null>(null);
 
+  const [params, setParams] = useState<AnalysisParams>(DEFAULT_PARAMS);
+  const [showParams, setShowParams] = useState(false);
   const [meta, setMeta] = useState<AnalysisMeta | null>(null);
   const [analyzedUpTo, setAnalyzedUpTo] = useState(0);
   const [xRealtime, setXRealtime] = useState(0);
   const [activityCount, setActivityCount] = useState(0);
+  const [validCount, setValidCount] = useState(0);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<Activity | null>(null);
@@ -24,12 +41,12 @@ export default function App() {
 
   const canPlay = done || analyzedUpTo >= PLAYBACK_LEAD;
 
-  function loadFile(file: File) {
+  function analyze(file: File, p: AnalysisParams) {
     workerRef.current?.terminate();
+    fileRef.current = file;
     activitiesRef.current = [];
-    setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0);
-    setDone(false); setError(null); setCurrent(null); setCurrentTime(0);
-    setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+    setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
+    setDone(false); setError(null); setCurrent(null);
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
@@ -38,12 +55,23 @@ export default function App() {
       else if (m.type === "activity") {
         activitiesRef.current.push(m.activity);
         setActivityCount((c) => c + 1);
+        if (m.activity.isValid) setValidCount((c) => c + 1);
       } else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); }
       else if (m.type === "done") { setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); }
       else if (m.type === "error") setError(m.message);
     };
-    worker.postMessage({ type: "start", file, analysisWidth: ANALYSIS_WIDTH, sampleInterval: SAMPLE_INTERVAL });
+    worker.postMessage({ type: "start", file, params: p });
     workerRef.current = worker;
+  }
+
+  function loadFile(file: File) {
+    setCurrentTime(0);
+    setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+    analyze(file, params);
+  }
+
+  function reanalyze() {
+    if (fileRef.current) analyze(fileRef.current, params);
   }
 
   // Dev-only auto-load for headless smoke tests: ?test=<name> fetches public/_test/<name>.
@@ -79,7 +107,9 @@ export default function App() {
     if (!v) return;
     setCurrentTime(v.currentTime);
     const t = v.currentTime;
-    const hits = activitiesRef.current.filter((a) => a.start - 1 <= t && a.end + 0.5 >= t);
+    const hits = activitiesRef.current.filter(
+      (a) => a.isValid && a.end - a.start >= params.minDuration && a.start - 1 <= t && a.end + 0.5 >= t
+    );
     hits.sort((a, b) => a.start - b.start);
     setCurrent(hits[0] ?? null);
   }
@@ -124,14 +154,42 @@ export default function App() {
             <div className="bar"><div className="fill" style={{ width: `${progressPct}%` }} /></div>
             <div className="stats">
               {meta ? `${meta.videoWidth}×${meta.videoHeight} → ${meta.analysisWidth}×${meta.analysisHeight}` : "…"}
-              {" · "}{activityCount} activities · analyzed {progressPct.toFixed(0)}%
+              {" · "}{validCount} valid / {activityCount} activities · analyzed {progressPct.toFixed(0)}%
               {" · playhead "}{currentTime.toFixed(1)}s
             </div>
+          </div>
+
+          <div className="params">
+            <button type="button" onClick={() => setShowParams((s) => !s)}>
+              {showParams ? "▾" : "▸"} Analysis parameters
+            </button>
+            {showParams && (
+              <>
+                <div className="param-grid">
+                  {PARAM_FIELDS.map(([label, key, step, hint]) => (
+                    <label key={key} title={hint}>
+                      <span>{label}</span>
+                      <input
+                        type="number"
+                        step={step}
+                        value={params[key]}
+                        onChange={(e) => setParams((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="param-actions">
+                  <button type="button" className="primary" onClick={reanalyze}>Re-analyze</button>
+                  <button type="button" onClick={() => setParams(DEFAULT_PARAMS)}>Reset to defaults</button>
+                  <small>Min duration filters display only (no re-analysis needed).</small>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      <canvas ref={magCanvasRef} width={ANALYSIS_WIDTH} height={270} className="mag" />
+      <canvas ref={magCanvasRef} width={480} height={270} className="mag" />
     </div>
   );
 }

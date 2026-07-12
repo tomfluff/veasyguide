@@ -13,6 +13,39 @@ export type Activity = {
   end: number;
   box: Box; // bounding box over all member nodes
   nodeCount: number;
+  // Size-based validity heuristic (Python RoIActivity._is_valid): activity w/h within
+  // [minSizeFrac, maxSizeFrac] of the frame w/h. Invalid activities are kept but
+  // filtered from display by default.
+  isValid: boolean;
+};
+
+// Tunable analysis parameters. Defaults = the study's values (VeasyGuide analyzer.py).
+export type AnalysisParams = {
+  analysisWidth: number; // downscale target for analysis (px)
+  sampleInterval: number; // seconds between sampled frames (study: sample_fps_ratio 0.2)
+  diffThresh: number; // absdiff binarization threshold (Python: threshold@25)
+  dilateIters: number; // mask dilation passes (Python: iterations=3)
+  contourAreaLowFrac: number; // component box area filter, fraction of frame area
+  contourAreaHighFrac: number;
+  spanTh: number; // seconds; max time gap for linking nodes (study: 1.0)
+  distRatio: number; // max spatial gap for linking, fraction of frame diagonal (0.05)
+  minSizeFrac: number; // activity validity: min w/h fraction of frame (roi_area_low 0.01)
+  maxSizeFrac: number; // activity validity: max w/h fraction of frame (roi_area_high 0.7)
+  minDuration: number; // display filter: hide activities shorter than this (s)
+};
+
+export const DEFAULT_PARAMS: AnalysisParams = {
+  analysisWidth: 480,
+  sampleInterval: 0.2,
+  diffThresh: 25,
+  dilateIters: 3,
+  contourAreaLowFrac: 0.00015,
+  contourAreaHighFrac: 0.5,
+  spanTh: 1.0,
+  distRatio: 0.05,
+  minSizeFrac: 0.01,
+  maxSizeFrac: 0.7,
+  minDuration: 0,
 };
 
 export type AnalysisMeta = {
@@ -33,4 +66,4 @@ export type WorkerMsg =
   | { type: "error"; message: string };
 
 // Main -> worker
-export type StartMsg = { type: "start"; file: File; analysisWidth: number; sampleInterval: number };
+export type StartMsg = { type: "start"; file: File; params: AnalysisParams };

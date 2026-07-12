@@ -57,3 +57,18 @@ h1 { font-size: 20px; margin: 0 0 20px; }
 .stats { font-size: 13px; color: #666; }
 
 .mag { display: block; margin-top: 24px; width: 240px; height: 135px; border: 1px solid #ccc; opacity: .6; }
+
+.params { margin-top: 16px; }
+.params > button { background: none; border: none; font: inherit; cursor: pointer; padding: 4px 0; color: inherit; }
+.param-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 16px;
+  margin: 10px 0;
+}
+.param-grid label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.param-grid input { width: 90px; padding: 3px 6px; font: inherit; }
+.param-actions { display: flex; align-items: center; gap: 10px; }
+.param-actions .primary { font-weight: 600; }
+.param-actions button { padding: 5px 12px; cursor: pointer; }
+.param-actions small { color: #777; }

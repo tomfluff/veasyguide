@@ -4,8 +4,8 @@
 
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from "mediabunny";
 import { componentBoxes, diffMask, dilate, toGray } from "./pipeline";
-import { StreamingClusterer } from "./graph";
-import type { AnalysisMeta, Box, StartMsg, WorkerMsg } from "./types";
+import { StreamingClusterer, type RawActivity } from "./graph";
+import type { Activity, AnalysisMeta, Box, StartMsg, WorkerMsg } from "./types";
 
 const post = (m: WorkerMsg) => (self as unknown as Worker).postMessage(m);
 
@@ -19,7 +19,7 @@ self.onmessage = async (e: MessageEvent<StartMsg>) => {
   }
 };
 
-async function run({ file, analysisWidth, sampleInterval }: StartMsg) {
+async function run({ file, params }: StartMsg) {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   const track = await input.getPrimaryVideoTrack();
   if (!track) throw new Error("No video track found");
@@ -27,7 +27,7 @@ async function run({ file, analysisWidth, sampleInterval }: StartMsg) {
 
   const vw = track.displayWidth;
   const vh = track.displayHeight;
-  const aw = Math.min(analysisWidth, vw);
+  const aw = Math.min(params.analysisWidth, vw);
   const ah = Math.max(1, Math.round((aw / vw) * vh));
   const duration = await input.computeDuration();
 
@@ -44,10 +44,18 @@ async function run({ file, analysisWidth, sampleInterval }: StartMsg) {
 
   // Time-based sampling (design decision: robust to variable frame rate).
   const timestamps: number[] = [];
-  for (let t = 0; t < duration; t += sampleInterval) timestamps.push(t);
+  for (let t = 0; t < duration; t += params.sampleInterval) timestamps.push(t);
 
-  const distTh = 0.05 * Math.sqrt(aw * aw + ah * ah);
-  const clusterer = new StreamingClusterer(1.0, distTh); // spanTh = study's 1s
+  const distTh = params.distRatio * Math.sqrt(aw * aw + ah * ah);
+  const clusterer = new StreamingClusterer(params.spanTh, distTh);
+
+  // Size-based validity (Python RoIActivity._is_valid, c3/c4).
+  const validate = (a: RawActivity): Activity => ({
+    ...a,
+    isValid:
+      a.box.w >= params.minSizeFrac * aw && a.box.w <= params.maxSizeFrac * aw &&
+      a.box.h >= params.minSizeFrac * ah && a.box.h <= params.maxSizeFrac * ah,
+  });
 
   let prevGray: Uint8Array | null = null;
   const wallStart = performance.now();
@@ -62,10 +70,10 @@ async function run({ file, analysisWidth, sampleInterval }: StartMsg) {
     const gray = toGray(rgba, aw, ah);
 
     if (prevGray) {
-      const mask = dilate(diffMask(prevGray, gray, aw, ah), aw, ah);
-      const boxes: Box[] = componentBoxes(mask, aw, ah);
+      const mask = dilate(diffMask(prevGray, gray, aw, ah, params.diffThresh), aw, ah, params.dilateIters);
+      const boxes: Box[] = componentBoxes(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac);
       for (const box of boxes) {
-        for (const act of clusterer.add({ t, box })) post({ type: "activity", activity: act });
+        for (const act of clusterer.add({ t, box })) post({ type: "activity", activity: validate(act) });
       }
     }
     prevGray = gray;
@@ -77,7 +85,7 @@ async function run({ file, analysisWidth, sampleInterval }: StartMsg) {
     }
   }
 
-  for (const act of clusterer.flush()) post({ type: "activity", activity: act });
+  for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
   const wallMs = performance.now() - wallStart;
   post({ type: "done", wallMs, xRealtime: duration / (wallMs / 1000) });
   input.dispose?.();
