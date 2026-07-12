@@ -6,8 +6,20 @@ drop a video, and it detects instructor activity (pointing, writing, sketching r
 it back with a highlight overlay and content-following magnification.
 
 Successor to the [VeasyGuide](../VeasyGuide) research study rig: same detection idea and
-accessibility player, rebuilt as a standalone tool. The full design lives in
-[`docs/design.md`](docs/design.md); the UI direction in [`docs/wireframe-v1.png`](docs/wireframe-v1.png).
+accessibility player, rebuilt as a standalone tool.
+
+## Documentation
+
+**[`docs/`](docs/README.md)** — why this exists, how it works, and why it's built this way.
+
+| | |
+|---|---|
+| [architecture.md](docs/architecture.md) | How a dropped video becomes highlights on screen |
+| [decisions.md](docs/decisions.md) | Why each major call was made, and what we rejected |
+| [parameters.md](docs/parameters.md) | Every analysis parameter, and the reasoning behind it |
+| [research-data.md](docs/research-data.md) | Data captured for future ML — and the privacy line |
+| [debug-tools.md](docs/debug-tools.md) | `?debug` / `?research` / `?snippets`, and honest benchmarking |
+| [porting-notes.md](docs/porting-notes.md) | Bugs found in the original study code |
 
 ## Status: Phase 0 (throughput spike) — PASS on dev hardware
 

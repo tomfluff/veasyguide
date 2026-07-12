@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 470" width="980" height="470" font-family="system-ui, sans-serif">
+  <style>
+    .box { fill: #fff; stroke: #667; stroke-width: 1.5; rx: 6; }
+    .worker { fill: #f4f7fb; stroke: #4a90d9; }
+    .main { fill: #fbf6f4; stroke: #d97a4a; }
+    .research { fill: #f7f4fb; stroke: #7c4dff; stroke-dasharray: 4 3; }
+    .t { font-size: 13px; fill: #222; }
+    .s { font-size: 11px; fill: #666; }
+    .lbl { font-size: 12px; font-weight: 600; fill: #444; }
+    .hdr { font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+    .arrow { stroke: #889; stroke-width: 1.5; fill: none; marker-end: url(#a); }
+    .arrow-r { stroke: #7c4dff; stroke-width: 1.5; fill: none; marker-end: url(#ar); stroke-dasharray: 4 3; }
+  </style>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="#889" />
+    </marker>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="#7c4dff" />
+    </marker>
+  </defs>
+
+  <!-- Worker lane -->
+  <rect x="10" y="10" width="770" height="290" rx="8" fill="#fafbfd" stroke="#ccd" stroke-dasharray="5 4" />
+  <text x="24" y="30" class="hdr" fill="#4a90d9">WEB WORKER — analyzer/</text>
+
+  <!-- decode -->
+  <rect class="box worker" x="24" y="46" width="150" height="62" />
+  <text x="34" y="68" class="t">Decode (Mediabunny)</text>
+  <text x="34" y="84" class="s">WebCodecs, sampled at</text>
+  <text x="34" y="97" class="s">sampleInterval, → 480p</text>
+
+  <!-- scene -->
+  <rect class="box worker" x="204" y="46" width="150" height="62" />
+  <text x="214" y="68" class="t">Scene detection</text>
+  <text x="214" y="84" class="s">HSV content score vs</text>
+  <text x="214" y="97" class="s">sceneThreshold (cut?)</text>
+
+  <!-- diff -->
+  <rect class="box worker" x="384" y="46" width="170" height="62" />
+  <text x="394" y="68" class="t">Change detection</text>
+  <text x="394" y="84" class="s">absdiff → threshold →</text>
+  <text x="394" y="97" class="s">dilate → flood fill</text>
+
+  <!-- regions -->
+  <rect class="box worker" x="584" y="46" width="176" height="62" />
+  <text x="594" y="68" class="t">Regions (nodes)</text>
+  <text x="594" y="84" class="s">bbox, mass, centroid,</text>
+  <text x="594" y="97" class="s">Hu moments, meanDiff</text>
+
+  <!-- clusterer -->
+  <rect class="box worker" x="584" y="150" width="176" height="72" />
+  <text x="594" y="172" class="t">Streaming clusterer</text>
+  <text x="594" y="188" class="s">link if ≤ spanTh apart in</text>
+  <text x="594" y="201" class="s">time AND ≤ distRatio in</text>
+  <text x="594" y="214" class="s">space (node-to-node)</text>
+
+  <!-- watermark -->
+  <rect class="box worker" x="384" y="150" width="170" height="72" />
+  <text x="394" y="172" class="t">Watermark finalize</text>
+  <text x="394" y="188" class="s">a cluster closes once the</text>
+  <text x="394" y="201" class="s">frontier passes spanTh</text>
+  <text x="394" y="214" class="s">beyond its last node</text>
+
+  <!-- features -->
+  <rect class="box worker" x="204" y="150" width="150" height="72" />
+  <text x="214" y="172" class="t">Activity + features</text>
+  <text x="214" y="188" class="s">isValid, IoU, growth,</text>
+  <text x="214" y="201" class="s">tortuosity, shapeDiff…</text>
+  <text x="214" y="214" class="s">(+ node log if research)</text>
+
+  <!-- segments -->
+  <rect class="box worker" x="24" y="150" width="150" height="72" />
+  <text x="34" y="172" class="t">Segments (ranges)</text>
+  <text x="34" y="188" class="s">seek → abandon &amp; restart</text>
+  <text x="34" y="201" class="s">there; idle → backfill</text>
+  <text x="34" y="214" class="s">earliest gap</text>
+
+  <text x="24" y="262" class="lbl">postMessage stream →</text>
+  <text x="24" y="280" class="s">meta · scene · activity · progress(ranges, ×realtime) · debugFrame · done</text>
+
+  <!-- arrows top row -->
+  <path class="arrow" d="M174,77 L202,77" />
+  <path class="arrow" d="M354,77 L382,77" />
+  <path class="arrow" d="M554,77 L582,77" />
+  <path class="arrow" d="M672,108 L672,148" />
+  <path class="arrow" d="M582,186 L556,186" />
+  <path class="arrow" d="M382,186 L356,186" />
+  <path class="arrow" d="M202,186 L176,186" />
+  <path class="arrow" d="M99,222 L99,252" />
+
+  <!-- Main thread -->
+  <rect x="800" y="10" width="170" height="290" rx="8" fill="#fdfaf8" stroke="#ddc" stroke-dasharray="5 4" />
+  <text x="812" y="30" class="hdr" fill="#d97a4a">MAIN THREAD</text>
+
+  <rect class="box main" x="812" y="46" width="146" height="70" />
+  <text x="822" y="68" class="t">VideoPlayer</text>
+  <text x="822" y="84" class="s">highlight + magnify,</text>
+  <text x="822" y="97" class="s">rVFC per-frame track</text>
+  <text x="822" y="110" class="s">select.ts (lead/linger)</text>
+
+  <rect class="box main" x="812" y="132" width="146" height="54" />
+  <text x="822" y="154" class="t">Analyzed ranges</text>
+  <text x="822" y="170" class="s">timeline shading, gate,</text>
+  <text x="822" y="182" class="s">seek → worker</text>
+
+  <rect class="box research" x="812" y="202" width="146" height="70" />
+  <text x="822" y="224" class="t">Gallery (?research)</text>
+  <text x="822" y="240" class="s">feature cards, lazy</text>
+  <text x="822" y="253" class="s">native-res snippets,</text>
+  <text x="822" y="266" class="s">research JSON export</text>
+
+  <path class="arrow" d="M782,120 C795,120 799,80 810,80" />
+  <path class="arrow" d="M782,150 L810,155" />
+  <path class="arrow-r" d="M782,240 L810,240" />
+
+  <!-- Video source note -->
+  <rect class="box" x="24" y="330" width="270" height="56" />
+  <text x="34" y="352" class="t">Local video file (object URL)</text>
+  <text x="34" y="370" class="s">never uploaded · never stored · never leaves device</text>
+  <path class="arrow" d="M99,330 L99,300" />
+  <path class="arrow" d="M294,358 C600,358 700,300 880,278" />
+
+  <text x="24" y="415" class="s">Blue = analysis (worker) · Orange = playback (main) · Purple dashed = research mode, opt-in</text>
+  <text x="24" y="435" class="s">Named thresholds (sampleInterval, sceneThreshold, spanTh, distRatio…) are all tunable at runtime — see parameters.md</text>
+  <text x="24" y="455" class="s">Nothing in this diagram involves a server. The only network request is loading the app itself.</text>
+</svg>
