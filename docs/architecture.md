@@ -94,16 +94,70 @@ Ported from the study app, with fixes ([porting-notes.md](porting-notes.md)).
   `start − highlightLead` to `end + highlightLinger`, with a **currently-active activity
   always beating a pre-activity cue**. The lead is the accessibility payoff — a low-vision
   viewer needs time to orient their gaze *before* the action, not after it.
-- **`HighlightIndicator`** draws the styled box (fill, border, shape, pointer, animation,
-  SVG filters — all user-tunable).
-- **`MagnificationOverlay`** mirrors the video onto a canvas and CSS-transforms it to zoom
-  into the current activity. It only renders while actually zoomed (a fix — see porting notes).
+- **`HighlightIndicator`** draws the styled box (fill, border, shape, pointer, animation —
+  all user-tunable), plus the enhance layer below.
+- **`MagnificationOverlay`** mirrors the video onto a canvas and transforms it to zoom into
+  the current activity. It only renders while actually zoomed (a fix — see porting notes).
+  The pan/zoom maths lives in **`zoom.ts`** and is deliberately *continuous*: as an activity
+  approaches a frame edge the pan **saturates** rather than stepping, and everything lives in a
+  single animated `transform` — animating two coupled properties is what made the original
+  jump ([porting notes](porting-notes.md#the-magnifier-jumped-when-an-activity-was-near-a-frame-edge)).
 - Tracking runs on **`requestVideoFrameCallback`**, once per presented frame. The original
   used `timeupdate` (~4 Hz), which visibly lagged the pen.
 
 ![Magnification](media/magnification.png)
 
 *Magnification following the instructor's annotation.*
+
+### The enhance layer (`EnhanceCanvas.tsx`, `glEnhance.ts`)
+
+The "enhance" filters — **Bolder ink**, **Bolder ink (dark slide)**, **Sharpen**, **Invert** —
+make the region the viewer is being pointed at easier to actually *see*. They apply to the
+highlighted region and to the magnifier.
+
+Two non-obvious decisions govern how they're implemented:
+
+**1. We copy the video into a canvas rather than filtering the backdrop
+([D14](decisions.md#d14--enhance-filters-copy-the-video-into-a-canvas-instead-of-filtering-the-backdrop)).**
+The study player used `backdrop-filter: url(#svg-filter)`, which Firefox and Safari don't
+support — and Firefox renders the element at `opacity: 0` rather than degrading, so the
+highlight *vanished*. Regular `filter: url(#…)` works everywhere, so the region is mirrored
+into a canvas and that is filtered.
+
+**2. The filters run as WebGL shaders, not CSS/SVG filters
+([D15](decisions.md#d15--enhance-filters-run-as-webgl-shaders-not-csssvg-filters)).**
+CSS filter *functions* (`contrast()`, `blur()`) are GPU-accelerated, but a *reference* filter —
+`filter: url(#…)` — drops the browser into its **software** SVG-filter path. `feConvolveMatrix`
+(Sharpen) is a per-pixel convolution on the **CPU**, re-run every frame because the canvas
+beneath updates every frame. That was a visible CPU load. `glEnhance.ts` implements the same
+effects as fragment shaders:
+
+| Filter | Shader |
+|---|---|
+| `bold-dark` / `bold-light` | 3×3 min/max (erode/dilate) + contrast stretch + saturate, folded into one pass |
+| `sharpen` | `[0 −1 0; −1 5 −1; 0 −1 0]` unsharp kernel |
+| `invert`, magnifier `contrast` | point ops in the final pass |
+
+The SVG defs in `SVGFilters.tsx` remain as the **no-WebGL fallback**, and as the reference
+implementation the shaders are written to match.
+
+### Redraw discipline — and the trap in it
+
+Both enhance surfaces repaint on **`requestVideoFrameCallback`**: once per *new video frame*
+(≈30/s for a lecture), not once per display refresh (144/s on a fast monitor), and **not at all
+while paused**.
+
+That last part bit us. rVFC never fires on a paused video — so **toggling a filter while paused
+left the canvas showing the previous render** until playback resumed. Anything that changes the
+output and *isn't* a new video frame must explicitly ask for a repaint: `driveFrames()` returns
+a `redraw` handle, and both surfaces call it when the filters, contrast, or source region change.
+If you add a new setting that affects the rendered pixels, **wire it into that redraw** or it
+will look broken while paused.
+
+> **Debugging note.** The GL canvas is created with `preserveDrawingBuffer: false`, so
+> `gl.readPixels()` from *outside* the render loop always reads black — the buffer is cleared
+> after compositing. Verify visual output with screenshots (the composited frame), never with
+> `readPixels`.
 
 ## Coordinate spaces
 

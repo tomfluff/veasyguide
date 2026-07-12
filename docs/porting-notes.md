@@ -59,6 +59,25 @@ wishes.
 
 **Fixed:** the overlay tracks whether *it* was the one that paused, and only resumes then.
 
+### 🟠 The magnifier jumped when an activity was near a frame edge
+The zoom animated **two coupled properties at different durations**:
+
+```
+transform-origin: <activity centre>    transition: 150ms
+transform: translate(…) scale(…)       transition: 200ms
+```
+
+A point's rendered position depends on *both*, so mid-tween they disagreed — correct at the
+endpoints, wrong in between. It only *looked* like an edge bug because the overflow-clamp term
+is zero mid-frame and non-zero near an edge, so that's where the disagreement showed. (The
+clamp maths itself was correct.)
+
+**Fixed:** `transform-origin` pinned at `0 0`, everything folded into a single animated
+`transform`, and the pan/zoom extracted to `player/zoom.ts` as
+`t = clamp(size/2 − f·centre, size·(1−f), 0)` — a clamped linear function, hence continuous:
+the pan *saturates* at an edge instead of stepping. The selfcheck sweeps an activity one pixel
+at a time to the edge and asserts the pan never moves more than `f` px per step.
+
 ### 🟠 `stableActivity` survived scene changes
 The zoom fallback target (`stableActivity`) was never cleared on a scene change, so pressing
 *Z* just after a slide transition could magnify a region belonging to the **previous slide**.

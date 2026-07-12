@@ -87,6 +87,22 @@ See [research-data.md](research-data.md) for what the features mean and how to e
 
 ---
 
+## Dev-only handles
+
+`window.__magSettings` (`{ get(), set(partial) }`) exists in dev builds only. The player's
+settings live inside popovers that close on focus loss, which makes them awkward to drive from
+an automated browser — this exists so the enhance/magnification behaviour can be exercised
+headlessly.
+
+```js
+__magSettings.set({ filter_style: ["invert"], contrast: 1.5 });
+```
+
+> **Do not verify GL output with `gl.readPixels()`.** The enhance canvas is created with
+> `preserveDrawingBuffer: false`, so reading it from outside the render loop always returns
+> black (the buffer is cleared after compositing). Use a screenshot — it captures the
+> composited frame.
+
 ## Verifying a change
 
 ```bash

@@ -145,7 +145,7 @@ this is that idea, rebuilt client-side.)
 
 Hovering a gallery card plays the sequence.
 
-**How they're made ([D10](decisions.md#d10--snippets-are-generated-post-hoc-not-during-analysis)).**
+**How they're made ([D10](decisions.md#d10--snippets-are-sequences-generated-post-hoc-in-one-decode-pass)).**
 The naive approach — seek a hidden `<video>` once per crop — means ~275 random seeks for a
 5-minute lecture, each flushing the decoder: minutes of work. Instead, **every requested
 timestamp across all activities is collected, sorted, and fed through one monotonic decode
