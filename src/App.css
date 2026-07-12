@@ -100,6 +100,10 @@ h1 { font-size: 20px; margin: 0 0 20px; }
 .param-actions .primary { font-weight: 600; }
 .param-actions button { padding: 5px 12px; cursor: pointer; }
 .param-actions small { color: #777; }
+.capture-toggle { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+.runs { border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+.runs th, .runs td { border: 1px solid #ddd; padding: 3px 10px; text-align: left; }
+.runs th { background: #f4f4f4; font-weight: 600; }
 
 .debug { margin-top: 24px; padding-top: 12px; border-top: 1px dashed #bbb; }
 .debug h2 { font-size: 14px; margin: 0 0 8px; color: #555; }

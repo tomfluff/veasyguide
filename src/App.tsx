@@ -6,12 +6,15 @@ import "./App.css";
 
 const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
 
-// Debug tooling is for us: always on in dev, ?debug=1 in production builds.
-const DEBUG = import.meta.env.DEV || new URLSearchParams(location.search).get("debug") === "1";
+// Debug tooling is for us, and it is OFF unless asked for — in dev too, so that a dev
+// run measures the same thing a production run does. `?debug=1` turns it on.
+const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
 // In-memory cap for stored analyzer frames (~25 KB each => ~150 MB worst case).
 const MAX_DEBUG_FRAMES = 6000;
 
 type DebugFrame = { t: number; blob: Blob; boxes: Box[] };
+// One completed analysis run, for comparing the cost of the debug instrumentation.
+type Run = { wallMs: number; xRealtime: number; capture: boolean; width: number; label: string };
 
 type ParamField = {
   key: keyof AnalysisParams;
@@ -123,6 +126,11 @@ export default function App() {
   const [params, setParams] = useState<AnalysisParams>(DEFAULT_PARAMS);
   const [showParams, setShowParams] = useState(false);
   const [infoKey, setInfoKey] = useState<keyof AnalysisParams | null>(null);
+  // Frame capture is the expensive half of debug (WebP-encodes every sample). Kept
+  // separately toggleable so its cost can be measured against the same run without it.
+  const [capture, setCapture] = useState(DEBUG);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const captureRef = useRef(DEBUG);
   const [meta, setMeta] = useState<AnalysisMeta | null>(null);
   const [analyzedUpTo, setAnalyzedUpTo] = useState(0);
   const [xRealtime, setXRealtime] = useState(0);
@@ -161,8 +169,9 @@ export default function App() {
 
   const canPlay = done || analyzedUpTo >= PLAYBACK_LEAD;
 
-  function analyze(file: File, p: AnalysisParams) {
+  function analyze(file: File, p: AnalysisParams, cap = captureRef.current) {
     workerRef.current?.terminate();
+    captureRef.current = cap;
     fileRef.current = file;
     activitiesRef.current = [];
     framesRef.current = [];
@@ -182,7 +191,13 @@ export default function App() {
         if (m.activity.isValid) setValidCount((c) => c + 1);
       } else if (m.type === "scene") { setScenes((s) => [...s, m.scene]); }
       else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); setOpenClusters(m.openClusters); setRanges(m.ranges); }
-      else if (m.type === "done") { setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); setRanges(m.ranges); }
+      else if (m.type === "done") {
+        setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); setRanges(m.ranges);
+        setRuns((rs) => [...rs, {
+          wallMs: m.wallMs, xRealtime: m.xRealtime, capture: cap, width: p.analysisWidth,
+          label: `${cap ? "debug frames" : "no capture"} @ ${p.analysisWidth}px`,
+        }]);
+      }
       else if (m.type === "error") setError(m.message);
       else if (m.type === "debugFrame") {
         if (framesRef.current.length < MAX_DEBUG_FRAMES) {
@@ -197,7 +212,7 @@ export default function App() {
         }
       }
     };
-    worker.postMessage({ type: "start", file, params: p, debug: DEBUG });
+    worker.postMessage({ type: "start", file, params: p, debug: cap });
     workerRef.current = worker;
   }
 
@@ -207,8 +222,8 @@ export default function App() {
     analyze(file, params);
   }
 
-  function reanalyze() {
-    if (fileRef.current) analyze(fileRef.current, params);
+  function reanalyze(cap = captureRef.current) {
+    if (fileRef.current) analyze(fileRef.current, params, cap);
   }
 
   // Dev-only auto-load for headless smoke tests: ?test=<name> fetches public/_test/<name>.
@@ -336,6 +351,7 @@ export default function App() {
             </div>
           </div>
 
+          {DEBUG && (
           <div className="params">
             <button type="button" onClick={() => setShowParams((s) => !s)}>
               {showParams ? "▾" : "▸"} Analysis parameters
@@ -385,17 +401,43 @@ export default function App() {
                   </div>
                 ))}
                 <div className="param-actions">
-                  <button type="button" className="primary" onClick={reanalyze}>Re-analyze</button>
+                  <button type="button" className="primary" onClick={() => reanalyze()}>Re-analyze</button>
                   <button type="button" onClick={() => setParams(DEFAULT_PARAMS)}>Reset to defaults</button>
-                  <small>Duration, lead and linger apply live; size validity needs Re-analyze.</small>
+                  <label className="capture-toggle" title="WebP-encodes every sampled frame for the analyzer view — the expensive half of debug mode.">
+                    <input type="checkbox" checked={capture}
+                      onChange={(e) => { setCapture(e.target.checked); reanalyze(e.target.checked); }} />
+                    capture analyzer frames
+                  </label>
+                  <small>Duration, lead and linger apply live; the rest need Re-analyze.</small>
                 </div>
+
+                {runs.length > 0 && (
+                  <table className="runs">
+                    <thead><tr><th>run</th><th>wall</th><th>×realtime</th><th>vs. no-capture</th></tr></thead>
+                    <tbody>
+                      {runs.map((r, i) => {
+                        const base = runs.find((x) => !x.capture && x.width === r.width);
+                        const delta = base && base !== r ? (r.wallMs / base.wallMs - 1) * 100 : null;
+                        return (
+                          <tr key={i}>
+                            <td>{r.label}</td>
+                            <td>{(r.wallMs / 1000).toFixed(2)}s</td>
+                            <td>{r.xRealtime.toFixed(1)}×</td>
+                            <td>{delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta.toFixed(0)}%`}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </>
             )}
           </div>
+          )}
         </div>
       )}
 
-      {DEBUG && (
+      {DEBUG && capture && (
         <div className="debug">
           <h2>
             Analyzer view
@@ -461,7 +503,9 @@ export default function App() {
         </div>
       )}
 
-      <canvas ref={magCanvasRef} width={480} height={270} className="mag" />
+      {/* Stand-in for MagnificationOverlay's per-frame video->canvas readback, so the
+          measured cost includes what the real magnifier will pay during playback. */}
+      <canvas ref={magCanvasRef} width={480} height={270} className="mag" hidden={!DEBUG} />
     </div>
   );
 }
