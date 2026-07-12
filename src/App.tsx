@@ -19,6 +19,14 @@ type ParamField = {
   why: string; // why the heuristic exists + origin + tuning direction
 };
 
+// Pipeline-stage grouping: mirrors the order data flows through the analyzer.
+const PARAM_GROUPS: { title: string; note: string; keys: (keyof AnalysisParams)[] }[] = [
+  { title: "1 · Sampling", note: "which pixels the analyzer looks at", keys: ["analysisWidth", "sampleInterval"] },
+  { title: "2 · Change detection", note: "frame pair → changed regions (red mask / green boxes)", keys: ["diffThresh", "dilateIters", "contourAreaLowFrac", "contourAreaHighFrac"] },
+  { title: "3 · Clustering", note: "regions over time → activities", keys: ["spanTh", "distRatio"] },
+  { title: "4 · Filtering", note: "which activities the player shows", keys: ["minSizeFrac", "maxSizeFrac", "minDuration"] },
+];
+
 const PARAM_FIELDS: ParamField[] = [
   {
     key: "analysisWidth", label: "Analysis width (px)", step: 40,
@@ -282,40 +290,48 @@ export default function App() {
             </button>
             {showParams && (
               <>
-                <div className="param-grid">
-                  {PARAM_FIELDS.map(({ key, label, step, what }) => (
-                    <div className="param-field" key={key}>
-                      <button
-                        type="button"
-                        className={`info-btn ${infoKey === key ? "active" : ""}`}
-                        title={what}
-                        aria-label={`About ${label}`}
-                        onClick={() => setInfoKey((k) => (k === key ? null : key))}
-                      >
-                        ⓘ
-                      </button>
-                      <label>
-                        <span>{label}</span>
-                        <input
-                          type="number"
-                          step={step}
-                          value={params[key]}
-                          onChange={(e) => setParams((p) => ({ ...p, [key]: Number(e.target.value) }))}
-                        />
-                      </label>
+                {PARAM_GROUPS.map((group) => (
+                  <div className="param-group" key={group.title}>
+                    <h3>{group.title} <small>{group.note}</small></h3>
+                    <div className="param-grid">
+                      {group.keys.map((key) => {
+                        const f = PARAM_FIELDS.find((f) => f.key === key)!;
+                        return (
+                          <div className="param-field" key={key}>
+                            <button
+                              type="button"
+                              className={`info-btn ${infoKey === key ? "active" : ""}`}
+                              title={f.what}
+                              aria-label={`About ${f.label}`}
+                              onClick={() => setInfoKey((k) => (k === key ? null : key))}
+                            >
+                              ⓘ
+                            </button>
+                            <label>
+                              <span>{f.label}</span>
+                              <input
+                                type="number"
+                                step={f.step}
+                                value={params[key]}
+                                onChange={(e) => setParams((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                              />
+                            </label>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-                {infoKey && (() => {
-                  const f = PARAM_FIELDS.find((f) => f.key === infoKey)!;
-                  return (
-                    <div className="param-info">
-                      <b>{f.label}</b>
-                      <p><b>What it does:</b> {f.what}</p>
-                      <p><b>Why it exists:</b> {f.why}</p>
-                    </div>
-                  );
-                })()}
+                    {infoKey && group.keys.includes(infoKey) && (() => {
+                      const f = PARAM_FIELDS.find((f) => f.key === infoKey)!;
+                      return (
+                        <div className="param-info">
+                          <b>{f.label}</b>
+                          <p><b>What it does:</b> {f.what}</p>
+                          <p><b>Why it exists:</b> {f.why}</p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ))}
                 <div className="param-actions">
                   <button type="button" className="primary" onClick={reanalyze}>Re-analyze</button>
                   <button type="button" onClick={() => setParams(DEFAULT_PARAMS)}>Reset to defaults</button>
