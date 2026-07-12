@@ -54,9 +54,27 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 10px;
 }
+.gallery-progress { color: #888; font-size: 12px; }
 .gallery-card { border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: 12px; }
 .gallery-card.invalid { opacity: 0.55; border-style: dashed; }
-.gallery-card img { width: 100%; border-radius: 4px; background: #000; display: block; margin-bottom: 6px; }
+.gallery-card:hover { border-color: #2979ff; }
+.card-media { position: relative; margin-bottom: 6px; }
+.card-media > img {
+  width: 100%; border-radius: 4px; background: #000; display: block;
+}
+.frame-time {
+  position: absolute; top: 4px; right: 4px;
+  background: rgba(0,0,0,.65); color: #fff;
+  font-size: 10px; padding: 1px 5px; border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.filmstrip { display: flex; gap: 2px; margin-top: 3px; overflow-x: auto; }
+.strip-frame {
+  flex: 0 0 auto; padding: 0; border: 2px solid transparent; border-radius: 3px;
+  background: none; cursor: pointer; line-height: 0;
+}
+.strip-frame.on { border-color: #2979ff; }
+.strip-frame img { width: 34px; height: 22px; object-fit: cover; border-radius: 2px; display: block; }
 .gallery-card .crop-pending {
   width: 100%; aspect-ratio: 16/6; background: #eee; border-radius: 4px;
   display: flex; align-items: center; justify-content: center; color: #aaa; margin-bottom: 6px;

@@ -208,17 +208,36 @@ learn from.*
 
 ---
 
-## D10 — Snippets are generated post-hoc, not during analysis
+## D10 — Snippets are sequences, generated post-hoc in one decode pass
 
-**Decision.** Image crops are made *after* analysis, by seeking a hidden `<video>` element
-to each activity's timestamp and cropping its region.
+**Decision.** Each activity gets a **sequence** of native-resolution crops
+(`before → start → every 0.5s → end`, capped at 12, fixed crop window), generated *after*
+analysis by a dedicated worker doing **one monotonic decode pass** over all requested
+timestamps.
 
-**Why.** The obvious approach — save crops while analyzing — is worse in three ways: it
-would slow the analysis loop (the thing we most want to protect), it would only capture the
-downscaled 480p analysis frames, and it would run even when nobody looks at them. Post-hoc
-generation is **free of analysis cost**, produces **native-resolution** crops, and only
-happens when snippets are actually switched on. It also works for a cached analysis when the
-same file is re-opened.
+**Why a sequence, not one frame.** A single crop shows what an activity ended up being; a
+sequence shows *what kind of thing it was*. Writing accumulates ink; pointing stays static;
+an animation changes without ink. That temporal signature is the discriminative signal — the
+thing a learned classifier is supposed to pick up on ([D8](#d8--activity-type-classification-is-deferred)).
+A "before" frame is included as the baseline: what the region looked like with nothing there.
+
+**Why the crop window is fixed** (the activity's box, not each node's): same window every
+frame means the frames are spatially registered, so the stroke visibly grows inside a stable
+frame. Per-node crops would jitter and be useless to both a human and a model.
+
+**Why post-hoc, not during analysis.** Capturing crops inside the analysis loop would slow
+the thing we most want to protect, would only capture downscaled 480p frames, and would run
+even when nobody looks at them. Post-hoc costs analysis **nothing**, gives **native
+resolution**, and only runs when snippets are on.
+
+**Why a worker and not `<video>` seeks.** The obvious post-hoc implementation seeks a hidden
+`<video>` once per crop. That's ~275 random seeks for a 5-minute lecture, each flushing the
+decoder — minutes of work, and far worse on a long lecture. Instead we collect every
+timestamp across all activities, sort them, and run **one** `samplesAtTimestamps()` pass
+(the same optimized path the analyzer uses; each packet decoded at most once), cropping every
+activity that needs a given frame from that single decode.
+
+Measured: **275 crops in ~5 s, 0.4 MB** on the 5:32 RL lecture.
 
 ---
 

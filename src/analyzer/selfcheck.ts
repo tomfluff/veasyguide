@@ -5,6 +5,7 @@ import { computeFeatures, shapeDiff, type DetailedNode } from "./features.ts";
 import { StreamingClusterer } from "./graph.ts";
 import { selectActivity } from "./select.ts";
 import { addRange, coverage, isAnalyzed, nextGap } from "./ranges.ts";
+import { cropRect, snippetTimestamps, SNIPPET_MAX_FRAMES } from "./snippets.ts";
 import type { Activity, Node } from "./types.ts";
 
 function assert(cond: boolean, msg: string) {
@@ -173,6 +174,50 @@ const lShape = (x0: number, y0: number, s: number) => (mask: Uint8Array) => {
   assert(fs.displacement > 20, `drifting activity displaces (got ${fs.displacement.toFixed(1)})`);
   assert(fs.growth > fp.growth, "drifting activity's union bbox grows more than static's");
   assert(fp.nodeCount === 4 && Math.abs(fp.duration - 0.6) < 1e-9, "count/duration recorded");
+}
+
+// 9. Snippet planning: before-frame, 0.5s cadence, even spread when capped.
+{
+  const mk = (start: number, end: number): Activity => ({
+    id: 0, start, end, box: { x: 10, y: 10, w: 40, h: 30 }, nodeCount: 1, isValid: true,
+    features: computeFeatures([]),
+  });
+  const meta = {
+    videoWidth: 1280, videoHeight: 720, analysisWidth: 480, analysisHeight: 270,
+    scale: 1280 / 480, duration: 600,
+  };
+
+  // A 2s activity: before + start + 0.5 steps + end.
+  const ts = snippetTimestamps(mk(10, 12), 600);
+  assert(Math.abs(ts[0] - 9.7) < 1e-9, `first frame is the "before" baseline (got ${ts[0]})`);
+  assert(Math.abs(ts[ts.length - 1] - 12) < 1e-9, "last frame is the activity end (the result)");
+  assert(ts.length === 6, `2s activity -> before+start+3 steps+end = 6 frames (got ${ts.length})`);
+  assert(ts.every((t, i) => i === 0 || t > ts[i - 1]), "timestamps strictly ascending");
+
+  // A 30s activity would be 61 frames at 0.5s — must cap and spread evenly.
+  const long = snippetTimestamps(mk(100, 130), 600);
+  assert(long.length <= SNIPPET_MAX_FRAMES, `long activity capped (got ${long.length})`);
+  assert(Math.abs(long[long.length - 1] - 130) < 1e-9, "capped sequence still ends at the end");
+  assert(Math.abs(long[1] - 100) < 1e-9, "capped sequence still starts at the start");
+  const gaps = long.slice(2).map((t, i) => t - long[i + 1]);
+  const spread = Math.max(...gaps) - Math.min(...gaps);
+  assert(spread < 1e-6, `capped frames are evenly spread (gap spread ${spread.toExponential(1)})`);
+
+  // Zero-length activity: still yields a before + the moment itself.
+  const inst = snippetTimestamps(mk(50, 50), 600);
+  assert(inst.length === 2, `instantaneous activity -> before + itself (got ${inst.length})`);
+
+  // Crop rect is in native px, padded, and clamped to the frame.
+  const r = cropRect(mk(0, 1), meta);
+  assert(r.x >= 0 && r.y >= 0 && r.x < 10 * meta.scale,
+    `crop is padded left of the activity box but never negative (x=${r.x})`);
+  assert(r.w > 40 * meta.scale, "crop is padded beyond the raw activity box");
+  // An activity hugging the top-left corner must clamp rather than go negative.
+  const corner = cropRect({ ...mk(0, 1), box: { x: 0, y: 0, w: 20, h: 20 } }, meta);
+  assert(corner.x === 0 && corner.y === 0, "crop clamps at the frame origin");
+  const edge = cropRect({ ...mk(0, 1), box: { x: 470, y: 260, w: 10, h: 10 } }, meta);
+  assert(edge.x + edge.w <= meta.videoWidth && edge.y + edge.h <= meta.videoHeight,
+    "crop never exceeds the frame bounds");
 }
 
 console.log("\nALL PASS");

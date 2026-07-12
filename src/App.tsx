@@ -463,9 +463,10 @@ export default function App() {
           key={videoUrl}
           activitiesRef={activitiesRef}
           version={activityCount}
+          analysisDone={done}
           meta={meta}
+          file={fileRef.current}
           videoUrl={videoUrl}
-          fileName={fileRef.current.name}
           params={params}
           collectNodes={RESEARCH}
           snippetsDefault={SNIPPETS}

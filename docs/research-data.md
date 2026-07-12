@@ -107,21 +107,56 @@ know what it was run with.
 
 ---
 
-## C — Snippets (`?snippets=1`, or the gallery toggle)
+## C — Snippet sequences (`?snippets=1`, or the gallery toggle)
 
-Native-resolution image crops of each activity's region, shown as cards in the gallery.
+Not one image per activity — a **sequence**: native-resolution crops showing how the activity
+*evolved*.
 
-![Activity gallery](media/activity-gallery.png)
+```
+before  →  start  →  every 0.5s  →  end
+```
 
-*The two natural classes are visible before any model runs: blue ink (writing/sketching) vs.
-translucent cursor arrows (pointing). Their features differ accordingly — note `iou` and
-`gr`.*
+- **before** — one frame ~0.3s *prior* to the first node: the clean baseline, what the region
+  looked like with nothing there. For a model, this is the reference against which everything
+  else is a delta.
+- **every 0.5s** — the evolution.
+- **end** — the result (the finished stroke). This is the card's default image.
+
+Capped at **12 frames**; longer activities spread their frames evenly across the duration
+rather than truncating, so the full arc survives.
+
+**The crop window is fixed for the whole sequence** — the activity's bounding box (plus 15%
+padding), not each node's own box. Same window every frame means the frames are spatially
+registered, so you can watch the stroke grow inside a stable frame. Per-node crops would
+jitter and be useless to both a human and a model.
+
+![Snippet sequence](media/snippet-sequence.png)
+
+*The filmstrip under each card is the whole point. Activity #0: empty → `(` → `(R` → `(RL` →
+`(RL)`. You can watch the handwriting accumulate. A pointing activity's filmstrip, by
+contrast, is five near-identical cursor frames.*
+
+**Why a sequence and not one frame.** A single crop shows *what* an activity ended up being;
+a sequence shows *what kind of thing it was*. Writing accumulates ink monotonically; pointing
+stays static; an animation changes without ink appearing. That temporal signature is the
+discriminative feature — and it's exactly what a video model or a multi-frame LLM prompt
+eats. (The original VeasyGuide backend had an `activities/gif/` bucket for the same reason;
+this is that idea, rebuilt client-side.)
+
+Hovering a gallery card plays the sequence.
 
 **How they're made ([D10](decisions.md#d10--snippets-are-generated-post-hoc-not-during-analysis)).**
-Lazily, *after* analysis, by seeking a hidden `<video>` element to each activity's end
-timestamp and cropping its region (with 15% padding). This costs the analysis loop nothing,
-uses the **native** resolution rather than the 480p analysis frames, and only happens when
-snippets are switched on.
+The naive approach — seek a hidden `<video>` once per crop — means ~275 random seeks for a
+5-minute lecture, each flushing the decoder: minutes of work. Instead, **every requested
+timestamp across all activities is collected, sorted, and fed through one monotonic decode
+pass** (`snippetWorker.ts`, using the same `samplesAtTimestamps()` path as the analyzer,
+which decodes each packet at most once). Frames that several activities need are decoded once
+and cropped several times.
+
+Measured on the 5:32 RL lecture: **275 crops in ~5 seconds, 0.4 MB**. It runs *after*
+analysis and only when snippets are on, so analysis throughput is untouched.
+
+![Activity gallery](media/activity-gallery.png)
 
 **Why they'd help ML.** Crops are the strongest possible input for type detection — feed them
 to a vision model or an LLM and skip hand-crafted features entirely. That is the intended
