@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type WorkerMsg } from "./analyzer/types";
+import { selectActivity } from "./analyzer/select";
 import "./App.css";
 
 const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
@@ -24,7 +25,7 @@ const PARAM_GROUPS: { title: string; note: string; keys: (keyof AnalysisParams)[
   { title: "1 · Sampling", note: "which pixels the analyzer looks at", keys: ["analysisWidth", "sampleInterval"] },
   { title: "2 · Change detection", note: "frame pair → changed regions (red mask / green boxes)", keys: ["diffThresh", "dilateIters", "contourAreaLowFrac", "contourAreaHighFrac"] },
   { title: "3 · Clustering", note: "regions over time → activities", keys: ["spanTh", "distRatio"] },
-  { title: "4 · Filtering", note: "which activities the player shows", keys: ["minSizeFrac", "maxSizeFrac", "minDuration"] },
+  { title: "4 · Filtering & display", note: "which activities the player shows, and when", keys: ["minSizeFrac", "maxSizeFrac", "minDuration", "highlightLead", "highlightLinger"] },
 ];
 
 const PARAM_FIELDS: ParamField[] = [
@@ -82,6 +83,16 @@ const PARAM_FIELDS: ParamField[] = [
     key: "minDuration", label: "Min duration (s)", step: 0.1,
     what: "Display filter only (no re-analysis): activities shorter than this are hidden from the player overlays.",
     why: "Sub-second blips — a stray cursor flick — can distract more than help when highlighted. This comes from the player, not the analyzer: the study player filtered by duration ('atLeast', up to 1.5 s in some modes) when choosing what to highlight.",
+  },
+  {
+    key: "highlightLead", label: "Highlight lead (s)", step: 0.1,
+    what: "Pre-activity cue (display only): the highlight appears this many seconds before the activity starts — but a currently-active activity always takes precedence, so the early cue only shows when nothing else is highlighted.",
+    why: "A low-vision viewer needs time to orient their gaze before the action happens; cueing at activity start means the beginning is always missed. Study player: padding[0]=1.0 s in normal mode. Higher = more anticipation but the highlight sits on 'nothing happening yet' longer.",
+  },
+  {
+    key: "highlightLinger", label: "Highlight linger (s)", step: 0.1,
+    what: "Display only: the highlight stays this many seconds after the activity ends.",
+    why: "Dropping the highlight the instant motion stops feels abrupt and yanks attention away from what was just drawn — the result of the activity is usually what the viewer wants to read. Study player: padding[1]=0.5 s.",
   },
 ];
 
@@ -218,11 +229,13 @@ export default function App() {
     if (!v) return;
     setCurrentTime(v.currentTime);
     const t = v.currentTime;
-    const hits = activitiesRef.current.filter(
-      (a) => a.isValid && a.end - a.start >= params.minDuration && a.start - 1 <= t && a.end + 0.5 >= t
+    setCurrent(
+      selectActivity(activitiesRef.current, t, {
+        lead: params.highlightLead,
+        linger: params.highlightLinger,
+        minDuration: params.minDuration,
+      })
     );
-    hits.sort((a, b) => a.start - b.start);
-    setCurrent(hits[0] ?? null);
     if (DEBUG) {
       // Raw nodes detected near the playhead — what the pipeline saw, pre-clustering.
       setPlayheadNodes(
@@ -335,7 +348,7 @@ export default function App() {
                 <div className="param-actions">
                   <button type="button" className="primary" onClick={reanalyze}>Re-analyze</button>
                   <button type="button" onClick={() => setParams(DEFAULT_PARAMS)}>Reset to defaults</button>
-                  <small>Min duration filters display only (no re-analysis needed).</small>
+                  <small>Duration, lead and linger apply live; size validity needs Re-analyze.</small>
                 </div>
               </>
             )}

@@ -32,6 +32,8 @@ export type AnalysisParams = {
   minSizeFrac: number; // activity validity: min w/h fraction of frame (roi_area_low 0.01)
   maxSizeFrac: number; // activity validity: max w/h fraction of frame (roi_area_high 0.7)
   minDuration: number; // display filter: hide activities shorter than this (s)
+  highlightLead: number; // pre-activity cue: highlight this many seconds before start (s)
+  highlightLinger: number; // keep highlight this many seconds after end (s)
 };
 
 export const DEFAULT_PARAMS: AnalysisParams = {
@@ -46,6 +48,8 @@ export const DEFAULT_PARAMS: AnalysisParams = {
   minSizeFrac: 0.01,
   maxSizeFrac: 0.7,
   minDuration: 0,
+  highlightLead: 1.0,
+  highlightLinger: 0.5,
 };
 
 export type AnalysisMeta = {

@@ -2,7 +2,8 @@
 // Run: node --experimental-strip-types src/analyzer/selfcheck.ts
 import { componentBoxes, diffMask, dilate, toGray } from "./pipeline.ts";
 import { StreamingClusterer } from "./graph.ts";
-import type { Node } from "./types.ts";
+import { selectActivity } from "./select.ts";
+import type { Activity, Node } from "./types.ts";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) { console.error("FAIL:", msg); process.exit(1); }
@@ -58,6 +59,33 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
   assert(Math.abs(finalized[0].start - 0) < 1e-9 && Math.abs(finalized[0].end - 0.4) < 1e-9, "cluster time span correct");
   const rest = c.flush();
   assert(rest.length === 1, "flush emits the remaining open cluster");
+}
+
+// 4. Activity selection: pre-activity lead + active-precedence (study player port).
+{
+  const act = (id: number, start: number, end: number): Activity => ({
+    id, start, end, box: { x: 0, y: 0, w: 10, h: 10 }, nodeCount: 1, isValid: true,
+  });
+  const opts = { lead: 1.0, linger: 0.5, minDuration: 0 };
+  const A = act(0, 10, 20); // long, active during most tests
+  const B = act(1, 21, 25); // upcoming
+
+  // Pre-activity: nothing active at t=9.5, A starts at 10 -> highlighted early.
+  assert(selectActivity([A, B], 9.5, opts)?.id === 0, "pre-activity cue shows before start");
+  // Nothing eligible well before.
+  assert(selectActivity([A, B], 8.5, opts) === null, "no highlight outside lead window");
+  // Active precedence: at t=20.3, A lingers (ended 20) and B is upcoming (starts 21).
+  // Neither is active; closest start to t wins -> B (|21-20.3| < |10-20.3|).
+  assert(selectActivity([A, B], 20.3, opts)?.id === 1, "closest start wins when none active");
+  // A active at t=19.9 while B is in its lead window -> the ACTIVE one wins.
+  assert(selectActivity([A, B], 19.9, opts)?.id === 0, "active activity beats pre-activity cue");
+  // Linger: A still highlighted at t=20.4 when B removed.
+  assert(selectActivity([A], 20.4, opts)?.id === 0, "highlight lingers after end");
+  // minDuration filter hides short activities.
+  const S = act(2, 30, 30.2);
+  assert(selectActivity([S], 30.1, { ...opts, minDuration: 0.5 }) === null, "minDuration hides short activities");
+  // Invalid activities never selected.
+  assert(selectActivity([{ ...A, isValid: false }], 15, opts) === null, "invalid activities never selected");
 }
 
 console.log("\nALL PASS");
