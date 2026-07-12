@@ -39,3 +39,12 @@ export const setMagnificationSettings = (
 ) => {
   useMagnificationSettingsStore.setState((state) => ({ ...state, ...newSettings }));
 };
+
+// Dev-only handle: settings live inside popovers that close on focus loss, which makes
+// them awkward to drive from an automated browser. Never shipped.
+if (import.meta.env.DEV) {
+  (window as unknown as Record<string, unknown>).__magSettings = {
+    get: () => useMagnificationSettingsStore.getState(),
+    set: setMagnificationSettings,
+  };
+}

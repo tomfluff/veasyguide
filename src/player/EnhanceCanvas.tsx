@@ -30,7 +30,9 @@ const EnhanceCanvas = ({ videoRef, filters, source, width, height, className }: 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<GLEnhancer | null>(null);
   const glFailedRef = useRef(false);
-  // Latest props in refs so the frame loop never needs tearing down mid-activity.
+  const redrawRef = useRef<() => void>(() => {});
+  // Latest props in refs so the frame loop never needs tearing down mid-activity —
+  // and so an on-demand redraw always paints with the current filters/source.
   const srcRef = useRef(source);
   srcRef.current = source;
   const filtersRef = useRef(filters);
@@ -48,7 +50,7 @@ const EnhanceCanvas = ({ videoRef, filters, source, width, height, className }: 
     const gl = glRef.current;
     const ctx2d = gl ? null : canvas.getContext("2d");
 
-    const stop = driveFrames(video, () => {
+    const { stop, redraw } = driveFrames(video, () => {
       const s = srcRef.current;
       if (!video.videoWidth || s.width <= 0 || s.height <= 0) return;
       if (gl) {
@@ -57,9 +59,16 @@ const EnhanceCanvas = ({ videoRef, filters, source, width, height, className }: 
         ctx2d.drawImage(video, s.x, s.y, s.width, s.height, 0, 0, canvas.width, canvas.height);
       }
     });
+    redrawRef.current = redraw;
     return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoRef, filters.length === 0]);
+
+  // rVFC doesn't fire while the video is paused, so a filter toggled (or the region
+  // changing) would otherwise keep showing the previous render until playback resumed.
+  useEffect(() => {
+    redrawRef.current();
+  }, [filters.join(","), source.x, source.y, source.width, source.height, width, height]);
 
   useEffect(() => {
     return () => {

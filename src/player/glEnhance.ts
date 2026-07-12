@@ -265,8 +265,16 @@ export class GLEnhancer {
  * falling back to requestAnimationFrame. rVFC alone can cut redraw work ~2-5×:
  * a 30fps video on a 144Hz display repaints 30 times/s instead of 144 — and not
  * at all while paused.
+ *
+ * Because it does NOT fire while paused, anything else that changes the output
+ * (a filter toggled in settings, a new source rect) must ask for a repaint —
+ * otherwise a paused frame keeps showing the previous render. Callers use the
+ * returned `redraw` for that.
  */
-export function driveFrames(video: HTMLVideoElement, render: () => void): () => void {
+export function driveFrames(
+  video: HTMLVideoElement,
+  render: () => void
+): { stop: () => void; redraw: () => void } {
   render(); // paint the current frame immediately (also covers paused video)
   if ("requestVideoFrameCallback" in video) {
     let handle = 0;
@@ -275,7 +283,7 @@ export function driveFrames(video: HTMLVideoElement, render: () => void): () => 
       handle = video.requestVideoFrameCallback(loop);
     };
     handle = video.requestVideoFrameCallback(loop);
-    return () => video.cancelVideoFrameCallback(handle);
+    return { stop: () => video.cancelVideoFrameCallback(handle), redraw: render };
   }
   let raf = 0;
   const loop = () => {
@@ -283,5 +291,5 @@ export function driveFrames(video: HTMLVideoElement, render: () => void): () => 
     raf = requestAnimationFrame(loop);
   };
   raf = requestAnimationFrame(loop);
-  return () => cancelAnimationFrame(raf);
+  return { stop: () => cancelAnimationFrame(raf), redraw: render };
 }

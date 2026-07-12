@@ -37,6 +37,7 @@ const MagnificationOverlay = (props: Props) => {
   const pausedByZoomRef = useRef(false);
   const glRef = useRef<GLEnhancer | null>(null);
   const glFailedRef = useRef(false);
+  const redrawRef = useRef<() => void>(() => {});
 
   const [zoomFactor, setZoomFactor] = useState(1);
   const [zoomShift, setZoomShift] = useState<Pos>({ x: 0, y: 0 });
@@ -57,7 +58,7 @@ const MagnificationOverlay = (props: Props) => {
     const gl = glRef.current;
     const ctx2d = gl ? null : canvas.getContext("2d");
 
-    return driveFrames(video, () => {
+    const { stop, redraw } = driveFrames(video, () => {
       const s = useMagnificationSettingsStore.getState();
       if (gl) {
         gl.draw(video, { filters: sanitizeFilters(s.filter_style), contrast: s.contrast });
@@ -66,7 +67,15 @@ const MagnificationOverlay = (props: Props) => {
         ctx2d.drawImage(video, 0, 0, canvas.width, canvas.height);
       }
     });
+    redrawRef.current = redraw;
+    return stop;
   }, [props.videoRef, props.zoomIn]);
+
+  // Settings changed while paused: rVFC won't fire, so repaint on demand or the
+  // canvas keeps showing the previous filter until playback resumes.
+  useEffect(() => {
+    redrawRef.current();
+  }, [settings.filter_style, settings.contrast]);
 
   useEffect(() => {
     return () => {
