@@ -3,6 +3,7 @@
 import { componentBoxes, contentScore, diffMask, dilate, toGray } from "./pipeline.ts";
 import { StreamingClusterer } from "./graph.ts";
 import { selectActivity } from "./select.ts";
+import { addRange, coverage, isAnalyzed, nextGap } from "./ranges.ts";
 import type { Activity, Node } from "./types.ts";
 
 function assert(cond: boolean, msg: string) {
@@ -99,6 +100,24 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
   assert(activityScore < 27, `pen-stroke-scale change stays below cut threshold (${activityScore.toFixed(1)})`);
   assert(cutScore > 27, `whole-frame change exceeds cut threshold (${cutScore.toFixed(1)})`);
   assert(contentScore(dark, dark) === 0, "identical frames score 0");
+}
+
+// 6. Range bookkeeping: coverage is a set of segments, and gaps get backfilled in order.
+{
+  let r = addRange([], { start: 0, end: 10 });
+  assert(isAnalyzed(r, 5) && !isAnalyzed(r, 15), "isAnalyzed respects range bounds");
+  // Seek to 40 creates a second segment; the gap between them is still open.
+  r = addRange(r, { start: 40, end: 50 });
+  assert(r.length === 2, "disjoint segments stay separate");
+  assert(nextGap(r, 60, 0) === 10, "next gap starts right after the first segment");
+  // Fill the middle; adjacent ranges merge.
+  r = addRange(r, { start: 10, end: 40 });
+  assert(r.length === 1 && r[0].end === 50, "adjacent ranges merge");
+  assert(nextGap(r, 60, 0) === 50, "remaining tail is the next gap");
+  assert(Math.abs(coverage(r, 60) - 50 / 60) < 1e-9, "coverage fraction correct");
+  // Fully covered -> no gaps left.
+  r = addRange(r, { start: 50, end: 60 });
+  assert(nextGap(r, 60, 0) === null, "no gap when fully covered");
 }
 
 console.log("\nALL PASS");

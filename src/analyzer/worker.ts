@@ -1,26 +1,39 @@
 /// <reference lib="webworker" />
-// Phase-0 analysis worker: sequential WebCodecs decode (via Mediabunny) of sampled
-// frames -> diff pipeline -> streaming clusterer -> postMessage. Measures x-realtime.
+// Analysis worker: sequential WebCodecs decode (via Mediabunny) of sampled frames
+// -> diff pipeline -> streaming clusterer -> postMessage.
+//
+// Analysis is segmented, not a single forward pass. A seek into unanalyzed video
+// abandons the current segment and restarts there, so the viewer's position is
+// always the priority; when a segment runs into already-analyzed video (or the end),
+// the worker backfills the earliest remaining gap. Coverage is therefore a set of
+// ranges, not one frontier.
 
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from "mediabunny";
 import { componentBoxes, contentScore, diffMask, dilate, toGray } from "./pipeline";
 import { StreamingClusterer, type RawActivity } from "./graph";
-import type { Activity, AnalysisMeta, Box, StartMsg, WorkerMsg } from "./types";
+import { addRange, isAnalyzed, nextGap } from "./ranges";
+import type { Activity, AnalysisMeta, Box, InMsg, Range, WorkerMsg } from "./types";
 
-const post = (m: WorkerMsg, transfer: Transferable[] = []) =>
-  (self as unknown as Worker).postMessage(m, transfer);
+const post = (m: WorkerMsg) => (self as unknown as Worker).postMessage(m);
 
-self.onmessage = async (e: MessageEvent<StartMsg>) => {
+let seekRequest: number | null = null; // set by the main thread; aborts the current segment
+
+self.onmessage = async (e: MessageEvent<InMsg>) => {
   const msg = e.data;
+  if (msg.type === "seek") {
+    seekRequest = msg.t;
+    return;
+  }
   if (msg.type !== "start") return;
   try {
+    seekRequest = null;
     await run(msg);
   } catch (err) {
     post({ type: "error", message: err instanceof Error ? err.message : String(err) });
   }
 };
 
-async function run({ file, params, debug }: StartMsg) {
+async function run({ file, params, debug }: Extract<InMsg, { type: "start" }>) {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   const track = await input.getPrimaryVideoTrack();
   if (!track) throw new Error("No video track found");
@@ -45,12 +58,7 @@ async function run({ file, params, debug }: StartMsg) {
   const debugCtx = debugCanvas?.getContext("2d") ?? null;
   const sink = new VideoSampleSink(track);
 
-  // Time-based sampling (design decision: robust to variable frame rate).
-  const timestamps: number[] = [];
-  for (let t = 0; t < duration; t += params.sampleInterval) timestamps.push(t);
-
   const distTh = params.distRatio * Math.sqrt(aw * aw + ah * ah);
-  const clusterer = new StreamingClusterer(params.spanTh, distTh);
 
   // Size-based validity (Python RoIActivity._is_valid, c3/c4).
   const validate = (a: RawActivity): Activity => ({
@@ -60,75 +68,132 @@ async function run({ file, params, debug }: StartMsg) {
       a.box.h >= params.minSizeFrac * ah && a.box.h <= params.maxSizeFrac * ah,
   });
 
-  let prevGray: Uint8Array | null = null;
-  let prevRgba: Uint8ClampedArray | null = null;
-  const wallStart = performance.now();
-  let lastProgress = 0;
-
-  // Scene tracking: a cut closes the current scene and starts a new one.
+  let ranges: Range[] = [];
+  const coverageOf = (rs: Range[]) => rs.reduce((s, r) => s + (r.end - r.start), 0);
   let sceneId = 0;
-  let sceneStart = 0;
-  let lastCut = -Infinity;
+  let analyzedSec = 0; // video-seconds actually analyzed (for an honest x-realtime)
+  const wallStart = performance.now();
 
-  for await (const sample of sink.samplesAtTimestamps(timestamps)) {
-    if (!sample) continue;
-    const t = sample.timestamp;
-    sample.draw(ctx, 0, 0, aw, ah);
-    sample.close(); // release the decoded frame (readback already done via draw)
-    const rgba = ctx.getImageData(0, 0, aw, ah).data;
-    const gray = toGray(rgba, aw, ah);
+  // Analyze forward from `from` until: a seek is requested, we run into already-analyzed
+  // video, or the video ends. Each segment is independent — fresh clusterer, and its start
+  // is treated as a scene start (as a cut would be).
+  async function analyzeSegment(from: number) {
+    const clusterer = new StreamingClusterer(params.spanTh, distTh);
+    let prevGray: Uint8Array | null = null;
+    let prevRgba: Uint8ClampedArray | null = null;
+    let sceneStart = from;
+    let lastCut = -Infinity;
+    let segEnd = from;
+    let lastProgress = from;
 
-    // Scene cut? Score the HSV content change against the previous sample.
-    let isCut = false;
-    if (prevRgba) {
-      const score = contentScore(prevRgba, rgba);
-      if (score >= params.sceneThreshold && t - lastCut >= params.sceneMinLen) {
-        isCut = true;
-        lastCut = t;
-        post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: t } });
-        sceneStart = t;
-        // Activities must not span a cut: the Python analyzer generated frame pairs
-        // per scene, so no diff ever crossed a boundary. Close everything open.
-        for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
-      }
-    }
+    const timestamps: number[] = [];
+    for (let t = from; t < duration; t += params.sampleInterval) timestamps.push(t);
 
-    // A cut's own frame pair is a whole-frame change, not instructor activity — skip it.
-    if (prevGray && !isCut) {
-      const mask = dilate(diffMask(prevGray, gray, aw, ah, params.diffThresh), aw, ah, params.dilateIters);
-      const boxes: Box[] = componentBoxes(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac);
-      for (const box of boxes) {
-        for (const act of clusterer.add({ t, box })) post({ type: "activity", activity: validate(act) });
-      }
+    const flushSegment = () => {
+      for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
+      if (segEnd > sceneStart) post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: segEnd } });
+      ranges = addRange(ranges, { start: from, end: segEnd });
+    };
 
-      if (debugCanvas && debugCtx) {
-        // Composite: grayscale frame, diff-mask pixels tinted red. WebP-encoded so a
-        // whole video's frames fit in memory for after-the-fact scrubbing.
-        const comp = new Uint8ClampedArray(aw * ah * 4);
-        for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
-          const g = gray[i];
-          if (mask[i]) { comp[p] = 255; comp[p + 1] = g >> 2; comp[p + 2] = g >> 2; }
-          else { comp[p] = g; comp[p + 1] = g; comp[p + 2] = g; }
-          comp[p + 3] = 255;
+    for await (const sample of sink.samplesAtTimestamps(timestamps)) {
+      if (!sample) continue;
+      const t = sample.timestamp;
+
+      // The viewer jumped somewhere unanalyzed: drop this segment and go serve them.
+      if (seekRequest !== null) { sample.close(); flushSegment(); return; }
+      // Ran into video a previous segment already covered: stop. Claim coverage right up
+      // to that boundary — otherwise a sub-sample sliver is left behind, and the segment
+      // loop would pick it forever without ever producing a sample from it.
+      if (t > from && isAnalyzed(ranges, t)) { sample.close(); segEnd = t; flushSegment(); return; }
+
+      sample.draw(ctx, 0, 0, aw, ah);
+      sample.close(); // release the decoded frame (readback already done via draw)
+      const rgba = ctx.getImageData(0, 0, aw, ah).data;
+      const gray = toGray(rgba, aw, ah);
+
+      // Scene cut? Score the HSV content change against the previous sample.
+      let isCut = false;
+      if (prevRgba) {
+        const score = contentScore(prevRgba, rgba);
+        if (score >= params.sceneThreshold && t - lastCut >= params.sceneMinLen) {
+          isCut = true;
+          lastCut = t;
+          post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: t } });
+          sceneStart = t;
+          // Activities must not span a cut: the Python analyzer generated frame pairs
+          // per scene, so no diff ever crossed a boundary. Close everything open.
+          for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
         }
-        debugCtx.putImageData(new ImageData(comp, aw, ah), 0, 0);
-        const blob = await debugCanvas.convertToBlob({ type: "image/webp", quality: 0.8 });
-        post({ type: "debugFrame", t, blob, w: aw, h: ah, boxes });
+      }
+
+      // A cut's own frame pair is a whole-frame change, not instructor activity — skip it.
+      if (prevGray && !isCut) {
+        const mask = dilate(diffMask(prevGray, gray, aw, ah, params.diffThresh), aw, ah, params.dilateIters);
+        const boxes: Box[] = componentBoxes(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac);
+        for (const box of boxes) {
+          for (const act of clusterer.add({ t, box })) post({ type: "activity", activity: validate(act) });
+        }
+
+        if (debugCanvas && debugCtx) {
+          // Composite: grayscale frame, diff-mask pixels tinted red. WebP-encoded so a
+          // whole video's frames fit in memory for after-the-fact scrubbing.
+          const comp = new Uint8ClampedArray(aw * ah * 4);
+          for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
+            const g = gray[i];
+            if (mask[i]) { comp[p] = 255; comp[p + 1] = g >> 2; comp[p + 2] = g >> 2; }
+            else { comp[p] = g; comp[p + 1] = g; comp[p + 2] = g; }
+            comp[p + 3] = 255;
+          }
+          debugCtx.putImageData(new ImageData(comp, aw, ah), 0, 0);
+          const blob = await debugCanvas.convertToBlob({ type: "image/webp", quality: 0.8 });
+          post({ type: "debugFrame", t, blob, w: aw, h: ah, boxes });
+        }
+      }
+      prevGray = gray;
+      prevRgba = rgba;
+      analyzedSec += params.sampleInterval;
+      segEnd = t;
+
+      if (t - lastProgress >= 0.5) {
+        const wallSec = (performance.now() - wallStart) / 1000;
+        post({
+          type: "progress",
+          analyzedUpTo: t,
+          xRealtime: wallSec > 0 ? analyzedSec / wallSec : 0,
+          openClusters: clusterer.openCount,
+          ranges: addRange(ranges, { start: from, end: segEnd }),
+        });
+        lastProgress = t;
       }
     }
-    prevGray = gray;
-    prevRgba = rgba;
 
-    if (t - lastProgress >= 0.5) {
-      const wallSec = (performance.now() - wallStart) / 1000;
-      post({ type: "progress", analyzedUpTo: t, xRealtime: wallSec > 0 ? t / wallSec : 0, openClusters: clusterer.openCount });
-      lastProgress = t;
-    }
+    segEnd = duration;
+    flushSegment();
   }
 
-  for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
-  post({ type: "scene", scene: { id: sceneId, start: sceneStart, end: duration } });
+  // Segment loop: serve seeks first, otherwise fill the earliest remaining gap.
+  let start: number | null = 0;
+  while (start !== null) {
+    const before = coverageOf(ranges);
+    await analyzeSegment(start);
+    if (seekRequest !== null) {
+      const target = seekRequest;
+      seekRequest = null;
+      start = isAnalyzed(ranges, target) ? nextGap(ranges, duration, 0) : target;
+      continue;
+    }
+    // Safety: a segment that covered nothing new would be picked again forever.
+    // Claim the gap it failed on so the loop always terminates.
+    if (coverageOf(ranges) <= before + 1e-6) {
+      const stuck = nextGap(ranges, duration, 0);
+      if (stuck === null) break;
+      const nextStart = ranges.find((r) => r.start > stuck)?.start ?? duration;
+      ranges = addRange(ranges, { start: stuck, end: nextStart });
+    }
+    start = nextGap(ranges, duration, 0);
+  }
+
   const wallMs = performance.now() - wallStart;
-  post({ type: "done", wallMs, xRealtime: duration / (wallMs / 1000) });
+  post({ type: "done", wallMs, xRealtime: analyzedSec / (wallMs / 1000), ranges });
   input.dispose?.();
 }

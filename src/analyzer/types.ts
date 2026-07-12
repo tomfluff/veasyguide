@@ -72,8 +72,8 @@ export type WorkerMsg =
   | { type: "meta"; meta: AnalysisMeta }
   | { type: "activity"; activity: Activity }
   | { type: "scene"; scene: Scene }
-  | { type: "progress"; analyzedUpTo: number; xRealtime: number; openClusters: number }
-  | { type: "done"; wallMs: number; xRealtime: number }
+  | { type: "progress"; analyzedUpTo: number; xRealtime: number; openClusters: number; ranges: Range[] }
+  | { type: "done"; wallMs: number; xRealtime: number; ranges: Range[] }
   | { type: "error"; message: string }
   // Debug-only: per-sample analyzer view. `blob` is a WebP of the composite
   // (grayscale sample with the post-dilate diff mask tinted red) — ~10-25 KB each,
@@ -81,5 +81,10 @@ export type WorkerMsg =
   // `boxes` are the node boxes detected for this sample (analysis-res px).
   | { type: "debugFrame"; t: number; blob: Blob; w: number; h: number; boxes: Box[] };
 
+// A contiguous analyzed time range [start, end].
+export type Range = { start: number; end: number };
+
 // Main -> worker
 export type StartMsg = { type: "start"; file: File; params: AnalysisParams; debug: boolean };
+export type SeekMsg = { type: "seek"; t: number }; // analyze from here next, abandoning current segment
+export type InMsg = StartMsg | SeekMsg;

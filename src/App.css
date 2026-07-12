@@ -57,8 +57,14 @@ h1 { font-size: 20px; margin: 0 0 20px; }
 .meter.ok b { color: #1a9e4b; }
 .meter.warn b { color: #c88a00; }
 .meter.bad b { color: #c00; }
-.bar { height: 8px; background: #e3e3e3; border-radius: 4px; overflow: hidden; margin: 6px 0; }
-.fill { height: 100%; background: #4a90d9; transition: width .2s; }
+.bar { position: relative; height: 8px; background: #e3e3e3; border-radius: 4px; overflow: hidden; margin: 6px 0; }
+.fill { position: absolute; top: 0; bottom: 0; background: #4a90d9; }
+.playhead { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #111; }
+.catching-up {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+  background: rgba(0, 0, 0, .7); color: #fff;
+  padding: 5px 12px; border-radius: 14px; font-size: 13px;
+}
 .stats { font-size: 13px; color: #666; }
 
 .mag { display: block; margin-top: 24px; width: 240px; height: 135px; border: 1px solid #ccc; opacity: .6; }

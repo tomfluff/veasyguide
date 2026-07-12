@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Scene, type WorkerMsg } from "./analyzer/types";
+import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Range, type Scene, type WorkerMsg } from "./analyzer/types";
 import { selectActivity } from "./analyzer/select";
+import { coverage, isAnalyzed } from "./analyzer/ranges";
 import "./App.css";
 
 const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
@@ -133,6 +134,7 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
+  const [ranges, setRanges] = useState<Range[]>([]);
   const [openClusters, setOpenClusters] = useState(0);
   const [framesCount, setFramesCount] = useState(0);
   const [viewIdx, setViewIdx] = useState(-1); // -1 = follow the frontier
@@ -168,7 +170,7 @@ export default function App() {
     followRef.current = true;
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
     setDone(false); setError(null); setCurrent(null); setOpenClusters(0); setPlayheadNodes([]);
-    setFramesCount(0); setViewIdx(-1); setScenes([]);
+    setFramesCount(0); setViewIdx(-1); setScenes([]); setRanges([]);
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
@@ -179,8 +181,8 @@ export default function App() {
         setActivityCount((c) => c + 1);
         if (m.activity.isValid) setValidCount((c) => c + 1);
       } else if (m.type === "scene") { setScenes((s) => [...s, m.scene]); }
-      else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); setOpenClusters(m.openClusters); }
-      else if (m.type === "done") { setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); }
+      else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); setOpenClusters(m.openClusters); setRanges(m.ranges); }
+      else if (m.type === "done") { setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); setRanges(m.ranges); }
       else if (m.type === "error") setError(m.message);
       else if (m.type === "debugFrame") {
         if (framesRef.current.length < MAX_DEBUG_FRAMES) {
@@ -237,6 +239,16 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Seeking somewhere unanalyzed: tell the worker to abandon what it's doing and
+  // analyze from here, so the viewer's position always wins.
+  function onSeeked() {
+    const v = videoRef.current;
+    if (!v || done || !workerRef.current) return;
+    if (!isAnalyzed(ranges, v.currentTime)) {
+      workerRef.current.postMessage({ type: "seek", t: v.currentTime });
+    }
+  }
+
   function onTimeUpdate() {
     const v = videoRef.current;
     if (!v) return;
@@ -257,7 +269,8 @@ export default function App() {
     }
   }
 
-  const progressPct = meta ? Math.min(100, (Math.min(analyzedUpTo, meta.duration) / meta.duration) * 100) : 0;
+  const progressPct = meta ? coverage(ranges, meta.duration) * 100 : 0;
+  const atUnanalyzed = !!meta && !done && !isAnalyzed(ranges, currentTime);
 
   return (
     <div className="app">
@@ -278,7 +291,8 @@ export default function App() {
         <div className="stage">
           <div className="video-wrap">
             <video ref={videoRef} src={videoUrl} controls={canPlay}
-              onTimeUpdate={onTimeUpdate} style={{ width: "100%", display: "block" }} />
+              onTimeUpdate={onTimeUpdate} onSeeked={onSeeked}
+              style={{ width: "100%", display: "block" }} />
             {current && meta && (
               <div className="highlight" style={{
                 left: `${(current.box.x / meta.analysisWidth) * 100}%`,
@@ -296,13 +310,25 @@ export default function App() {
               }} />
             ))}
             {!canPlay && <div className="gate">Analyzing… playback unlocks at {PLAYBACK_LEAD}s lead</div>}
+            {canPlay && atUnanalyzed && <div className="catching-up">Analyzing this part…</div>}
           </div>
 
           <div className="hud">
             <div className={`meter ${xRealtime >= 4 ? "ok" : xRealtime >= 2 ? "warn" : "bad"}`}>
               {done ? "done" : "analyzing"} · <b>{xRealtime.toFixed(1)}×</b> realtime
             </div>
-            <div className="bar"><div className="fill" style={{ width: `${progressPct}%` }} /></div>
+            {/* Analyzed coverage — segments, not a single frontier (a seek starts a new one). */}
+            <div className="bar">
+              {meta && ranges.map((r, i) => (
+                <div key={i} className="fill" style={{
+                  left: `${(r.start / meta.duration) * 100}%`,
+                  width: `${((r.end - r.start) / meta.duration) * 100}%`,
+                }} />
+              ))}
+              {meta && (
+                <div className="playhead" style={{ left: `${(currentTime / meta.duration) * 100}%` }} />
+              )}
+            </div>
             <div className="stats">
               {meta ? `${meta.videoWidth}×${meta.videoHeight} → ${meta.analysisWidth}×${meta.analysisHeight}` : "…"}
               {" · "}{validCount} valid / {activityCount} activities · {scenes.length} scene{scenes.length === 1 ? "" : "s"}
