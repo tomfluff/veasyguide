@@ -80,6 +80,9 @@ export type AnalysisMeta = {
 
 // Worker -> main messages
 export type WorkerMsg =
+  // Progress through the pre-analysis read phase, so a slow or stuck open is visible
+  // rather than an indefinite "Reading video…".
+  | { type: "status"; stage: string }
   | { type: "meta"; meta: AnalysisMeta }
   | { type: "activity"; activity: Activity }
   | { type: "scene"; scene: Scene }

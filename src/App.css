@@ -28,7 +28,20 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   color: #c00;
 }
 
-.probing { padding: 48px; text-align: center; color: #888; }
+.probing { padding: 48px 24px; text-align: center; color: #888; }
+.watchdog {
+  margin: 16px auto 0;
+  max-width: 520px;
+  padding: 12px 16px;
+  border: 1px solid #e0b000;
+  background: #fffaea;
+  border-radius: 8px;
+  color: #7a5c00;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+.watchdog code { background: #f3e6b8; padding: 1px 4px; border-radius: 3px; }
 
 .gallery { margin-top: 24px; padding-top: 12px; border-top: 1px dashed #bbb; }
 .gallery h2 { font-size: 14px; margin: 0 0 8px; color: #555; }

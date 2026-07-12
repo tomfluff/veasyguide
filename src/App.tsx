@@ -117,6 +117,24 @@ const PARAM_FIELDS: ParamField[] = [
   },
 ];
 
+// If the read phase never completes, say so instead of spinning forever.
+function Watchdog({ active }: { active: boolean }) {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    const id = setTimeout(() => setLate(true), 15000);
+    return () => clearTimeout(id);
+  }, [active]);
+  if (!late) return null;
+  return (
+    <div className="watchdog">
+      This is taking longer than expected. The analysis worker may have failed to start —
+      check the browser console. If you have more than one dev server running, stop all of
+      them, delete <code>node_modules/.vite</code>, and start a single one.
+    </div>
+  );
+}
+
 export default function App() {
   // Lets debug UI (analyzer view, scene strip) seek the player's video element.
   const seekFnRef = useRef<(t: number) => void>(() => {});
@@ -144,6 +162,7 @@ export default function App() {
   const [validCount, setValidCount] = useState(0);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<string | null>(null); // pre-analysis read progress
   const [currentTime, setCurrentTime] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
@@ -185,11 +204,23 @@ export default function App() {
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
     setDone(false); setError(null); setOpenClusters(0); setPlayheadNodes([]);
     setFramesCount(0); setViewIdx(-1); setScenes([]); setRanges([]);
+    setStage("Starting worker…");
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
+    // Without these, a worker that fails to load or throws outside our try/catch dies
+    // silently and the UI waits forever for a `meta` that will never arrive.
+    worker.onerror = (e) => {
+      setError(
+        `The analysis worker failed to start${e.message ? `: ${e.message}` : "."} ` +
+          `If you are running two dev servers, stop one and restart (a shared Vite cache can break the worker).`
+      );
+      setStage(null);
+    };
+    worker.onmessageerror = () => setError("The analysis worker sent a message that could not be read.");
     worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
       const m = e.data;
-      if (m.type === "meta") setMeta(m.meta);
+      if (m.type === "status") setStage(m.stage);
+      else if (m.type === "meta") { setStage(null); setMeta(m.meta); }
       else if (m.type === "activity") {
         activitiesRef.current.push(m.activity);
         setActivityCount((c) => c + 1);
@@ -203,7 +234,7 @@ export default function App() {
           label: `${cap ? "debug frames" : "no capture"} @ ${p.analysisWidth}px`,
         }]);
       }
-      else if (m.type === "error") setError(m.message);
+      else if (m.type === "error") { setError(m.message); setStage(null); }
       else if (m.type === "debugFrame") {
         if (framesRef.current.length < MAX_DEBUG_FRAMES) {
           framesRef.current.push({ t: m.t, blob: m.blob, boxes: m.boxes });
@@ -311,8 +342,11 @@ export default function App() {
               onTimeChange={onTimeChange}
               seekFnRef={seekFnRef}
             />
-          ) : (
-            <div className="probing">Reading video…</div>
+          ) : error ? null : (
+            <div className="probing">
+              <div>{stage ?? "Reading video…"}</div>
+              <Watchdog active />
+            </div>
           )}
 
           <div className="hud">

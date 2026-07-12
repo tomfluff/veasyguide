@@ -35,16 +35,43 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
 };
 
 async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type: "start" }>) {
+  post({ type: "status", stage: "Reading container…" });
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+
   const track = await input.getPrimaryVideoTrack();
-  if (!track) throw new Error("No video track found");
-  if (!(await track.canDecode())) throw new Error(`Cannot decode codec: ${track.codec ?? "unknown"}`);
+  if (!track) {
+    throw new Error(
+      "This file has no video track. If it's an audio file or a container we can't parse, try an MP4/WebM."
+    );
+  }
+
+  post({ type: "status", stage: `Checking codec (${track.codec ?? "unknown"})…` });
+  if (!(await track.canDecode())) {
+    throw new Error(
+      `Your browser can't decode this video's codec (${track.codec ?? "unknown"}). ` +
+        `H.264, VP9 and AV1 work in Chrome; HEVC/H.265 usually does not. ` +
+        `Re-encoding to H.264 MP4 will fix it.`
+    );
+  }
 
   const vw = track.displayWidth;
   const vh = track.displayHeight;
   const aw = Math.min(params.analysisWidth, vw);
   const ah = Math.max(1, Math.round((aw / vw) * vh));
-  const duration = await input.computeDuration();
+
+  // Duration: prefer the container metadata. computeDuration() is documented as
+  // "potentially expensive… must check all tracks" (it can scan the whole file), and by
+  // default it waits for live streams to end — either of which looks like a hang.
+  post({ type: "status", stage: "Reading duration…" });
+  const fromMeta = await input.getDurationFromMetadata(undefined, { skipLiveWait: true });
+  let duration = fromMeta ?? 0;
+  if (!Number.isFinite(duration) || duration <= 0) {
+    post({ type: "status", stage: "Scanning for duration (no metadata)…" });
+    duration = await input.computeDuration(undefined, { skipLiveWait: true });
+  }
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error("Could not determine the video's duration — the file may be corrupt or still recording.");
+  }
 
   const meta: AnalysisMeta = {
     videoWidth: vw, videoHeight: vh,
