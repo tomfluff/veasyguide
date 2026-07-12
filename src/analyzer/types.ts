@@ -7,6 +7,8 @@ export type Node = { t: number; box: Box };
 
 // A finalized activity: connected group of nodes. Coordinates in analysis-res pixels;
 // scale by `scale` to reach video display pixels.
+export type Scene = { id: number; start: number; end: number };
+
 export type Activity = {
   id: number;
   start: number;
@@ -27,6 +29,8 @@ export type AnalysisParams = {
   dilateIters: number; // mask dilation passes (Python: iterations=3)
   contourAreaLowFrac: number; // component box area filter, fraction of frame area
   contourAreaHighFrac: number;
+  sceneThreshold: number; // HSV content score above which a scene cut is declared
+  sceneMinLen: number; // minimum seconds between cuts (debounce)
   spanTh: number; // seconds; max time gap for linking nodes (study: 1.0)
   distRatio: number; // max spatial gap for linking, fraction of frame diagonal (0.05)
   minSizeFrac: number; // activity validity: min w/h fraction of frame (roi_area_low 0.01)
@@ -43,6 +47,8 @@ export const DEFAULT_PARAMS: AnalysisParams = {
   dilateIters: 3,
   contourAreaLowFrac: 0.00015,
   contourAreaHighFrac: 0.5,
+  sceneThreshold: 27,
+  sceneMinLen: 1.0,
   spanTh: 1.0,
   distRatio: 0.05,
   minSizeFrac: 0.01,
@@ -65,6 +71,7 @@ export type AnalysisMeta = {
 export type WorkerMsg =
   | { type: "meta"; meta: AnalysisMeta }
   | { type: "activity"; activity: Activity }
+  | { type: "scene"; scene: Scene }
   | { type: "progress"; analyzedUpTo: number; xRealtime: number; openClusters: number }
   | { type: "done"; wallMs: number; xRealtime: number }
   | { type: "error"; message: string }

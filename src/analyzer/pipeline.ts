@@ -5,6 +5,43 @@
 
 import type { Box } from "./types";
 
+// Scene-change score between two frames, 0..255. Ports PySceneDetect's ContentDetector:
+// mean absolute difference of hue, saturation and luma in HSV, averaged with equal
+// weights (its default). A hard cut spikes this; a pen stroke barely moves it.
+// Computed on frames we already decoded — no second decode, no extra dependency.
+export function contentScore(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
+  let dh = 0, ds = 0, dl = 0;
+  const n = a.length / 4;
+  for (let p = 0; p < a.length; p += 4) {
+    const [h1, s1, v1] = rgbToHsv(a[p], a[p + 1], a[p + 2]);
+    const [h2, s2, v2] = rgbToHsv(b[p], b[p + 1], b[p + 2]);
+    // Hue is circular: 0 and 255 are adjacent, so take the shorter way round.
+    const raw = Math.abs(h1 - h2);
+    dh += Math.min(raw, 255 - raw);
+    ds += Math.abs(s1 - s2);
+    dl += Math.abs(v1 - v2);
+  }
+  return (dh / n + ds / n + dl / n) / 3;
+}
+
+// RGB -> HSV, each channel scaled to 0..255 (matches OpenCV's 8-bit HSV convention
+// closely enough for a threshold comparison).
+function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
+  const max = r > g ? (r > b ? r : b) : g > b ? g : b;
+  const min = r < g ? (r < b ? r : b) : g < b ? g : b;
+  const d = max - min;
+  const v = max;
+  const s = max === 0 ? 0 : (d * 255) / max;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = 42.5 * (((g - b) / d) % 6);
+    else if (max === g) h = 42.5 * ((b - r) / d + 2);
+    else h = 42.5 * ((r - g) / d + 4);
+    if (h < 0) h += 255;
+  }
+  return [h, s, v];
+}
+
 // OpenCV BGR2GRAY weights (applied to RGBA input).
 export function toGray(rgba: Uint8ClampedArray, w: number, h: number): Uint8Array {
   const g = new Uint8Array(w * h);

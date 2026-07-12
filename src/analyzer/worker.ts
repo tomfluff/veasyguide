@@ -3,7 +3,7 @@
 // frames -> diff pipeline -> streaming clusterer -> postMessage. Measures x-realtime.
 
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from "mediabunny";
-import { componentBoxes, diffMask, dilate, toGray } from "./pipeline";
+import { componentBoxes, contentScore, diffMask, dilate, toGray } from "./pipeline";
 import { StreamingClusterer, type RawActivity } from "./graph";
 import type { Activity, AnalysisMeta, Box, StartMsg, WorkerMsg } from "./types";
 
@@ -61,8 +61,14 @@ async function run({ file, params, debug }: StartMsg) {
   });
 
   let prevGray: Uint8Array | null = null;
+  let prevRgba: Uint8ClampedArray | null = null;
   const wallStart = performance.now();
   let lastProgress = 0;
+
+  // Scene tracking: a cut closes the current scene and starts a new one.
+  let sceneId = 0;
+  let sceneStart = 0;
+  let lastCut = -Infinity;
 
   for await (const sample of sink.samplesAtTimestamps(timestamps)) {
     if (!sample) continue;
@@ -72,7 +78,23 @@ async function run({ file, params, debug }: StartMsg) {
     const rgba = ctx.getImageData(0, 0, aw, ah).data;
     const gray = toGray(rgba, aw, ah);
 
-    if (prevGray) {
+    // Scene cut? Score the HSV content change against the previous sample.
+    let isCut = false;
+    if (prevRgba) {
+      const score = contentScore(prevRgba, rgba);
+      if (score >= params.sceneThreshold && t - lastCut >= params.sceneMinLen) {
+        isCut = true;
+        lastCut = t;
+        post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: t } });
+        sceneStart = t;
+        // Activities must not span a cut: the Python analyzer generated frame pairs
+        // per scene, so no diff ever crossed a boundary. Close everything open.
+        for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
+      }
+    }
+
+    // A cut's own frame pair is a whole-frame change, not instructor activity — skip it.
+    if (prevGray && !isCut) {
       const mask = dilate(diffMask(prevGray, gray, aw, ah, params.diffThresh), aw, ah, params.dilateIters);
       const boxes: Box[] = componentBoxes(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac);
       for (const box of boxes) {
@@ -95,6 +117,7 @@ async function run({ file, params, debug }: StartMsg) {
       }
     }
     prevGray = gray;
+    prevRgba = rgba;
 
     if (t - lastProgress >= 0.5) {
       const wallSec = (performance.now() - wallStart) / 1000;
@@ -104,6 +127,7 @@ async function run({ file, params, debug }: StartMsg) {
   }
 
   for (const act of clusterer.flush()) post({ type: "activity", activity: validate(act) });
+  post({ type: "scene", scene: { id: sceneId, start: sceneStart, end: duration } });
   const wallMs = performance.now() - wallStart;
   post({ type: "done", wallMs, xRealtime: duration / (wallMs / 1000) });
   input.dispose?.();

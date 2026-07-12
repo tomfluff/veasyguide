@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type WorkerMsg } from "./analyzer/types";
+import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Scene, type WorkerMsg } from "./analyzer/types";
 import { selectActivity } from "./analyzer/select";
 import "./App.css";
 
@@ -24,8 +24,9 @@ type ParamField = {
 const PARAM_GROUPS: { title: string; note: string; keys: (keyof AnalysisParams)[] }[] = [
   { title: "1 · Sampling", note: "which pixels the analyzer looks at", keys: ["analysisWidth", "sampleInterval"] },
   { title: "2 · Change detection", note: "frame pair → changed regions (red mask / green boxes)", keys: ["diffThresh", "dilateIters", "contourAreaLowFrac", "contourAreaHighFrac"] },
-  { title: "3 · Clustering", note: "regions over time → activities", keys: ["spanTh", "distRatio"] },
-  { title: "4 · Filtering & display", note: "which activities the player shows, and when", keys: ["minSizeFrac", "maxSizeFrac", "minDuration", "highlightLead", "highlightLinger"] },
+  { title: "3 · Scene detection", note: "slide changes / cuts — activities never span one", keys: ["sceneThreshold", "sceneMinLen"] },
+  { title: "4 · Clustering", note: "regions over time → activities", keys: ["spanTh", "distRatio"] },
+  { title: "5 · Filtering & display", note: "which activities the player shows, and when", keys: ["minSizeFrac", "maxSizeFrac", "minDuration", "highlightLead", "highlightLinger"] },
 ];
 
 const PARAM_FIELDS: ParamField[] = [
@@ -58,6 +59,16 @@ const PARAM_FIELDS: ParamField[] = [
     key: "contourAreaHighFrac", label: "Max region area (frac)", step: 0.05,
     what: "Changed regions larger than this fraction of the frame area are discarded.",
     why: "A slide transition or scroll changes most of the frame at once — that's a scene change, not instructor activity, and without this cap it becomes one giant bogus 'activity'. Python: contour_area_high. Also the stand-in for scene detection until that lands (design Phase 1).",
+  },
+  {
+    key: "sceneThreshold", label: "Scene threshold", step: 1,
+    what: "A scene cut is declared when the HSV content score between two sampled frames (mean hue+saturation+luma change, 0–255) reaches this value. The cut's own frame pair produces no detection nodes, and any open activities are closed at the boundary.",
+    why: "A slide change alters the whole frame — treating that as instructor activity would produce one giant bogus highlight, and an activity must never span two slides. Ports PySceneDetect's ContentDetector, which the Python analyzer used at threshold 14 — but it scored every adjacent frame (~33 ms apart) while we compare frames one sample interval apart, so more change accumulates and our score runs higher; hence the higher default. Lower = more cuts (a big animation may split a slide); higher = slide changes get missed and leak into activities.",
+  },
+  {
+    key: "sceneMinLen", label: "Min scene length (s)", step: 0.5,
+    what: "Debounce: no second cut is allowed until this long after the previous one.",
+    why: "A slide transition (fade, wipe, build animation) crosses the threshold on several consecutive samples and would otherwise register as a burst of cuts. Not in the Python version — it detected on every frame, where transitions are handled by ContentDetector's own internals; at our coarser sampling an explicit debounce is the simpler equivalent.",
   },
   {
     key: "spanTh", label: "Link time gap (s)", step: 0.1,
@@ -121,6 +132,7 @@ export default function App() {
   const [current, setCurrent] = useState<Activity | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [scenes, setScenes] = useState<Scene[]>([]);
   const [openClusters, setOpenClusters] = useState(0);
   const [framesCount, setFramesCount] = useState(0);
   const [viewIdx, setViewIdx] = useState(-1); // -1 = follow the frontier
@@ -156,7 +168,7 @@ export default function App() {
     followRef.current = true;
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
     setDone(false); setError(null); setCurrent(null); setOpenClusters(0); setPlayheadNodes([]);
-    setFramesCount(0); setViewIdx(-1);
+    setFramesCount(0); setViewIdx(-1); setScenes([]);
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
@@ -166,7 +178,8 @@ export default function App() {
         activitiesRef.current.push(m.activity);
         setActivityCount((c) => c + 1);
         if (m.activity.isValid) setValidCount((c) => c + 1);
-      } else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); setOpenClusters(m.openClusters); }
+      } else if (m.type === "scene") { setScenes((s) => [...s, m.scene]); }
+      else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); setOpenClusters(m.openClusters); }
       else if (m.type === "done") { setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); }
       else if (m.type === "error") setError(m.message);
       else if (m.type === "debugFrame") {
@@ -292,8 +305,8 @@ export default function App() {
             <div className="bar"><div className="fill" style={{ width: `${progressPct}%` }} /></div>
             <div className="stats">
               {meta ? `${meta.videoWidth}×${meta.videoHeight} → ${meta.analysisWidth}×${meta.analysisHeight}` : "…"}
-              {" · "}{validCount} valid / {activityCount} activities · analyzed {progressPct.toFixed(0)}%
-              {" · playhead "}{currentTime.toFixed(1)}s
+              {" · "}{validCount} valid / {activityCount} activities · {scenes.length} scene{scenes.length === 1 ? "" : "s"}
+              {" · analyzed "}{progressPct.toFixed(0)}%{" · playhead "}{currentTime.toFixed(1)}s
             </div>
           </div>
 
@@ -388,6 +401,25 @@ export default function App() {
               void renderDebugFrame(i);
             }}
           />
+          {meta && scenes.length > 0 && (
+            <div className="scene-strip" title="Scene cuts — click to seek">
+              {scenes.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className="scene-seg"
+                  style={{
+                    left: `${(s.start / meta.duration) * 100}%`,
+                    width: `${((s.end - s.start) / meta.duration) * 100}%`,
+                  }}
+                  title={`Scene ${s.id + 1}: ${s.start.toFixed(1)}s – ${s.end.toFixed(1)}s`}
+                  onClick={() => { if (videoRef.current) videoRef.current.currentTime = s.start; }}
+                >
+                  {s.id + 1}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="debug-legend">
             <span><i className="sw red" /> diff mask (post-dilate)</span>
             <span><i className="sw green" /> node boxes (this sample)</span>

@@ -1,6 +1,6 @@
 // Runnable self-check for the pure pipeline + clusterer logic (no browser needed).
 // Run: node --experimental-strip-types src/analyzer/selfcheck.ts
-import { componentBoxes, diffMask, dilate, toGray } from "./pipeline.ts";
+import { componentBoxes, contentScore, diffMask, dilate, toGray } from "./pipeline.ts";
 import { StreamingClusterer } from "./graph.ts";
 import { selectActivity } from "./select.ts";
 import type { Activity, Node } from "./types.ts";
@@ -86,6 +86,19 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
   assert(selectActivity([S], 30.1, { ...opts, minDuration: 0.5 }) === null, "minDuration hides short activities");
   // Invalid activities never selected.
   assert(selectActivity([{ ...A, isValid: false }], 15, opts) === null, "invalid activities never selected");
+}
+
+// 5. Scene scoring: a small moving mark barely registers; a whole-frame change spikes.
+{
+  const dark = frameWithBox(20, 20, 12, 12); // small white box on dark bg
+  const darkMoved = frameWithBox(40, 40, 12, 12); // same, box moved
+  const light = new Uint8ClampedArray(W * H * 4).fill(230); // entirely different frame
+
+  const activityScore = contentScore(dark, darkMoved);
+  const cutScore = contentScore(dark, light);
+  assert(activityScore < 27, `pen-stroke-scale change stays below cut threshold (${activityScore.toFixed(1)})`);
+  assert(cutScore > 27, `whole-frame change exceeds cut threshold (${cutScore.toFixed(1)})`);
+  assert(contentScore(dark, dark) === 0, "identical frames score 0");
 }
 
 console.log("\nALL PASS");
