@@ -7,7 +7,8 @@ import { componentBoxes, diffMask, dilate, toGray } from "./pipeline";
 import { StreamingClusterer, type RawActivity } from "./graph";
 import type { Activity, AnalysisMeta, Box, StartMsg, WorkerMsg } from "./types";
 
-const post = (m: WorkerMsg) => (self as unknown as Worker).postMessage(m);
+const post = (m: WorkerMsg, transfer: Transferable[] = []) =>
+  (self as unknown as Worker).postMessage(m, transfer);
 
 self.onmessage = async (e: MessageEvent<StartMsg>) => {
   const msg = e.data;
@@ -19,7 +20,7 @@ self.onmessage = async (e: MessageEvent<StartMsg>) => {
   }
 };
 
-async function run({ file, params }: StartMsg) {
+async function run({ file, params, debug }: StartMsg) {
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   const track = await input.getPrimaryVideoTrack();
   if (!track) throw new Error("No video track found");
@@ -75,12 +76,24 @@ async function run({ file, params }: StartMsg) {
       for (const box of boxes) {
         for (const act of clusterer.add({ t, box })) post({ type: "activity", activity: validate(act) });
       }
+
+      if (debug) {
+        // Composite: grayscale frame, diff-mask pixels tinted red.
+        const comp = new Uint8ClampedArray(aw * ah * 4);
+        for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
+          const g = gray[i];
+          if (mask[i]) { comp[p] = 255; comp[p + 1] = g >> 2; comp[p + 2] = g >> 2; }
+          else { comp[p] = g; comp[p + 1] = g; comp[p + 2] = g; }
+          comp[p + 3] = 255;
+        }
+        post({ type: "debugFrame", t, frame: comp.buffer, w: aw, h: ah, boxes }, [comp.buffer]);
+      }
     }
     prevGray = gray;
 
     if (t - lastProgress >= 0.5) {
       const wallSec = (performance.now() - wallStart) / 1000;
-      post({ type: "progress", analyzedUpTo: t, xRealtime: wallSec > 0 ? t / wallSec : 0 });
+      post({ type: "progress", analyzedUpTo: t, xRealtime: wallSec > 0 ? t / wallSec : 0, openClusters: clusterer.openCount });
       lastProgress = t;
     }
   }

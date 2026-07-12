@@ -36,6 +36,11 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   pointer-events: none;
   transition: left .2s, top .2s, width .2s, height .2s;
 }
+.node-box {
+  position: absolute;
+  border: 1.5px solid #2979ff;
+  pointer-events: none;
+}
 .gate {
   position: absolute;
   inset: 0;
@@ -72,3 +77,12 @@ h1 { font-size: 20px; margin: 0 0 20px; }
 .param-actions .primary { font-weight: 600; }
 .param-actions button { padding: 5px 12px; cursor: pointer; }
 .param-actions small { color: #777; }
+
+.debug { margin-top: 24px; padding-top: 12px; border-top: 1px dashed #bbb; }
+.debug h2 { font-size: 14px; margin: 0 0 8px; color: #555; }
+.debug canvas { max-width: 100%; border: 1px solid #999; background: #000; }
+.debug-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #666; margin-top: 6px; }
+.debug-legend .sw { display: inline-block; width: 10px; height: 10px; margin-right: 4px; }
+.sw.red { background: #ff5252; }
+.sw.green { background: #00e676; }
+.sw.blue { background: #2979ff; }

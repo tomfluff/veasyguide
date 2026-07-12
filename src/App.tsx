@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type WorkerMsg } from "./analyzer/types";
+import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type WorkerMsg } from "./analyzer/types";
 import "./App.css";
 
 const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
+
+// Debug tooling is for us: always on in dev, ?debug=1 in production builds.
+const DEBUG = import.meta.env.DEV || new URLSearchParams(location.search).get("debug") === "1";
 
 // label, key, step, hint
 const PARAM_FIELDS: [string, keyof AnalysisParams, number, string][] = [
@@ -22,8 +25,10 @@ const PARAM_FIELDS: [string, keyof AnalysisParams, number, string][] = [
 export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const magCanvasRef = useRef<HTMLCanvasElement>(null);
+  const debugCanvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const activitiesRef = useRef<Activity[]>([]);
+  const samplesRef = useRef<{ t: number; boxes: Box[] }[]>([]); // per-sample node boxes (debug)
   const fileRef = useRef<File | null>(null);
 
   const [params, setParams] = useState<AnalysisParams>(DEFAULT_PARAMS);
@@ -38,6 +43,9 @@ export default function App() {
   const [current, setCurrent] = useState<Activity | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [openClusters, setOpenClusters] = useState(0);
+  const [debugT, setDebugT] = useState(0);
+  const [playheadNodes, setPlayheadNodes] = useState<Box[]>([]);
 
   const canPlay = done || analyzedUpTo >= PLAYBACK_LEAD;
 
@@ -45,8 +53,9 @@ export default function App() {
     workerRef.current?.terminate();
     fileRef.current = file;
     activitiesRef.current = [];
+    samplesRef.current = [];
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
-    setDone(false); setError(null); setCurrent(null);
+    setDone(false); setError(null); setCurrent(null); setOpenClusters(0); setPlayheadNodes([]);
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
@@ -56,11 +65,27 @@ export default function App() {
         activitiesRef.current.push(m.activity);
         setActivityCount((c) => c + 1);
         if (m.activity.isValid) setValidCount((c) => c + 1);
-      } else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); }
+      } else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); setOpenClusters(m.openClusters); }
       else if (m.type === "done") { setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); }
       else if (m.type === "error") setError(m.message);
+      else if (m.type === "debugFrame") {
+        samplesRef.current.push({ t: m.t, boxes: m.boxes });
+        // Draw straight to the canvas — no React state per sample (5/sec of video × 16×).
+        const c = debugCanvasRef.current;
+        if (c) {
+          if (c.width !== m.w) { c.width = m.w; c.height = m.h; }
+          const ctx = c.getContext("2d");
+          if (ctx) {
+            ctx.putImageData(new ImageData(new Uint8ClampedArray(m.frame), m.w, m.h), 0, 0);
+            ctx.strokeStyle = "#00e676";
+            ctx.lineWidth = 1.5;
+            for (const b of m.boxes) ctx.strokeRect(b.x, b.y, b.w, b.h);
+          }
+        }
+        setDebugT(m.t);
+      }
     };
-    worker.postMessage({ type: "start", file, params: p });
+    worker.postMessage({ type: "start", file, params: p, debug: DEBUG });
     workerRef.current = worker;
   }
 
@@ -112,6 +137,12 @@ export default function App() {
     );
     hits.sort((a, b) => a.start - b.start);
     setCurrent(hits[0] ?? null);
+    if (DEBUG) {
+      // Raw nodes detected near the playhead — what the pipeline saw, pre-clustering.
+      setPlayheadNodes(
+        samplesRef.current.filter((s) => Math.abs(s.t - t) <= 0.6).flatMap((s) => s.boxes)
+      );
+    }
   }
 
   const progressPct = meta ? Math.min(100, (Math.min(analyzedUpTo, meta.duration) / meta.duration) * 100) : 0;
@@ -144,6 +175,14 @@ export default function App() {
                 height: `${(current.box.h / meta.analysisHeight) * 100}%`,
               }} />
             )}
+            {DEBUG && meta && playheadNodes.map((b, i) => (
+              <div key={i} className="node-box" style={{
+                left: `${(b.x / meta.analysisWidth) * 100}%`,
+                top: `${(b.y / meta.analysisHeight) * 100}%`,
+                width: `${(b.w / meta.analysisWidth) * 100}%`,
+                height: `${(b.h / meta.analysisHeight) * 100}%`,
+              }} />
+            ))}
             {!canPlay && <div className="gate">Analyzing… playback unlocks at {PLAYBACK_LEAD}s lead</div>}
           </div>
 
@@ -185,6 +224,19 @@ export default function App() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {DEBUG && (
+        <div className="debug">
+          <h2>Analyzer view {done ? "(final sample)" : `@ ${debugT.toFixed(1)}s`}</h2>
+          <canvas ref={debugCanvasRef} width={480} height={270} />
+          <div className="debug-legend">
+            <span><i className="sw red" /> diff mask (post-dilate)</span>
+            <span><i className="sw green" /> node boxes (this sample)</span>
+            <span><i className="sw blue" /> raw nodes near playhead (on video)</span>
+            <span>{openClusters} open clusters · {samplesRef.current.length} samples</span>
           </div>
         </div>
       )}

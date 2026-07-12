@@ -61,9 +61,13 @@ export type AnalysisMeta = {
 export type WorkerMsg =
   | { type: "meta"; meta: AnalysisMeta }
   | { type: "activity"; activity: Activity }
-  | { type: "progress"; analyzedUpTo: number; xRealtime: number }
+  | { type: "progress"; analyzedUpTo: number; xRealtime: number; openClusters: number }
   | { type: "done"; wallMs: number; xRealtime: number }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  // Debug-only: per-sample analyzer view. `frame` is RGBA (w×h×4, transferred):
+  // grayscale sample with the post-dilate diff mask tinted red. `boxes` are the
+  // node boxes detected for this sample (analysis-res px).
+  | { type: "debugFrame"; t: number; frame: ArrayBuffer; w: number; h: number; boxes: Box[] };
 
 // Main -> worker
-export type StartMsg = { type: "start"; file: File; params: AnalysisParams };
+export type StartMsg = { type: "start"; file: File; params: AnalysisParams; debug: boolean };

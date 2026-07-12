@@ -26,7 +26,10 @@ function union(a: Box, b: Box): Box {
   return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
 }
 
-type Cluster = { box: Box; start: number; end: number; nodeCount: number };
+// `recent` holds member nodes still within spanTh of the frontier — the only ones a
+// new node can link to. Linking is node-to-node (faithful to roi.py edges), NOT
+// node-to-cluster-bbox, which would grow ever more aggressive as clusters merge.
+type Cluster = { box: Box; start: number; end: number; nodeCount: number; recent: Node[] };
 
 export class StreamingClusterer {
   private open: Cluster[] = [];
@@ -47,13 +50,16 @@ export class StreamingClusterer {
     let merged: Cluster | null = null;
     const survivors: Cluster[] = [];
     for (const c of this.open) {
-      const linked = node.t - c.end <= this.spanTh && rectGap(node.box, c.box) <= this.distTh;
+      // Prune members that fell out of the linkable window.
+      c.recent = c.recent.filter((r) => node.t - r.t <= this.spanTh);
+      const linked = c.recent.some((r) => rectGap(node.box, r.box) <= this.distTh);
       if (!linked) { survivors.push(c); continue; }
       if (!merged) {
         c.box = union(c.box, node.box);
         c.end = Math.max(c.end, node.t);
         c.start = Math.min(c.start, node.t);
         c.nodeCount++;
+        c.recent.push(node);
         merged = c;
         survivors.push(c);
       } else {
@@ -61,13 +67,18 @@ export class StreamingClusterer {
         merged.start = Math.min(merged.start, c.start);
         merged.end = Math.max(merged.end, c.end);
         merged.nodeCount += c.nodeCount;
+        merged.recent.push(...c.recent);
       }
     }
     if (!merged) {
-      survivors.push({ box: node.box, start: node.t, end: node.t, nodeCount: 1 });
+      survivors.push({ box: node.box, start: node.t, end: node.t, nodeCount: 1, recent: [node] });
     }
     this.open = survivors;
     return finalized;
+  }
+
+  get openCount(): number {
+    return this.open.length;
   }
 
   // Finalize clusters that can no longer grow (frontier passed end + spanTh).
