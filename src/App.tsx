@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Range, type Scene, type WorkerMsg } from "./analyzer/types";
-import { selectActivity } from "./analyzer/select";
 import { coverage, isAnalyzed } from "./analyzer/ranges";
+import VideoPlayer from "./player/VideoPlayer";
 import "./App.css";
 
 const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
@@ -112,8 +112,8 @@ const PARAM_FIELDS: ParamField[] = [
 ];
 
 export default function App() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const magCanvasRef = useRef<HTMLCanvasElement>(null);
+  // Lets debug UI (analyzer view, scene strip) seek the player's video element.
+  const seekFnRef = useRef<(t: number) => void>(() => {});
   const debugCanvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const activitiesRef = useRef<Activity[]>([]);
@@ -138,7 +138,6 @@ export default function App() {
   const [validCount, setValidCount] = useState(0);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [current, setCurrent] = useState<Activity | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
@@ -178,7 +177,7 @@ export default function App() {
     framesBytesRef.current = 0;
     followRef.current = true;
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
-    setDone(false); setError(null); setCurrent(null); setOpenClusters(0); setPlayheadNodes([]);
+    setDone(false); setError(null); setOpenClusters(0); setPlayheadNodes([]);
     setFramesCount(0); setViewIdx(-1); setScenes([]); setRanges([]);
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
@@ -238,44 +237,22 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Magnification-rate canvas blit — mirrors MagnificationOverlay's per-frame readback
-  // cost so the Phase-0 measurement is honest.
-  useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      const v = videoRef.current, c = magCanvasRef.current;
-      if (v && c && !v.paused && v.videoWidth) {
-        const ctx = c.getContext("2d");
-        if (ctx) ctx.drawImage(v, 0, 0, c.width, c.height);
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
   // Seeking somewhere unanalyzed: tell the worker to abandon what it's doing and
   // analyze from here, so the viewer's position always wins.
-  function onSeeked() {
-    const v = videoRef.current;
-    if (!v || done || !workerRef.current) return;
-    if (!isAnalyzed(ranges, v.currentTime)) {
-      workerRef.current.postMessage({ type: "seek", t: v.currentTime });
+  function onSeeked(t: number) {
+    if (done || !workerRef.current) return;
+    if (!isAnalyzed(ranges, t)) {
+      workerRef.current.postMessage({ type: "seek", t });
     }
   }
 
-  function onTimeUpdate() {
-    const v = videoRef.current;
-    if (!v) return;
-    setCurrentTime(v.currentTime);
-    const t = v.currentTime;
-    setCurrent(
-      selectActivity(activitiesRef.current, t, {
-        lead: params.highlightLead,
-        linger: params.highlightLinger,
-        minDuration: params.minDuration,
-      })
-    );
+  // The player reports time per presented frame (rVFC); throttle App re-renders,
+  // which only feed the HUD and the debug node overlay.
+  const lastTimeRef = useRef(-1);
+  function onTimeChange(t: number) {
+    if (Math.abs(t - lastTimeRef.current) < 0.2) return;
+    lastTimeRef.current = t;
+    setCurrentTime(t);
     if (DEBUG) {
       // Raw nodes detected near the playhead — what the pipeline saw, pre-clustering.
       setPlayheadNodes(
@@ -284,12 +261,20 @@ export default function App() {
     }
   }
 
+  const selectOpts = useMemo(
+    () => ({
+      lead: params.highlightLead,
+      linger: params.highlightLinger,
+      minDuration: params.minDuration,
+    }),
+    [params.highlightLead, params.highlightLinger, params.minDuration]
+  );
+
   const progressPct = meta ? coverage(ranges, meta.duration) * 100 : 0;
-  const atUnanalyzed = !!meta && !done && !isAnalyzed(ranges, currentTime);
 
   return (
     <div className="app">
-      <h1>veasyguide-app · Phase 0 spike</h1>
+      <h1>veasyguide-app</h1>
 
       {!videoUrl && (
         <label className="drop">
@@ -304,29 +289,25 @@ export default function App() {
 
       {videoUrl && (
         <div className="stage">
-          <div className="video-wrap">
-            <video ref={videoRef} src={videoUrl} controls={canPlay}
-              onTimeUpdate={onTimeUpdate} onSeeked={onSeeked}
-              style={{ width: "100%", display: "block" }} />
-            {current && meta && (
-              <div className="highlight" style={{
-                left: `${(current.box.x / meta.analysisWidth) * 100}%`,
-                top: `${(current.box.y / meta.analysisHeight) * 100}%`,
-                width: `${(current.box.w / meta.analysisWidth) * 100}%`,
-                height: `${(current.box.h / meta.analysisHeight) * 100}%`,
-              }} />
-            )}
-            {DEBUG && meta && playheadNodes.map((b, i) => (
-              <div key={i} className="node-box" style={{
-                left: `${(b.x / meta.analysisWidth) * 100}%`,
-                top: `${(b.y / meta.analysisHeight) * 100}%`,
-                width: `${(b.w / meta.analysisWidth) * 100}%`,
-                height: `${(b.h / meta.analysisHeight) * 100}%`,
-              }} />
-            ))}
-            {!canPlay && <div className="gate">Analyzing… playback unlocks at {PLAYBACK_LEAD}s lead</div>}
-            {canPlay && atUnanalyzed && <div className="catching-up">Analyzing this part…</div>}
-          </div>
+          {meta ? (
+            <VideoPlayer
+              key={videoUrl}
+              src={videoUrl}
+              meta={meta}
+              activitiesRef={activitiesRef}
+              scenes={scenes}
+              ranges={ranges}
+              done={done}
+              canPlay={canPlay}
+              selectOpts={selectOpts}
+              debugNodes={DEBUG ? playheadNodes : undefined}
+              onSeeked={onSeeked}
+              onTimeChange={onTimeChange}
+              seekFnRef={seekFnRef}
+            />
+          ) : (
+            <div className="probing">Reading video…</div>
+          )}
 
           <div className="hud">
             <div className={`meter ${xRealtime >= 4 ? "ok" : xRealtime >= 2 ? "warn" : "bad"}`}>
@@ -453,7 +434,7 @@ export default function App() {
             onClick={() => {
               const i = viewIdx >= 0 ? viewIdx : framesCount - 1;
               const f = framesRef.current[i];
-              if (f && videoRef.current) videoRef.current.currentTime = f.t;
+              if (f) seekFnRef.current(f.t);
             }}
           />
           <input
@@ -481,7 +462,7 @@ export default function App() {
                     width: `${((s.end - s.start) / meta.duration) * 100}%`,
                   }}
                   title={`Scene ${s.id + 1}: ${s.start.toFixed(1)}s – ${s.end.toFixed(1)}s`}
-                  onClick={() => { if (videoRef.current) videoRef.current.currentTime = s.start; }}
+                  onClick={() => seekFnRef.current(s.start)}
                 >
                   {s.id + 1}
                 </button>
@@ -503,9 +484,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Stand-in for MagnificationOverlay's per-frame video->canvas readback, so the
-          measured cost includes what the real magnifier will pay during playback. */}
-      <canvas ref={magCanvasRef} width={480} height={270} className="mag" hidden={!DEBUG} />
     </div>
   );
 }

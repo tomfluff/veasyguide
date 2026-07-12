@@ -1,0 +1,352 @@
+/* Ported from VeasyGuide: VideoPlayer.css + HighlightIndicator.css +
+   MagnificationOverlay.css, combined. Additions for streaming analysis at the
+   bottom (.timeline-analyzed, .overlay-gate, .overlay-catching-up, .node-box). */
+
+.video-container {
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  justify-content: center;
+  margin-inline: auto;
+  position: relative;
+  background-color: black;
+  box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.5);
+}
+
+.video-container.theater,
+.video-container.fullscreen {
+  max-width: initial;
+  width: 100%;
+  margin-top: 0;
+}
+
+.video-container.theater {
+  max-height: 80vh;
+}
+
+.video-container.fullscreen {
+  max-height: initial;
+  height: 100vh;
+}
+
+.video-container video {
+  width: 100%;
+  aspect-ratio: 16/9;
+}
+
+.video-controls-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  opacity: 1;
+  transition: opacity 150ms ease-in-out;
+}
+
+.video-controls-container::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
+  aspect-ratio: 6/1;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.video-container.paused .video-controls-container {
+  opacity: 1;
+}
+
+.video-container.clear .video-controls-container {
+  opacity: 0;
+}
+
+.video-controls-container .controls button {
+  color: white;
+  height: 2rem;
+  width: 2rem;
+}
+
+.video-controls-container .controls button svg {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.controls button {
+  opacity: 0.85;
+}
+
+.controls button:hover {
+  opacity: 1;
+}
+
+.controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.volume-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.volume-container .volume-slider {
+  width: 0px;
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: width 150ms ease-in-out, transform 150ms ease-in-out;
+}
+
+.volume-container:hover .volume-slider,
+.volume-container:focus-within .volume-slider {
+  width: 100px;
+  transform: scaleX(1);
+}
+
+.duration-container {
+  color: white;
+  flex-grow: 1;
+}
+
+.timeline-container {
+  height: 0.75rem;
+  margin-inline: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.timeline {
+  background-color: rgba(100, 100, 100, 0.75);
+  height: 0.5rem;
+  width: 100%;
+  position: relative;
+  transition: height 150ms ease-in-out;
+}
+
+.timeline-container:hover .timeline {
+  height: 100%;
+}
+
+.timeline-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background-color: rgba(215, 31, 31, 0.75);
+}
+
+.timeline-thumb {
+  --scale: 0;
+  position: absolute;
+  height: 200%;
+  top: -50%;
+  border-radius: 50%;
+  transform: translateX(-50%) scale(var(--scale));
+  transition: transform 100ms ease-out;
+  background-color: rgba(215, 31, 31, 1);
+  aspect-ratio: 1/1;
+}
+
+.timeline-container:hover .timeline-thumb {
+  --scale: 1;
+}
+
+.timeline-tooltip {
+  position: absolute;
+  bottom: 200%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  display: none;
+}
+
+.timeline-container:hover .timeline-tooltip {
+  display: block;
+}
+
+.video-highlights,
+.video-magnification {
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.video-overlay,
+.video-overlay .overlay-play-pause {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 15;
+}
+
+.video-overlay .overlay-play-pause {
+  z-index: 20;
+}
+
+.video-overlay .time-shift {
+  position: absolute;
+  width: 25%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--flash-speed) ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-overlay .time-shift.back-shift {
+  top: 0;
+  left: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.25), transparent);
+}
+
+.video-overlay .time-shift.forward-shift {
+  top: 0;
+  right: 0;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.25), transparent);
+}
+
+.video-overlay .time-shift svg {
+  width: 25%;
+  height: auto;
+  padding: 1rem;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.video-overlay .zoom-indicator {
+  --zoom-indicator-size: 4rem;
+  width: var(--zoom-indicator-size);
+  height: var(--zoom-indicator-size);
+  margin: calc(var(--zoom-indicator-size) / 2);
+  padding: 0.25rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0 0.5rem 0.5rem rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transition: opacity var(--flash-speed) ease-in-out;
+}
+
+.video-overlay .zoom-indicator svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0.25rem 0.35rem rgba(0, 0, 0, 0.5));
+  color: rgba(255, 255, 255, 1);
+}
+
+.overlay-end {
+  background-color: rgba(0, 0, 0, 0.5);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* HighlightIndicator */
+.highlight-wrapper {
+  z-index: 10;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(var(--indicator-scale));
+  }
+  50% {
+    transform: scale(calc(var(--indicator-scale) * 1.25));
+  }
+  100% {
+    transform: scale(var(--indicator-scale));
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: var(--highlight-opacity);
+  }
+}
+
+/* MagnificationOverlay */
+.magnification-wrapper {
+  z-index: 10;
+  margin-inline: auto;
+  height: inherit;
+  background-color: black;
+}
+
+.magnification-wrapper .magnification-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+.magnification-content canvas {
+  margin: 0;
+  padding: 0;
+}
+
+/* --- Streaming-analysis additions (not in the original) --- */
+
+.timeline-analyzed {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.35),
+    rgba(255, 255, 255, 0.35) 4px,
+    rgba(255, 255, 255, 0.15) 4px,
+    rgba(255, 255, 255, 0.15) 8px
+  );
+}
+
+.video-overlay .overlay-gate,
+.video-overlay .overlay-catching-up {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 0.35rem 0.9rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  z-index: 25;
+  pointer-events: none;
+}
+
+.video-overlay .overlay-gate {
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1rem;
+}
+
+.video-overlay .overlay-catching-up {
+  top: 0.75rem;
+}
+
+.video-highlights .node-box {
+  position: absolute;
+  border: 1.5px solid #2979ff;
+  pointer-events: none;
+  z-index: 11;
+}
