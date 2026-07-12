@@ -279,6 +279,41 @@ guard. Worth knowing about if you touch `ranges.ts`.
 
 ---
 
+## D15 — Enhance filters run as WebGL shaders, not CSS/SVG filters
+
+**Decision.** `EnhanceCanvas` and `MagnificationOverlay` render through a small WebGL
+renderer (`glEnhance.ts`) that implements the enhance effects as fragment shaders. The
+SVG filter defs remain, but only as the **fallback** when WebGL is unavailable.
+
+**Why.** `sharpen` was visibly loading the CPU. Simple CSS filter *functions* (`contrast`,
+`blur`) are GPU-accelerated, but a **reference filter** — `filter: url(#…)` — drops the
+browser into its **software SVG-filter path**. `feConvolveMatrix` is a per-pixel 3×3
+convolution executed on the CPU, and because the canvas beneath updates every frame, it was
+re-run on every frame, forever. Same for the `feMorphology` in the "bolder ink" filters.
+
+A fragment shader does the identical maths on the GPU in microseconds. Everything moved:
+- `bold-dark` / `bold-light` → 3×3 min/max (erode/dilate) with the same contrast stretch and
+  saturate, folded into one pass (the stretch is monotonic, so it commutes with min/max)
+- `sharpen` → the same `[0 −1 0; −1 5 −1; 0 −1 0]` unsharp kernel
+- `invert`, and the magnifier's `contrast` → point ops in the final pass
+
+**The second win, independent of the GPU:** redraws are now driven by
+`requestVideoFrameCallback` — once per **new video frame** — instead of
+`requestAnimationFrame`. A 30 fps lecture on a 144 Hz display was being re-filtered 144×/s to
+show 30 distinct images. It also stops entirely while the video is paused, where the old loop
+kept running forever.
+
+**Fallback.** No WebGL → the 2D canvas + `filter: url(#…)` path from D14, unchanged. The SVG
+defs are still the reference implementation, and the shaders are written to match them.
+
+**Not verified here:** the CPU saving was measured by the user on real hardware, not by us —
+the headless Chromium used for automated checks runs software GL (it even logs *"GPU stall due
+to ReadPixels"*), so any performance number taken there would be meaningless. What *is*
+verified in the browser: WebGL is selected, no CSS filter is applied, and the shader output is
+correct (an `invert` magnifier renders fully inverted).
+
+---
+
 ## D14 — Enhance filters copy the video into a canvas instead of filtering the backdrop
 
 **Decision.** The highlight's "enhance" filters no longer use `backdrop-filter: url(#…)`.
