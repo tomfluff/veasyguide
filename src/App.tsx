@@ -11,19 +11,70 @@ const MAX_DEBUG_FRAMES = 6000;
 
 type DebugFrame = { t: number; blob: Blob; boxes: Box[] };
 
-// label, key, step, hint
-const PARAM_FIELDS: [string, keyof AnalysisParams, number, string][] = [
-  ["Analysis width (px)", "analysisWidth", 40, "downscale target; lower = faster, coarser"],
-  ["Sample interval (s)", "sampleInterval", 0.05, "time between compared frames"],
-  ["Diff threshold", "diffThresh", 1, "min pixel change to count as motion (0-255)"],
-  ["Dilate iterations", "dilateIters", 1, "mask growth passes; higher merges nearby specks"],
-  ["Min region area (frac)", "contourAreaLowFrac", 0.00005, "drop changed regions smaller than this fraction of frame"],
-  ["Max region area (frac)", "contourAreaHighFrac", 0.05, "drop changed regions larger than this fraction of frame"],
-  ["Link time gap (s)", "spanTh", 0.1, "max time between nodes of one activity"],
-  ["Link distance (frac diag)", "distRatio", 0.005, "max spatial gap between nodes of one activity"],
-  ["Min activity size (frac)", "minSizeFrac", 0.005, "validity: activity w/h at least this fraction of frame"],
-  ["Max activity size (frac)", "maxSizeFrac", 0.05, "validity: activity w/h at most this fraction of frame"],
-  ["Min duration (s)", "minDuration", 0.1, "hide activities shorter than this"],
+type ParamField = {
+  key: keyof AnalysisParams;
+  label: string;
+  step: number;
+  what: string; // what it does, mechanically
+  why: string; // why the heuristic exists + origin + tuning direction
+};
+
+const PARAM_FIELDS: ParamField[] = [
+  {
+    key: "analysisWidth", label: "Analysis width (px)", step: 40,
+    what: "Frames are downscaled to this width before any pixel work; detected coordinates are scaled back up for the overlays.",
+    why: "Pixel-op cost scales with area, and slide content is coarse enough to survive downscaling — 480p is ~4× cheaper than 720p. The Python analyzer ran at native resolution, so set this to the video's width to reproduce it exactly. Lower = faster but thin pen strokes (1–2 px) can vanish.",
+  },
+  {
+    key: "sampleInterval", label: "Sample interval (s)", step: 0.05,
+    what: "Consecutive sampled frames this far apart in time are compared; each comparison can yield detection nodes.",
+    why: "Adjacent frames (~33 ms) differ too little to segment — comparing across 200 ms accumulates enough change to see a pen stroke, and cuts the work ~6×. Study value: sample_fps_ratio=0.2. Lower = finer timing, more compute; higher = brief pointing gestures fall between samples.",
+  },
+  {
+    key: "diffThresh", label: "Diff threshold", step: 1,
+    what: "Minimum grayscale change (0–255) for a pixel to count as 'changed' between the two compared frames.",
+    why: "Video compression makes pixels wiggle a few units even in perfectly static regions; 25 sits above codec noise while ink-on-slide changes are high-contrast and clear it easily. Python: threshold(blur, 25). Lower = more sensitive but noise blobs appear; higher = faint cursors and low-contrast marks are missed.",
+  },
+  {
+    key: "dilateIters", label: "Dilate iterations", step: 1,
+    what: "Grows the changed-pixel mask outward ~1 px per pass before regions are extracted.",
+    why: "One pen stroke fragments into disconnected specks after thresholding; dilation glues them into a single region so it's detected as one node instead of ten. Python: cv2.dilate(iterations=3). More = distinct nearby events merge; fewer = fragments get dropped by the area filter.",
+  },
+  {
+    key: "contourAreaLowFrac", label: "Min region area (frac)", step: 0.00005,
+    what: "Changed regions smaller than this fraction of the frame area are discarded as noise.",
+    why: "Residual compression shimmer survives thresholding as tiny blobs, while real activity (cursor, text) is bigger. 0.00015 of 720p ≈ a 12×12 px blob. Python: contour_area_low. Lower = keeps tiny marks (dots on i's) plus more noise; higher = small pointer movements disappear.",
+  },
+  {
+    key: "contourAreaHighFrac", label: "Max region area (frac)", step: 0.05,
+    what: "Changed regions larger than this fraction of the frame area are discarded.",
+    why: "A slide transition or scroll changes most of the frame at once — that's a scene change, not instructor activity, and without this cap it becomes one giant bogus 'activity'. Python: contour_area_high. Also the stand-in for scene detection until that lands (design Phase 1).",
+  },
+  {
+    key: "spanTh", label: "Link time gap (s)", step: 0.1,
+    what: "Two detection nodes can belong to the same activity only if they occur within this many seconds of each other. Also sets finalization lag: an activity is emitted once analysis passes this far beyond its last node.",
+    why: "Writing pauses — the pen lifts between words — and 1 s bridges those pauses without chaining unrelated events. Study value: roi_timespan_th=1.0 (code default was 1.5). Higher = longer merged activities and more delay before they appear; lower = one gesture splits into several activities.",
+  },
+  {
+    key: "distRatio", label: "Link distance (frac diag)", step: 0.005,
+    what: "Max spatial gap between two nodes' boxes (as a fraction of the frame diagonal) for them to link into one activity.",
+    why: "Consecutive strokes of one annotation land near each other; unrelated activities happen across the slide. 5% of the diagonal ≈ 73 px at 720p. Python: roi_distance_ratio, node-to-node edges. Higher = neighboring distinct activities merge; lower = a fast-moving pointer splits into pieces.",
+  },
+  {
+    key: "minSizeFrac", label: "Min activity size (frac)", step: 0.005,
+    what: "Validity heuristic: a finished activity's width AND height must each be at least this fraction of the frame's, else it's flagged invalid (hidden, not deleted — see the valid/total count).",
+    why: "An activity under ~1% of the frame is usually noise that survived clustering, and too small to usefully highlight or zoom into. Python: roi_area_low in RoIActivity._is_valid.",
+  },
+  {
+    key: "maxSizeFrac", label: "Max activity size (frac)", step: 0.05,
+    what: "Validity heuristic: activity width/height must each be at most this fraction of the frame's.",
+    why: "Something spanning >70% of the frame is a scene-level change (scroll, transition, camera move) — highlighting it is meaningless and magnifying it is impossible. Python: roi_area_high in RoIActivity._is_valid.",
+  },
+  {
+    key: "minDuration", label: "Min duration (s)", step: 0.1,
+    what: "Display filter only (no re-analysis): activities shorter than this are hidden from the player overlays.",
+    why: "Sub-second blips — a stray cursor flick — can distract more than help when highlighted. This comes from the player, not the analyzer: the study player filtered by duration ('atLeast', up to 1.5 s in some modes) when choosing what to highlight.",
+  },
 ];
 
 export default function App() {
@@ -40,6 +91,7 @@ export default function App() {
 
   const [params, setParams] = useState<AnalysisParams>(DEFAULT_PARAMS);
   const [showParams, setShowParams] = useState(false);
+  const [infoKey, setInfoKey] = useState<keyof AnalysisParams | null>(null);
   const [meta, setMeta] = useState<AnalysisMeta | null>(null);
   const [analyzedUpTo, setAnalyzedUpTo] = useState(0);
   const [xRealtime, setXRealtime] = useState(0);
@@ -231,18 +283,39 @@ export default function App() {
             {showParams && (
               <>
                 <div className="param-grid">
-                  {PARAM_FIELDS.map(([label, key, step, hint]) => (
-                    <label key={key} title={hint}>
-                      <span>{label}</span>
-                      <input
-                        type="number"
-                        step={step}
-                        value={params[key]}
-                        onChange={(e) => setParams((p) => ({ ...p, [key]: Number(e.target.value) }))}
-                      />
-                    </label>
+                  {PARAM_FIELDS.map(({ key, label, step, what }) => (
+                    <div className="param-field" key={key}>
+                      <button
+                        type="button"
+                        className={`info-btn ${infoKey === key ? "active" : ""}`}
+                        title={what}
+                        aria-label={`About ${label}`}
+                        onClick={() => setInfoKey((k) => (k === key ? null : key))}
+                      >
+                        ⓘ
+                      </button>
+                      <label>
+                        <span>{label}</span>
+                        <input
+                          type="number"
+                          step={step}
+                          value={params[key]}
+                          onChange={(e) => setParams((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                        />
+                      </label>
+                    </div>
                   ))}
                 </div>
+                {infoKey && (() => {
+                  const f = PARAM_FIELDS.find((f) => f.key === infoKey)!;
+                  return (
+                    <div className="param-info">
+                      <b>{f.label}</b>
+                      <p><b>What it does:</b> {f.what}</p>
+                      <p><b>Why it exists:</b> {f.why}</p>
+                    </div>
+                  );
+                })()}
                 <div className="param-actions">
                   <button type="button" className="primary" onClick={reanalyze}>Re-analyze</button>
                   <button type="button" onClick={() => setParams(DEFAULT_PARAMS)}>Reset to defaults</button>
