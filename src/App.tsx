@@ -6,6 +6,10 @@ const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
 
 // Debug tooling is for us: always on in dev, ?debug=1 in production builds.
 const DEBUG = import.meta.env.DEV || new URLSearchParams(location.search).get("debug") === "1";
+// In-memory cap for stored analyzer frames (~25 KB each => ~150 MB worst case).
+const MAX_DEBUG_FRAMES = 6000;
+
+type DebugFrame = { t: number; blob: Blob; boxes: Box[] };
 
 // label, key, step, hint
 const PARAM_FIELDS: [string, keyof AnalysisParams, number, string][] = [
@@ -28,7 +32,10 @@ export default function App() {
   const debugCanvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const activitiesRef = useRef<Activity[]>([]);
-  const samplesRef = useRef<{ t: number; boxes: Box[] }[]>([]); // per-sample node boxes (debug)
+  const framesRef = useRef<DebugFrame[]>([]); // all analyzer-view frames (debug; in-memory only)
+  const framesBytesRef = useRef(0);
+  const followRef = useRef(true); // scrubber follows the analysis frontier until user scrubs
+  const lastDrawRef = useRef(0);
   const fileRef = useRef<File | null>(null);
 
   const [params, setParams] = useState<AnalysisParams>(DEFAULT_PARAMS);
@@ -44,8 +51,28 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [openClusters, setOpenClusters] = useState(0);
-  const [debugT, setDebugT] = useState(0);
+  const [framesCount, setFramesCount] = useState(0);
+  const [viewIdx, setViewIdx] = useState(-1); // -1 = follow the frontier
   const [playheadNodes, setPlayheadNodes] = useState<Box[]>([]);
+
+  // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
+  async function renderDebugFrame(i: number) {
+    const f = framesRef.current[i];
+    const c = debugCanvasRef.current;
+    if (!f || !c) return;
+    const bmp = await createImageBitmap(f.blob);
+    if (c.width !== bmp.width) { c.width = bmp.width; c.height = bmp.height; }
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(bmp, 0, 0);
+    bmp.close();
+    ctx.strokeStyle = "#00e676";
+    ctx.lineWidth = 1.5;
+    for (const b of f.boxes) ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px monospace";
+    ctx.fillText(`${f.t.toFixed(2)}s · ${f.boxes.length} nodes`, 6, 14);
+  }
 
   const canPlay = done || analyzedUpTo >= PLAYBACK_LEAD;
 
@@ -53,9 +80,12 @@ export default function App() {
     workerRef.current?.terminate();
     fileRef.current = file;
     activitiesRef.current = [];
-    samplesRef.current = [];
+    framesRef.current = [];
+    framesBytesRef.current = 0;
+    followRef.current = true;
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
     setDone(false); setError(null); setCurrent(null); setOpenClusters(0); setPlayheadNodes([]);
+    setFramesCount(0); setViewIdx(-1);
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
@@ -69,20 +99,16 @@ export default function App() {
       else if (m.type === "done") { setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); }
       else if (m.type === "error") setError(m.message);
       else if (m.type === "debugFrame") {
-        samplesRef.current.push({ t: m.t, boxes: m.boxes });
-        // Draw straight to the canvas — no React state per sample (5/sec of video × 16×).
-        const c = debugCanvasRef.current;
-        if (c) {
-          if (c.width !== m.w) { c.width = m.w; c.height = m.h; }
-          const ctx = c.getContext("2d");
-          if (ctx) {
-            ctx.putImageData(new ImageData(new Uint8ClampedArray(m.frame), m.w, m.h), 0, 0);
-            ctx.strokeStyle = "#00e676";
-            ctx.lineWidth = 1.5;
-            for (const b of m.boxes) ctx.strokeRect(b.x, b.y, b.w, b.h);
-          }
+        if (framesRef.current.length < MAX_DEBUG_FRAMES) {
+          framesRef.current.push({ t: m.t, blob: m.blob, boxes: m.boxes });
+          framesBytesRef.current += m.blob.size;
+          setFramesCount(framesRef.current.length);
         }
-        setDebugT(m.t);
+        // While following, live-draw the frontier (throttled to ~15 fps of wall time).
+        if (followRef.current && performance.now() - lastDrawRef.current > 66) {
+          lastDrawRef.current = performance.now();
+          void renderDebugFrame(framesRef.current.length - 1);
+        }
       }
     };
     worker.postMessage({ type: "start", file, params: p, debug: DEBUG });
@@ -140,7 +166,7 @@ export default function App() {
     if (DEBUG) {
       // Raw nodes detected near the playhead — what the pipeline saw, pre-clustering.
       setPlayheadNodes(
-        samplesRef.current.filter((s) => Math.abs(s.t - t) <= 0.6).flatMap((s) => s.boxes)
+        framesRef.current.filter((s) => Math.abs(s.t - t) <= 0.6).flatMap((s) => s.boxes)
       );
     }
   }
@@ -230,13 +256,47 @@ export default function App() {
 
       {DEBUG && (
         <div className="debug">
-          <h2>Analyzer view {done ? "(final sample)" : `@ ${debugT.toFixed(1)}s`}</h2>
-          <canvas ref={debugCanvasRef} width={480} height={270} />
+          <h2>
+            Analyzer view
+            {viewIdx >= 0
+              ? ` — sample ${viewIdx + 1}/${framesCount} (scrubbed)`
+              : done ? " — end (drag to scrub)" : " — following frontier"}
+          </h2>
+          <canvas
+            ref={debugCanvasRef}
+            width={480}
+            height={270}
+            title="Click to seek the video to this sample"
+            onClick={() => {
+              const i = viewIdx >= 0 ? viewIdx : framesCount - 1;
+              const f = framesRef.current[i];
+              if (f && videoRef.current) videoRef.current.currentTime = f.t;
+            }}
+          />
+          <input
+            className="debug-scrub"
+            type="range"
+            min={0}
+            max={Math.max(0, framesCount - 1)}
+            value={viewIdx >= 0 ? viewIdx : Math.max(0, framesCount - 1)}
+            onChange={(e) => {
+              const i = Number(e.target.value);
+              followRef.current = false;
+              setViewIdx(i);
+              void renderDebugFrame(i);
+            }}
+          />
           <div className="debug-legend">
             <span><i className="sw red" /> diff mask (post-dilate)</span>
             <span><i className="sw green" /> node boxes (this sample)</span>
             <span><i className="sw blue" /> raw nodes near playhead (on video)</span>
-            <span>{openClusters} open clusters · {samplesRef.current.length} samples</span>
+            <span>{openClusters} open clusters</span>
+            <span>{framesCount}{framesCount >= MAX_DEBUG_FRAMES ? " (capped)" : ""} frames · {(framesBytesRef.current / 1048576).toFixed(1)} MB in memory (cleared on refresh)</span>
+            {viewIdx >= 0 && (
+              <button type="button" onClick={() => { followRef.current = true; setViewIdx(-1); void renderDebugFrame(framesRef.current.length - 1); }}>
+                {done ? "jump to end" : "follow frontier"}
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -64,10 +64,11 @@ export type WorkerMsg =
   | { type: "progress"; analyzedUpTo: number; xRealtime: number; openClusters: number }
   | { type: "done"; wallMs: number; xRealtime: number }
   | { type: "error"; message: string }
-  // Debug-only: per-sample analyzer view. `frame` is RGBA (w×h×4, transferred):
-  // grayscale sample with the post-dilate diff mask tinted red. `boxes` are the
-  // node boxes detected for this sample (analysis-res px).
-  | { type: "debugFrame"; t: number; frame: ArrayBuffer; w: number; h: number; boxes: Box[] };
+  // Debug-only: per-sample analyzer view. `blob` is a WebP of the composite
+  // (grayscale sample with the post-dilate diff mask tinted red) — ~10-25 KB each,
+  // so a whole video's worth can be kept in memory for scrubbing (gone on refresh).
+  // `boxes` are the node boxes detected for this sample (analysis-res px).
+  | { type: "debugFrame"; t: number; blob: Blob; w: number; h: number; boxes: Box[] };
 
 // Main -> worker
 export type StartMsg = { type: "start"; file: File; params: AnalysisParams; debug: boolean };

@@ -41,6 +41,8 @@ async function run({ file, params, debug }: StartMsg) {
 
   const canvas = new OffscreenCanvas(aw, ah);
   const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const debugCanvas = debug ? new OffscreenCanvas(aw, ah) : null;
+  const debugCtx = debugCanvas?.getContext("2d") ?? null;
   const sink = new VideoSampleSink(track);
 
   // Time-based sampling (design decision: robust to variable frame rate).
@@ -77,8 +79,9 @@ async function run({ file, params, debug }: StartMsg) {
         for (const act of clusterer.add({ t, box })) post({ type: "activity", activity: validate(act) });
       }
 
-      if (debug) {
-        // Composite: grayscale frame, diff-mask pixels tinted red.
+      if (debugCanvas && debugCtx) {
+        // Composite: grayscale frame, diff-mask pixels tinted red. WebP-encoded so a
+        // whole video's frames fit in memory for after-the-fact scrubbing.
         const comp = new Uint8ClampedArray(aw * ah * 4);
         for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
           const g = gray[i];
@@ -86,7 +89,9 @@ async function run({ file, params, debug }: StartMsg) {
           else { comp[p] = g; comp[p + 1] = g; comp[p + 2] = g; }
           comp[p + 3] = 255;
         }
-        post({ type: "debugFrame", t, frame: comp.buffer, w: aw, h: ah, boxes }, [comp.buffer]);
+        debugCtx.putImageData(new ImageData(comp, aw, ah), 0, 0);
+        const blob = await debugCanvas.convertToBlob({ type: "image/webp", quality: 0.8 });
+        post({ type: "debugFrame", t, blob, w: aw, h: ah, boxes });
       }
     }
     prevGray = gray;
