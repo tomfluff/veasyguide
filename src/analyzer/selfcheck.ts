@@ -1,0 +1,63 @@
+// Runnable self-check for the pure pipeline + clusterer logic (no browser needed).
+// Run: node --experimental-strip-types src/analyzer/selfcheck.ts
+import { componentBoxes, diffMask, dilate, toGray } from "./pipeline.ts";
+import { StreamingClusterer } from "./graph.ts";
+import type { Node } from "./types.ts";
+
+function assert(cond: boolean, msg: string) {
+  if (!cond) { console.error("FAIL:", msg); process.exit(1); }
+  console.log("ok:", msg);
+}
+
+const W = 100, H = 100;
+
+// Build an RGBA frame with a filled white box.
+function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8ClampedArray {
+  const rgba = new Uint8ClampedArray(W * H * 4);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const inBox = x >= bx && x < bx + bw && y >= by && y < by + bh;
+      const p = (y * W + x) * 4;
+      const v = inBox ? 255 : 20;
+      rgba[p] = rgba[p + 1] = rgba[p + 2] = v;
+      rgba[p + 3] = 255;
+    }
+  return rgba;
+}
+
+// 1. A box that moves should produce exactly one detected component near the motion.
+{
+  const a = toGray(frameWithBox(20, 20, 12, 12), W, H);
+  const b = toGray(frameWithBox(40, 40, 12, 12), W, H);
+  const mask = dilate(diffMask(a, b, W, H), W, H);
+  const boxes = componentBoxes(mask, W, H);
+  assert(boxes.length >= 1, `motion produces >=1 component (got ${boxes.length})`);
+  // The changed region spans roughly x:20..52, y:20..52
+  const b0 = boxes[0];
+  assert(b0.x < 40 && b0.x + b0.w > 30, `component overlaps the motion region (x=${b0.x},w=${b0.w})`);
+}
+
+// 2. Identical frames produce no components.
+{
+  const a = toGray(frameWithBox(30, 30, 12, 12), W, H);
+  const mask = dilate(diffMask(a, a, W, H), W, H);
+  assert(componentBoxes(mask, W, H).length === 0, "identical frames -> 0 components");
+}
+
+// 3. Clusterer: two nodes within spanTh + distTh merge; a far-future node finalizes them.
+{
+  const c = new StreamingClusterer(1.0, 15);
+  const near = (t: number, x: number): Node => ({ t, box: { x, y: 10, w: 6, h: 6 } });
+  let finalized = c.add(near(0.0, 10));
+  finalized = finalized.concat(c.add(near(0.4, 12))); // links (close in time+space)
+  assert(finalized.length === 0, "linked nodes not yet finalized");
+  // A node 3s later is beyond spanTh of the first cluster -> finalizes it.
+  finalized = c.add(near(3.0, 80));
+  assert(finalized.length === 1, `watermark finalized the stale cluster (got ${finalized.length})`);
+  assert(finalized[0].nodeCount === 2, `merged cluster has 2 nodes (got ${finalized[0].nodeCount})`);
+  assert(Math.abs(finalized[0].start - 0) < 1e-9 && Math.abs(finalized[0].end - 0.4) < 1e-9, "cluster time span correct");
+  const rest = c.flush();
+  assert(rest.length === 1, "flush emits the remaining open cluster");
+}
+
+console.log("\nALL PASS");
