@@ -9,6 +9,7 @@
 // 3. Two overlapping useEffects both called setZoom on activity change; merged.
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
+import { sanitizeFilters } from "../stores/HighlightSettingsStore";
 import type { PlayerActivity } from "./types";
 
 type Pos = { x: number; y: number };
@@ -161,9 +162,10 @@ const MagnificationOverlay = (props: Props) => {
       <div
         className="magnification-content"
         style={{
-          filter: `${settings.filter_style
+          // Regular `filter` (not backdrop-filter) — works in every browser. See D14.
+          filter: sanitizeFilters(settings.filter_style)
             .map((filter) => `url(#svgf-${filter})`)
-            .join(" ")}`,
+            .join(" "),
         }}
       >
         <canvas
@@ -172,7 +174,7 @@ const MagnificationOverlay = (props: Props) => {
             transformOrigin: `${zoomOrigin.x}px ${zoomOrigin.y}px`,
             transform: `translate(${zoomShift.x}px, ${zoomShift.y}px) scale(${zoomFactor})`,
             ...zoomTransitionPosition,
-            filter: `contrast(${settings.sharpness})`,
+            filter: `contrast(${settings.contrast})`,
           }}
           width={(props.videoRef.current?.videoWidth ?? 0) * props.scaleRatio || 0}
           height={(props.videoRef.current?.videoHeight ?? 0) * props.scaleRatio || 0}

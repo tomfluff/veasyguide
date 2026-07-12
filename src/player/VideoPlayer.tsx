@@ -445,6 +445,7 @@ const VideoPlayer = (props: Props) => {
           topShift={topShift}
           scaleRatio={scaleRatio}
           activity={playerActivity}
+          videoRef={videoRef}
         />
         {props.debugNodes?.map((b, i) => (
           <Box

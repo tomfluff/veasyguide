@@ -65,6 +65,20 @@ The zoom fallback target (`stableActivity`) was never cleared on a scene change,
 
 **Fixed:** cleared alongside `currActivity` when the scene changes.
 
+### 🔴 Highlight enhance filters were broken in Firefox and Safari
+The filters were applied with `backdrop-filter: url(#svg-filter)`, which those browsers do
+not support — and Firefox renders the element at `opacity: 0` rather than just ignoring the
+filter, so the highlight *disappeared*. Roughly a third of users, failing destructively. The
+original README acknowledged the Firefox problem in prose and shipped it anyway.
+
+**Fixed:** the video region is copied into a canvas and a regular `filter: url(#…)` is applied
+to that (works everywhere) — see [D14](decisions.md#d14--enhance-filters-copy-the-video-into-a-canvas-instead-of-filtering-the-backdrop).
+
+### 🟠 The magnifier's "Sharpen" slider did not sharpen
+It drove CSS `contrast()`, and its label rendered `sharpness - 1.0` — so the slider labelled
+"1x" was really contrast `2`. Renamed to **Contrast**; a real `sharpen` filter
+(`feConvolveMatrix`) was added as an enhance option.
+
 ### 🟠 Fullscreen on `document.body`
 ```tsx
 document.body.requestFullscreen();

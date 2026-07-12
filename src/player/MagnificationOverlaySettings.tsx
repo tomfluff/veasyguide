@@ -1,12 +1,11 @@
 // Ported from VeasyGuide unchanged (Container/Stack wrappers trimmed).
-import { Grid, Slider, Title, Space, Switch, Button, Group } from "@mantine/core";
+import { Grid, Slider, Title, Space, Switch, Button, Group, Tooltip } from "@mantine/core";
 import {
   useMagnificationSettingsStore,
   setMagnificationSettings,
   filterStyleOptions,
-  type TFilterStyle,
 } from "../stores/MagnificationSettingsStore";
-import { convertToTitleCase } from "../utils/misc";
+import { filterStyleLabels } from "../stores/HighlightSettingsStore";
 
 const MagnificationOverlaySettings = () => {
   const settingsStore = useMagnificationSettingsStore();
@@ -66,56 +65,53 @@ const MagnificationOverlaySettings = () => {
         />
       </Grid.Col>
       <Grid.Col span={4}>
-        <Title order={6}>Filter</Title>
+        <Title order={6}>Enhance</Title>
       </Grid.Col>
       <Grid.Col span={8}>
         <Group gap="xs">
-          {filterStyleOptions.map((option) => (
-            <Button
-              key={option}
-              variant="filled"
-              size="xs"
-              px={6}
-              py={0}
-              color={
-                settingsStore.filter_style.includes(option as TFilterStyle)
-                  ? "blue"
-                  : "gray"
-              }
-              onClick={() =>
-                setMagnificationSettings({
-                  filter_style: settingsStore.filter_style.includes(
-                    option as TFilterStyle
-                  )
-                    ? settingsStore.filter_style.filter((f) => f !== option)
-                    : [...settingsStore.filter_style, option as TFilterStyle].sort(
-                        (a, b) =>
-                          filterStyleOptions.indexOf(a) - filterStyleOptions.indexOf(b)
-                      ),
-                })
-              }
-            >
-              {convertToTitleCase(option)}
-            </Button>
-          ))}
+          {filterStyleOptions.map((option) => {
+            const on = settingsStore.filter_style.includes(option);
+            return (
+              <Tooltip key={option} label={filterStyleLabels[option].hint} withArrow>
+                <Button
+                  variant={on ? "filled" : "default"}
+                  size="xs"
+                  px={8}
+                  py={0}
+                  onClick={() =>
+                    setMagnificationSettings({
+                      filter_style: on
+                        ? settingsStore.filter_style.filter((f) => f !== option)
+                        : [...settingsStore.filter_style, option].sort(
+                            (a, b) =>
+                              filterStyleOptions.indexOf(a) - filterStyleOptions.indexOf(b)
+                          ),
+                    })
+                  }
+                >
+                  {filterStyleLabels[option].label}
+                </Button>
+              </Tooltip>
+            );
+          })}
         </Group>
       </Grid.Col>
       <Grid.Col span={4}>
-        <Title order={6}>Sharpen</Title>
+        <Title order={6}>Contrast</Title>
       </Grid.Col>
       <Grid.Col span={8}>
         <Slider
-          label={`${settingsStore.sharpness - 1.0}x`}
+          label={`${settingsStore.contrast.toFixed(2)}×`}
           min={1}
           max={2}
-          step={0.25}
+          step={0.05}
           marks={[
             { value: 1, label: "None" },
-            { value: 1.5, label: "0.5x" },
-            { value: 2, label: "1x" },
+            { value: 1.5, label: "1.5×" },
+            { value: 2, label: "2×" },
           ]}
-          value={settingsStore.sharpness}
-          onChange={(value) => setMagnificationSettings({ sharpness: value })}
+          value={settingsStore.contrast}
+          onChange={(value) => setMagnificationSettings({ contrast: value })}
         />
         <Space h="lg" />
       </Grid.Col>

@@ -10,12 +10,29 @@ import { createSelectors } from "./createSelectors";
 export const pointerStyleOptions = ["none", "cursor", "hand"] as const;
 export const animationStyleOptions = ["none", "pulse"] as const;
 export const shapeStyleOptions = ["static-circle", "dynamic-square"] as const;
-export const filterStyleOptions = ["invert", "thicker", "thicker-[dark]"] as const;
+
+// Enhance filters, applied to a canvas copy of the video region (see SVGFilters).
+// Renamed from the study's `thicker` / `thicker-[dark]`, which said what they did to
+// pixels rather than when to use them — and whose `[...]` was fragile inside url(#…).
+export const filterStyleOptions = ["bold-dark", "bold-light", "sharpen", "invert"] as const;
+export type TFilterStyle = (typeof filterStyleOptions)[number];
+
+export const filterStyleLabels: Record<TFilterStyle, { label: string; hint: string }> = {
+  "bold-dark": { label: "Bolder ink", hint: "Thickens dark writing on a light slide" },
+  "bold-light": { label: "Bolder ink (dark slide)", hint: "Thickens light writing on a dark slide" },
+  sharpen: { label: "Sharpen", hint: "Edge enhancement — crisper strokes and text" },
+  invert: { label: "Invert", hint: "Inverts colours in the enhanced region" },
+};
+
+// Drop anything persisted from an older build (the filter ids changed).
+export const sanitizeFilters = (list: readonly string[]): TFilterStyle[] =>
+  list.filter((f): f is TFilterStyle =>
+    (filterStyleOptions as readonly string[]).includes(f)
+  );
 
 export type TPointerStyle = (typeof pointerStyleOptions)[number];
 export type TAnimationStyle = (typeof animationStyleOptions)[number];
 export type TShapeStyle = (typeof shapeStyleOptions)[number];
-export type TFilterStyle = (typeof filterStyleOptions)[number];
 
 const initialState = {
   fill_color: "#ffcc00",

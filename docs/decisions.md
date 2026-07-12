@@ -279,6 +279,44 @@ guard. Worth knowing about if you touch `ranges.ts`.
 
 ---
 
+## D14 — Enhance filters copy the video into a canvas instead of filtering the backdrop
+
+**Decision.** The highlight's "enhance" filters no longer use `backdrop-filter: url(#…)`.
+Both the highlight and the magnifier now draw the relevant video region into a canvas and
+apply a **regular** `filter: url(#…)` to that canvas (`EnhanceCanvas.tsx`).
+
+**Why.** `backdrop-filter: url(#svg-filter)` is **unsupported in Firefox *and* Safari**
+([mdn/browser-compat-data#24110](https://github.com/mdn/browser-compat-data/issues/24110)),
+and Firefox does not degrade gracefully — the element fails to render at all, appearing at
+`opacity: 0` ([bugzilla 1787623](https://bugzilla.mozilla.org/show_bug.cgi?id=1787623)). So
+the study player's highlight filters were broken for roughly a third of users, *destructively*.
+The original README noted "Firefox has issues with feMorphology over backdrop-filter" and
+worked around it in prose rather than in code.
+
+The asymmetry that makes the fix easy: a **regular** `filter: url(#…)` works in every current
+browser. `MagnificationOverlay` already relied on that (it filters a canvas), so the highlight
+just adopts the same technique. One approach, both features, no browser caveats.
+
+**Cost.** A per-frame `drawImage` of the highlighted region — but only while filters are
+enabled *and* an activity is highlighted. Off by default, zero cost.
+
+**Consequence.** The highlight's box no longer animates its geometry while an enhance filter
+is on: the canvas holds a fixed crop of the video, so tweening the box it lives in would smear
+it against the frame underneath. Opacity still fades.
+
+**Also cleaned up here:**
+- Filter names were `thicker` / `thicker-[dark]` — describing what they do to *pixels* rather
+  than *when to use them*, and the `[...]` was fragile inside `url(#…)`. Now `bold-dark`
+  ("Bolder ink" — thickens dark writing on a light slide), `bold-light` (same for dark slides),
+  `sharpen`, `invert`, each with a hint in the UI.
+- The magnifier's **"Sharpen" slider never sharpened anything** — it drove CSS `contrast()`,
+  and its label printed `sharpness − 1`, so "1x" actually meant contrast 2. Renamed to
+  **Contrast** with an honest label. Real edge enhancement is now a separate `sharpen` filter
+  (an `feConvolveMatrix` unsharp kernel).
+- Unknown filter ids persisted from older builds are dropped on load (`sanitizeFilters`).
+
+---
+
 ## D13 — Settings persist in localStorage
 
 **Decision.** Highlight and magnification settings moved from `sessionStorage` (the study's

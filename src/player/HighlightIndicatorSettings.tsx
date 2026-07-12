@@ -14,6 +14,7 @@ import {
   Group,
   Button,
   NativeSelect,
+  Tooltip,
 } from "@mantine/core";
 import {
   useHighlightSettingsStore,
@@ -22,10 +23,10 @@ import {
   pointerStyleOptions,
   shapeStyleOptions,
   filterStyleOptions,
+  filterStyleLabels,
   type TPointerStyle,
   type TAnimationStyle,
   type TShapeStyle,
-  type TFilterStyle,
 } from "../stores/HighlightSettingsStore";
 import { convertToTitleCase } from "../utils/misc";
 
@@ -255,42 +256,39 @@ const HighlightIndicatorSettings = () => {
             <Space h="lg" />
           </Grid.Col>
           <Grid.Col span={12}>
-            <Divider size="lg" label={<Title order={5}>Post Processing</Title>} />
+            <Divider size="lg" label={<Title order={5}>Enhance</Title>} />
           </Grid.Col>
-          <Grid.Col span={4}>
-            <Title order={6}>Filter</Title>
-          </Grid.Col>
-          <Grid.Col span={8}>
+          <Grid.Col span={12}>
+            <Text size="xs" c="dimmed" mb={6}>
+              Applied to the video inside the highlighted region.
+            </Text>
             <Group gap="xs">
-              {filterStyleOptions.map((option) => (
-                <Button
-                  key={option}
-                  variant="filled"
-                  size="xs"
-                  px={6}
-                  py={0}
-                  color={
-                    settingsStore.filter_style.includes(option as TFilterStyle)
-                      ? "blue"
-                      : "gray"
-                  }
-                  onClick={() =>
-                    setHighlightSettings({
-                      filter_style: settingsStore.filter_style.includes(
-                        option as TFilterStyle
-                      )
-                        ? settingsStore.filter_style.filter((f) => f !== option)
-                        : [...settingsStore.filter_style, option as TFilterStyle].sort(
-                            (a, b) =>
-                              filterStyleOptions.indexOf(a) -
-                              filterStyleOptions.indexOf(b)
-                          ),
-                    })
-                  }
-                >
-                  {convertToTitleCase(option)}
-                </Button>
-              ))}
+              {filterStyleOptions.map((option) => {
+                const on = settingsStore.filter_style.includes(option);
+                return (
+                  <Tooltip key={option} label={filterStyleLabels[option].hint} withArrow>
+                    <Button
+                      variant={on ? "filled" : "default"}
+                      size="xs"
+                      px={8}
+                      py={0}
+                      onClick={() =>
+                        setHighlightSettings({
+                          filter_style: on
+                            ? settingsStore.filter_style.filter((f) => f !== option)
+                            : [...settingsStore.filter_style, option].sort(
+                                (a, b) =>
+                                  filterStyleOptions.indexOf(a) -
+                                  filterStyleOptions.indexOf(b)
+                              ),
+                        })
+                      }
+                    >
+                      {filterStyleLabels[option].label}
+                    </Button>
+                  </Tooltip>
+                );
+              })}
             </Group>
           </Grid.Col>
         </Grid>

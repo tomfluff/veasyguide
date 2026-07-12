@@ -1,12 +1,13 @@
 // Ported from VeasyGuide HighlightIndicator (component name typo "Higghlight..."
 // at the import site fixed; logic unchanged). Consumes PlayerActivity (native
 // video px), scaled to the container by scaleRatio like the original.
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type RefObject } from "react";
 import { Box, type MantineStyleProp } from "@mantine/core";
 import { useTimeout } from "@mantine/hooks";
-import { useHighlightSettingsStore } from "../stores/HighlightSettingsStore";
+import { sanitizeFilters, useHighlightSettingsStore } from "../stores/HighlightSettingsStore";
 import { convertColorToRGBA } from "../utils/misc";
 import IndicatorPointer from "./IndicatorPointer";
+import EnhanceCanvas from "./EnhanceCanvas";
 import type { PlayerActivity } from "./types";
 
 type Props = {
@@ -14,11 +15,13 @@ type Props = {
   topShift: number;
   scaleRatio: number;
   activity: PlayerActivity | null | undefined;
+  videoRef: RefObject<HTMLVideoElement | null>;
 };
 
 const HighlightIndicator = (props: Props) => {
   const { leftShift, topShift, scaleRatio, activity } = props;
   const settings = useHighlightSettingsStore();
+  const filters = sanitizeFilters(settings.filter_style);
   const opacityDuration = 350;
   const [highlightOpacity, setHighlightOpacity] = useState(1);
   const [currActivity, setCurrActivity] = useState<PlayerActivity | null | undefined>(null);
@@ -65,12 +68,6 @@ const HighlightIndicator = (props: Props) => {
     borderRadius: "50%",
   };
 
-  const indicatorFilterStyle: CSSProperties = {
-    backdropFilter: `${settings.filter_style
-      .map((filter) => `url(#svgf-${filter})`)
-      .join(" ")}`,
-  };
-
   const indicatorAnimationStyle: CSSProperties = {
     animation: `${settings.animation_style} ${1 / settings.animation_speed}s ease-in-out forwards 3`,
   };
@@ -78,7 +75,6 @@ const HighlightIndicator = (props: Props) => {
   const indicatorStyle: MantineStyleProp = {
     ...indicatorBaseStyle,
     ...(settings.shape_style === "static-circle" ? indicatorCircleStyle : {}),
-    ...(settings.filter_style.length > 0 ? indicatorFilterStyle : {}),
     ...(settings.animation_style !== "none" ? indicatorAnimationStyle : {}),
   };
 
@@ -117,7 +113,13 @@ const HighlightIndicator = (props: Props) => {
         height: `${scaleRatio * currActivity.dim.height}px`,
         animation: `fade-in ${opacityDuration}ms ease-in-out`,
         opacity: "var(--highlight-opacity)",
-        transition: `
+        // Geometry is only animated when no enhance canvas is showing: the canvas holds
+        // a fixed crop of the video, so tweening the box it lives in would smear it
+        // against the frame underneath.
+        transition:
+          filters.length > 0
+            ? `opacity ${opacityDuration}ms ease-in-out`
+            : `
         opacity ${opacityDuration}ms ease-in-out,
         left ${opacityDuration}ms ease-in-out,
         top ${opacityDuration}ms ease-in-out,
@@ -126,6 +128,19 @@ const HighlightIndicator = (props: Props) => {
         `,
       }}
     >
+      <EnhanceCanvas
+        className="highlight-enhance"
+        videoRef={props.videoRef}
+        filters={filters}
+        source={{
+          x: currActivity.pos.x,
+          y: currActivity.pos.y,
+          width: currActivity.dim.width,
+          height: currActivity.dim.height,
+        }}
+        width={scaleRatio * currActivity.dim.width}
+        height={scaleRatio * currActivity.dim.height}
+      />
       <Box className="highlight-indicator" style={indicatorStyle} />
       <Box className="highlight-pointer" style={pointerStyle}>
         <Box style={pointerInnerStyle}>
