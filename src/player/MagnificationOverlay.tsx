@@ -35,6 +35,7 @@ const MagnificationOverlay = (props: Props) => {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pausedByZoomRef = useRef(false);
+  const wasZoomInRef = useRef(false); // previous value of props.zoomIn (the user's toggle)
   const glRef = useRef<GLEnhancer | null>(null);
   const glFailedRef = useRef(false);
   const redrawRef = useRef<() => void>(() => {});
@@ -141,10 +142,19 @@ const MagnificationOverlay = (props: Props) => {
   // Zoom state machine: enter, retarget on activity change, exit.
   useEffect(() => {
     const video = props.videoRef.current;
+    // pause_on_zoom means "pause when the viewer zooms in", so it fires on the edge where
+    // they turn zoom ON — not on every run of this effect. The effect also re-runs each
+    // time the activity changes, and while zoom stays on the zoom merely retargets to the
+    // new activity; pausing there would stop playback the viewer had resumed, again and
+    // again. (handleZoom() won't let zoom turn on without an activity, so this edge always
+    // coincides with a real zoom.)
+    const zoomedInNow = props.zoomIn && !wasZoomInRef.current;
+    wasZoomInRef.current = props.zoomIn;
+
     if (props.zoomIn && props.activity) {
       setZoom();
       setOpacityLevel(1);
-      if (settings.pause_on_zoom && video && !video.paused) {
+      if (zoomedInNow && settings.pause_on_zoom && video && !video.paused) {
         video.pause();
         pausedByZoomRef.current = true;
       }
