@@ -44,6 +44,10 @@ import {
   IconArrowBigRightLineFilled,
   IconZoom,
   IconSwitchHorizontal,
+  IconPlayerTrackPrevFilled,
+  IconPlayerTrackNextFilled,
+  IconChevronDown,
+  IconChevronUp,
 } from "@tabler/icons-react";
 import classNames from "classnames";
 import { convertSecondsToTimecode } from "../utils/misc";
@@ -52,6 +56,7 @@ import { isAnalyzed } from "../analyzer/ranges";
 import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
+import { timelineMarkers, nextMoment, prevMoment, seekTargetFor } from "./moments";
 import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
@@ -117,21 +122,30 @@ const VideoPlayer = (props: Props) => {
   const [isFullscreen, handleIsFullscreen] = useDisclosure(false);
   const [isTheaterMode, handleIsTheaterMode] = useDisclosure(false);
   const [hideControls, handleHideControls] = useDisclosure(false);
+  const [collapsed, handleCollapsed] = useDisclosure(false);
   const [popoverOpacity, setPopoverOpacity] = useState(0.5);
   const [sceneNotice, setSceneNotice] = useState(false);
   const currSceneIdRef = useRef<number | null>(null);
   const prevTimeRef = useRef(0);
   const lastReportedActivityRef = useRef<number | null>(null);
+  const chromeTimeRef = useRef(-1);
 
   const videoContainerClasses = classNames("video-container", {
-    clear: hideControls,
+    // The bar only ever hides while playing. Paused, it stays — you paused BECAUSE you want
+    // to do something, and hunting for the controls you just summoned is not that something.
+    clear: hideControls && isPlaying,
     paused: !isPlaying,
+    collapsed,
     fullscreen: isFullscreen,
     theater: isTheaterMode,
   });
 
   // Hooks and interactivity
   const { ref: timelineContainerRef, x: timelineX } = useMouse<HTMLDivElement>();
+  // Marker layout needs the track's real pixel width: a moment's mark gets a minimum width,
+  // and whether two marks collide depends on how wide the track actually is.
+  const { ref: trackSizeRef, width: trackWidth } = useElementSize<HTMLDivElement>();
+  const trackRef = useMergedRef(timelineContainerRef, trackSizeRef);
   const { start: startBackShiftTimeout, clear: clearBackShiftTimeout } = useTimeout(
     () => setBackShiftRequest(false),
     FLASH_SPEED
@@ -154,6 +168,10 @@ const VideoPlayer = (props: Props) => {
     ["ArrowRight", () => handleTimeShift(5)],
     ["ArrowUp", () => handleZoomShift(0.1)],
     ["ArrowDown", () => handleZoomShift(-0.1)],
+    // Mantine matches on event.key, which for these is literally "[" and "]" — not the
+    // KeyboardEvent.code names ("BracketLeft"/"BracketRight"), which never match.
+    ["[", () => handleStepMoment(-1)],
+    ["]", () => handleStepMoment(1)],
   ]);
 
   // Computed
@@ -167,6 +185,20 @@ const VideoPlayer = (props: Props) => {
 
   const atUnanalyzed = !props.done && !isAnalyzed(props.ranges, currTime);
 
+  // The marks under the scrubber. Recomputed only when the moment list or the track width
+  // changes — NOT on every presented frame.
+  const markers = useMemo(
+    () => timelineMarkers(props.activities, totalTime, trackWidth),
+    [props.activities, totalTime, trackWidth]
+  );
+  // Which moment is current, taken from the player's own selection rather than re-derived —
+  // otherwise the lit-up mark and the highlight on the video disagree by `lead` seconds.
+  const currIndex = currActivity ? props.activities.indexOf(currActivity) : -1;
+  const upcoming = nextMoment(props.activities, currTime);
+  // "Next at ..." is a lie while the video after the playhead is still unanalyzed: the next
+  // moment by time may simply not exist yet. Say nothing rather than point at the wrong one.
+  const nextIsKnown = props.done || isAnalyzed(props.ranges, upcoming?.start ?? currTime);
+
   // Helper functions
   const showControls = () => {
     clearHideControlsTimeout();
@@ -174,10 +206,33 @@ const VideoPlayer = (props: Props) => {
     startHideControlsTimeout();
   };
 
+  // Auto-hide is only safe because it is NOT pointer-only. A keyboard user who tabs in, a
+  // viewer who pauses, and anyone who presses a key all get the bar back. Hidden-until-you-
+  // move-a-mouse would delete this feature for exactly the people it is built for.
+  const handleStepMoment = (dir: 1 | -1) => {
+    const video = videoRef.current;
+    if (!video || !props.canPlay) return;
+    const target = dir === 1 ? nextMoment(props.activities, currTime) : prevMoment(props.activities, currTime);
+    if (!target) return; // at the ends: a no-op, not a wrap-around
+    showControls();
+    video.currentTime = seekTargetFor(target, props.selectOpts.lead);
+  };
+
   // Core per-time update: selection, stable activity, scene tracking. Kept in a ref
   // so the rVFC loop always calls the freshest closure.
   const updateAtTime = (t: number) => {
-    setCurrTime(t);
+    // The chrome (scrubber, timecode, now-line, current mark) updates at ~10Hz, not at the
+    // display's frame rate. Only the highlight and the magnifier need frame accuracy — a
+    // highlight 100ms behind the pen is the bug the rVFC loop exists to fix; a mark lighting
+    // up 100ms late is invisible. This caps React's work on a main thread already shared
+    // with the magnifier's per-frame canvas blit and the analyzer worker.
+    //
+    // currActivity/stableActivity are set every frame below, but selectActivity returns the
+    // SAME object while you stay in a moment, so React bails out of those renders for free.
+    if (Math.abs(t - chromeTimeRef.current) >= 0.1) {
+      chromeTimeRef.current = t;
+      setCurrTime(t);
+    }
     handleIsEnded.close();
 
     const activity = selectActivity(props.activities, t, props.selectOpts);
@@ -251,6 +306,16 @@ const VideoPlayer = (props: Props) => {
   };
 
   const handleMute = () => handleIsMuted.toggle();
+
+  // Mantine's useHotkeys ignores events from inputs and textareas — NOT from buttons. So
+  // without this, Space on a focused control both activates it AND toggles play/pause, and
+  // arrow keys on a moment mark both move focus AND seek/zoom. The headline "usable by
+  // keyboard alone" criterion fails on contact.
+  const stopPlayerHotkeys = (e: React.KeyboardEvent) => {
+    if ([" ", "Spacebar", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      e.stopPropagation();
+    }
+  };
 
   const handleTheaterMode = () => handleIsTheaterMode.toggle();
 
@@ -348,11 +413,21 @@ const VideoPlayer = (props: Props) => {
   const zoomActivity = currActivity ?? stableActivity;
 
   return (
-    <Box className={videoContainerClasses} ref={containerRef} onMouseMove={showControls}>
+    <Box
+      className={videoContainerClasses}
+      ref={containerRef}
+      onMouseMove={showControls}
+      // The reveal triggers that make auto-hide safe. Pointer movement alone would delete the
+      // moments and the controls for a keyboard or screen-reader user; focus and keypress
+      // bring them back for everyone. (Pause is handled by the `clear` class, which is gated
+      // on isPlaying.)
+      onKeyDown={showControls}
+      onFocusCapture={showControls}
+    >
       <Box className="video-controls-container" py="sm">
         <Box
           className="timeline-container"
-          ref={timelineContainerRef}
+          ref={trackRef}
           my={6}
           onMouseMove={handleSeek}
           onMouseDown={handleSeek}
@@ -389,10 +464,114 @@ const VideoPlayer = (props: Props) => {
             />
           </Box>
         </Box>
+        {/* The moment lane. Its own row, under the scrubber: each mark is a real button you
+            can click and Tab to, and scrubbing never competes with jumping. Drawing the marks
+            INSIDE the track (YouTube-chapter style) is cheaper in space but a mark under the
+            playhead becomes invisible and there is nothing separate to focus. */}
+        {markers.length > 0 && (
+          <Box className="moment-lane" role="group" aria-label="Moments in this lecture">
+            {markers.map((m) => {
+              const isNow = currIndex >= 0 && m.activities.some((a) => a === currActivity);
+              const label =
+                m.activities.length === 1
+                  ? `Moment ${m.index}, ${convertSecondsToTimecode(m.activities[0].start)}, ${(
+                      m.activities[0].end - m.activities[0].start
+                    ).toFixed(1)} seconds`
+                  : `Moments ${m.index} to ${m.index + m.activities.length - 1}, from ${convertSecondsToTimecode(
+                      m.activities[0].start
+                    )}`;
+              return (
+                <UnstyledButton
+                  key={m.index}
+                  className={classNames("moment-mark", { now: isNow })}
+                  style={{ left: `${m.leftPct}%`, width: `${m.widthPct}%` }}
+                  aria-label={label}
+                  disabled={!props.canPlay}
+                  onKeyDown={stopPlayerHotkeys}
+                  onClick={() => {
+                    const v = videoRef.current;
+                    if (v && props.canPlay) v.currentTime = seekTargetFor(m.activities[0], props.selectOpts.lead);
+                  }}
+                />
+              );
+            })}
+          </Box>
+        )}
+
+        {/* The label is TEXT, in a live region — not a hover tooltip. The lane is a map; a row
+            of identical rectangles tells a viewer nothing, and hover is invisible to a keyboard
+            user, a screen reader, and anyone driving a magnifier. */}
+        {props.activities.length > 0 && (
+          <Box className="now-line" role="status">
+            <span className={classNames("now-dot", { on: currIndex >= 0 })} />
+            <Text>
+              {currIndex >= 0 ? (
+                <>
+                  Moment <b>{currIndex + 1}</b>
+                  {props.done ? <> of <b>{props.activities.length}</b></> : null}
+                  {" · "}
+                  <b>{convertSecondsToTimecode(props.activities[currIndex].start)}</b>,{" "}
+                  {(props.activities[currIndex].end - props.activities[currIndex].start).toFixed(1)}s
+                </>
+              ) : props.done ? (
+                <>
+                  <b>{props.activities.length}</b> moments in this lecture
+                </>
+              ) : (
+                <>
+                  <b>{props.activities.length}</b> moments so far — still looking…
+                </>
+              )}
+            </Text>
+            {upcoming && nextIsKnown && (
+              <Text className="now-next">
+                Next at <b>{convertSecondsToTimecode(upcoming.start)}</b>
+              </Text>
+            )}
+          </Box>
+        )}
+
+        {props.done && props.activities.length === 0 && (
+          <Box className="now-line empty" role="status">
+            <Text>
+              No annotation moments found in this video — the highlight and magnifier have
+              nothing to follow.
+            </Text>
+          </Box>
+        )}
+
         <Group className="controls" gap="sm" align="center" px="xs">
-          <UnstyledButton onClick={handlePlayPause} aria-label={isPlaying ? "Pause" : "Play"}>
+          <UnstyledButton
+            onClick={handlePlayPause}
+            onKeyDown={stopPlayerHotkeys}
+            aria-label={isPlaying ? "Pause" : "Play"}
+          >
             {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
           </UnstyledButton>
+          {props.activities.length > 0 && (
+            <>
+              <UnstyledButton
+                className="collapse-hide"
+                onClick={() => handleStepMoment(-1)}
+                onKeyDown={stopPlayerHotkeys}
+                disabled={!props.canPlay}
+                aria-label="Previous moment"
+                title="Previous moment ( [ )"
+              >
+                <IconPlayerTrackPrevFilled />
+              </UnstyledButton>
+              <UnstyledButton
+                className="collapse-hide"
+                onClick={() => handleStepMoment(1)}
+                onKeyDown={stopPlayerHotkeys}
+                disabled={!props.canPlay}
+                aria-label="Next moment"
+                title="Next moment ( ] )"
+              >
+                <IconPlayerTrackNextFilled />
+              </UnstyledButton>
+            </>
+          )}
           <Box className="volume-container">
             <UnstyledButton onClick={handleMute} aria-label="Mute">
               {isMuted ? (
@@ -421,7 +600,7 @@ const VideoPlayer = (props: Props) => {
           {props.extraHud}
           <Popover width={360} position="top-end" shadow="md">
             <Popover.Target>
-              <UnstyledButton aria-label="Magnification settings">
+              <UnstyledButton className="collapse-hide" aria-label="Magnification settings">
                 <IconZoomInAreaFilled />
               </UnstyledButton>
             </Popover.Target>
@@ -436,7 +615,7 @@ const VideoPlayer = (props: Props) => {
           </Popover>
           <Popover width={420} position="top-end" shadow="md">
             <Popover.Target>
-              <UnstyledButton aria-label="Highlight settings">
+              <UnstyledButton className="collapse-hide" aria-label="Highlight settings">
                 <IconSparkles />
               </UnstyledButton>
             </Popover.Target>
@@ -449,7 +628,15 @@ const VideoPlayer = (props: Props) => {
               <HighlightIndicatorSettings />
             </Popover.Dropdown>
           </Popover>
-          <UnstyledButton onClick={handleTheaterMode} aria-label="Theater mode">
+          <UnstyledButton
+            onClick={() => handleCollapsed.toggle()}
+            onKeyDown={stopPlayerHotkeys}
+            aria-label={collapsed ? "Expand controls" : "Collapse controls"}
+            aria-expanded={!collapsed}
+          >
+            {collapsed ? <IconChevronUp /> : <IconChevronDown />}
+          </UnstyledButton>
+          <UnstyledButton className="collapse-hide" onClick={handleTheaterMode} aria-label="Theater mode">
             {isTheaterMode ? <IconArrowAutofitContent /> : <IconArrowAutofitWidth />}
           </UnstyledButton>
           <UnstyledButton onClick={handleFullscreen} aria-label="Fullscreen">

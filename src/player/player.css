@@ -383,3 +383,86 @@
   from { opacity: 0; transform: translate(-50%, -0.35rem); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* --- Moment lane ---------------------------------------------------------
+   Marks under the scrubber, one row of its own. Each is a real button: clickable,
+   focusable, and carrying its moment in an aria-label. The lane is a MAP — it is
+   allowed to be approximate (see moments.ts: marks get a minimum width and colliding
+   marks merge, so the lane slightly overstates how much time a moment covers). The
+   exact mechanisms are the [ / ] keys, the Prev/Next buttons, and the sidebar. */
+.moment-lane {
+  position: relative;
+  height: 24px;
+  margin-inline: 0.5rem;
+}
+
+.moment-mark {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  min-width: 6px;
+  background-color: #ff5a4d;
+  border-radius: 2px;
+  padding: 0;
+  /* The 24px hit area is the WCAG 2.5.8 target; the mark cannot be 44px wide without
+     lying about the timeline, and every mark is reachable by an equivalent full-size
+     control (the keys, the buttons, the sidebar) — that is 2.5.8's Equivalent exception. */
+}
+
+.moment-mark:hover { filter: brightness(1.25); }
+
+.moment-mark.now {
+  background-color: #ffc233;
+  box-shadow: 0 0 0 2px rgba(255, 194, 51, 0.45);
+}
+
+.moment-mark:focus-visible {
+  outline: 3px solid #6fb3ff;
+  outline-offset: 2px;
+}
+
+.moment-mark:disabled { opacity: 0.45; cursor: default; }
+
+/* --- Now-line ------------------------------------------------------------
+   The label, as text, in a live region. Not a hover tooltip: hover is invisible to a
+   keyboard user, a screen reader, and anyone driving a magnifier — which is the whole
+   audience. */
+.now-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0.5rem 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: rgba(24, 29, 38, 0.92);
+  border: 1px solid #3a4250;
+  color: #f2f4f7;
+  font-size: 16px;
+}
+
+.now-line.empty { color: #a7b0bd; }
+
+.now-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background-color: #4a5261;
+}
+
+.now-dot.on { background-color: #ffc233; }
+
+.now-next {
+  margin-left: auto;
+  color: #a7b0bd;
+  font-size: 15px;
+}
+
+/* --- Collapsed -----------------------------------------------------------
+   The biggest picture, without losing the ability to stop what you are hearing. Keeps the
+   scrubber, the moment marks, play/pause, volume and the way back; drops the now-line and
+   the moment buttons. The [ / ] keys still work. */
+.video-container.collapsed .now-line,
+.video-container.collapsed .collapse-hide {
+  display: none;
+}
