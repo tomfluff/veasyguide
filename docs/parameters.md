@@ -67,6 +67,35 @@ change, not instructor activity, and without this cap it becomes one giant bogus
 Python: `contour_area_high`. (Before scene detection existed, this was the *only* thing
 standing between us and that failure; now it's a backstop.)
 
+### `persistFrac` = 0.35
+Every pixel carries a running estimate of how often it changes — an EMA over the last ~20
+sampled frames, rendered **blue** in the debug composite. A detected region whose pixels
+average this much or more is **flagged** as structural motion rather than instructor activity.
+Flagging alone hides nothing; it feeds the per-activity veto, [`persistInvalidFrac`](#persistinvalidfrac--05).
+Not in the Python version. See `updateOccupancy` and `Region.occ` in `analyzer/pipeline.ts`.
+
+**Why.** A talking-head webcam overlay — or an animated logo, a scrolling ticker, a blinking
+caret — never stops moving, so its pixels churn for the whole video. Ink is the opposite: a
+pen crosses a pixel once and then leaves it alone forever. On our synthetic case that gap is
+enormous — a drifting head averages **occ ≈ 0.67**, handwriting **≈ 0.12** — which is what
+makes a single cutoff between them viable.
+
+**Lower** = flags more, eventually catching a region the instructor works in continuously.
+**Higher** = the webcam stops being flagged.
+
+**Why a score and not a veto.** The first version of this simply zeroed high-occupancy pixels
+out of the mask, and it does not survive contact with real video. A person *moves*: only the
+core of the head changes on nearly every frame (occ ≈ 0.9), while the silhouette edges drift
+around and sit near 0.3–0.5. Delete the core and the edges still form regions in the corner,
+still cluster, still take the highlight. The robust signal isn't "this pixel always changes",
+it's "**every** pixel in this region changes far more often than ink ever does" — a judgement
+about a region, and then about an activity, not about a pixel.
+
+The occupancy map is per-segment, with a fixed ~20-frame memory (`OCC_ALPHA`), so an overlay
+is learned within ~4 s of a segment's start at the default sampling, and a layout change
+re-adapts about as fast. Cut frames are excluded from it — a whole-frame change would
+otherwise nudge *every* pixel toward "always moving".
+
 ---
 
 ## 3 · Scene detection — slide changes / cuts
@@ -114,6 +143,30 @@ Linking is **node-to-node** (not node-to-cluster-bbox — see [porting notes](po
 ---
 
 ## 5 · Filtering & display — what the player shows, and when
+
+### `persistInvalidFrac` = 0.5
+Validity heuristic: an activity with at least this share of its member nodes flagged as
+structural motion (see [`persistFrac`](#persistfrac--035)) is marked `isValid: false` — hidden
+from the timeline and never highlighted. `1` disables it. The gallery shows the measured share
+per activity as `occ 0.87 (0.67)`: flagged fraction, then mean occupancy.
+
+**Why.** This is the rule that actually keeps the highlight off a talking head. A webcam's
+activity is built almost entirely out of flagged nodes (~0.9); a real activity that merely
+happens to pass near the webcam picks up a few and survives. Voting per node — rather than
+averaging occupancy, or vetoing pixels — is what makes it robust to a person who moves: an
+overlay's edge pixels are individually ambiguous, but an activity assembled almost wholly out
+of them is not.
+
+Left unhandled, a webcam does three things, all from the fact that it never stops moving:
+it **steals the highlight** (its activity is *active* at nearly every `t`, so it wins the
+active-precedence rule in `selectActivity` whenever a real activity is only in its
+pre-activity lead window); it can **bridge** into content within `distTh` and drag the
+highlight box into the corner; and if it never pauses at all, its cluster **never finalizes**,
+because `spanTh`-based reaping needs a gap it never gets. The size heuristic below can't catch
+any of this — a webcam rect is a perfectly reasonable size.
+
+**Lower** = more aggressive; a real activity that overlaps the webcam gets vetoed too.
+**Higher** = a webcam activity with a few stray nodes elsewhere sneaks through.
 
 ### `minSizeFrac` = 0.01 / `maxSizeFrac` = 0.7
 Validity heuristic: a finished activity's width **and** height must each fall within

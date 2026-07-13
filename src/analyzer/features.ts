@@ -30,6 +30,9 @@ export type ActivityFeatures = {
   growth: number; // union-bbox area / mean node bbox area — marking grows, pointing doesn't
   // Shape consistency (the matchShapes analog, cv2 CONTOURS_MATCH_I2 style)
   meanShapeDiff: number;
+  // Structural motion
+  meanOcc: number; // mean change-occupancy across member regions (see pipeline.Region.occ)
+  flaggedFrac: number; // share of member nodes sitting in habitually-moving frame area
 };
 
 function iou(a: Box, b: Box): number {
@@ -56,11 +59,18 @@ export function shapeDiff(huA: number[], huB: number[]): number {
   return d;
 }
 
-export function computeFeatures(nodes: DetailedNode[]): ActivityFeatures {
+// `flagTh`: a region whose mean change-occupancy reaches this is structural motion, not ink
+// (see pipeline.Region.occ). The share of an activity's nodes that trip it is `flaggedFrac`,
+// which is what invalidates a talking head: nearly all of its nodes are flagged, while a real
+// activity that merely happens to pass near the webcam has only a few. A per-node vote rather
+// than a mean, because a mean is dragged around by a handful of extreme nodes and this
+// shouldn't be — the question is "is most of this activity structural?", which is a count.
+export function computeFeatures(nodes: DetailedNode[], flagTh = Infinity): ActivityFeatures {
   const n = nodes.length;
   const sorted = [...nodes].sort((a, b) => a.t - b.t);
   const duration = n > 0 ? sorted[n - 1].t - sorted[0].t : 0;
 
+  let occSum = 0, flagged = 0;
   let massSum = 0, densitySum = 0, diffSum = 0;
   let cxSum = 0, cySum = 0, cx2Sum = 0, cy2Sum = 0;
   let unionMinX = Infinity, unionMinY = Infinity, unionMaxX = -Infinity, unionMaxY = -Infinity;
@@ -69,6 +79,8 @@ export function computeFeatures(nodes: DetailedNode[]): ActivityFeatures {
     massSum += r.mass;
     densitySum += r.mass / (r.box.w * r.box.h);
     diffSum += r.meanDiff;
+    occSum += r.occ;
+    if (r.occ >= flagTh) flagged++;
     cxSum += r.cx; cySum += r.cy;
     cx2Sum += r.cx * r.cx; cy2Sum += r.cy * r.cy;
     unionMinX = Math.min(unionMinX, r.box.x);
@@ -115,5 +127,7 @@ export function computeFeatures(nodes: DetailedNode[]): ActivityFeatures {
     ySpread: n > 0 ? Math.sqrt(Math.max(0, cy2Sum / n - (cySum / n) ** 2)) : 0,
     growth: meanArea > 0 ? unionArea / meanArea : 0,
     meanShapeDiff: meanPair(shapeSum),
+    meanOcc: mean(occSum),
+    flaggedFrac: n > 0 ? flagged / n : 0,
   };
 }

@@ -40,6 +40,10 @@ export type AnalysisParams = {
   dilateIters: number; // mask dilation passes (Python: iterations=3)
   contourAreaLowFrac: number; // component box area filter, fraction of frame area
   contourAreaHighFrac: number;
+  persistFrac: number; // a region whose mean change-occupancy reaches this is structural
+  // motion, not instructor activity (webcam overlay, animated logo). See pipeline.Region.occ.
+  persistInvalidFrac: number; // an activity with at least this share of its nodes flagged as
+  // structural is marked invalid (and so never highlighted). 1 = off.
   sceneThreshold: number; // HSV content score above which a scene cut is declared
   sceneMinLen: number; // minimum seconds between cuts (debounce)
   spanTh: number; // seconds; max time gap for linking nodes (study: 1.0)
@@ -58,6 +62,8 @@ export const DEFAULT_PARAMS: AnalysisParams = {
   dilateIters: 3,
   contourAreaLowFrac: 0.00015,
   contourAreaHighFrac: 0.5,
+  persistFrac: 0.35,
+  persistInvalidFrac: 0.5,
   sceneThreshold: 27,
   sceneMinLen: 1.0,
   spanTh: 1.0,

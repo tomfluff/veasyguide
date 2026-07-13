@@ -35,10 +35,10 @@ type ParamField = {
 // Pipeline-stage grouping: mirrors the order data flows through the analyzer.
 const PARAM_GROUPS: { title: string; note: string; keys: (keyof AnalysisParams)[] }[] = [
   { title: "1 · Sampling", note: "which pixels the analyzer looks at", keys: ["analysisWidth", "sampleInterval"] },
-  { title: "2 · Change detection", note: "frame pair → changed regions (red mask / green boxes)", keys: ["diffThresh", "dilateIters", "contourAreaLowFrac", "contourAreaHighFrac"] },
+  { title: "2 · Change detection", note: "frame pair → changed regions (red mask / green boxes / blue = habitually moving)", keys: ["diffThresh", "dilateIters", "contourAreaLowFrac", "contourAreaHighFrac", "persistFrac"] },
   { title: "3 · Scene detection", note: "slide changes / cuts — activities never span one", keys: ["sceneThreshold", "sceneMinLen"] },
   { title: "4 · Clustering", note: "regions over time → activities", keys: ["spanTh", "distRatio"] },
-  { title: "5 · Filtering & display", note: "which activities the player shows, and when", keys: ["minSizeFrac", "maxSizeFrac", "minDuration", "highlightLead", "highlightLinger"] },
+  { title: "5 · Filtering & display", note: "which activities the player shows, and when", keys: ["persistInvalidFrac", "minSizeFrac", "maxSizeFrac", "minDuration", "highlightLead", "highlightLinger"] },
 ];
 
 const PARAM_FIELDS: ParamField[] = [
@@ -73,6 +73,11 @@ const PARAM_FIELDS: ParamField[] = [
     why: "A slide transition or scroll changes most of the frame at once — that's a scene change, not instructor activity, and without this cap it becomes one giant bogus 'activity'. Python: contour_area_high. Also the stand-in for scene detection until that lands (design Phase 1).",
   },
   {
+    key: "persistFrac", label: "Structural-motion cutoff", step: 0.05,
+    what: "Each pixel carries a running estimate of how often it changes (blue in the debug composite). A detected region whose pixels average this much or more is flagged as structural motion rather than instructor activity.",
+    why: "A talking-head webcam overlay never stops moving, so its pixels churn through the whole video; ink is written once and then sits still, so its pixels average near 0.05. That gap is the signal. The flag doesn't hide the region on its own — it feeds the per-activity vote below. Lower = flags more (eventually catching a region the instructor works in continuously); higher = the webcam stops being flagged.",
+  },
+  {
     key: "sceneThreshold", label: "Scene threshold", step: 1,
     what: "A scene cut is declared when the HSV content score between two sampled frames (mean hue+saturation+luma change, 0–255) reaches this value. The cut's own frame pair produces no detection nodes, and any open activities are closed at the boundary.",
     why: "A slide change alters the whole frame — treating that as instructor activity would produce one giant bogus highlight, and an activity must never span two slides. Ports PySceneDetect's ContentDetector, which the Python analyzer used at threshold 14 — but it scored every adjacent frame (~33 ms apart) while we compare frames one sample interval apart, so more change accumulates and our score runs higher; hence the higher default. Lower = more cuts (a big animation may split a slide); higher = slide changes get missed and leak into activities.",
@@ -91,6 +96,11 @@ const PARAM_FIELDS: ParamField[] = [
     key: "distRatio", label: "Link distance (frac diag)", step: 0.005,
     what: "Max spatial gap between two nodes' boxes (as a fraction of the frame diagonal) for them to link into one activity.",
     why: "Consecutive strokes of one annotation land near each other; unrelated activities happen across the slide. 5% of the diagonal ≈ 73 px at 720p. Python: roi_distance_ratio, node-to-node edges. Higher = neighboring distinct activities merge; lower = a fast-moving pointer splits into pieces.",
+  },
+  {
+    key: "persistInvalidFrac", label: "Structural-motion veto (frac)", step: 0.05,
+    what: "Validity heuristic: an activity with at least this share of its nodes flagged as structural motion (see the cutoff in stage 2) is marked invalid — hidden and never highlighted. 1 = off.",
+    why: "The per-activity vote is what actually keeps the highlight off a talking head. A webcam's activity is ~100% flagged nodes; a real activity that merely happens near the webcam picks up only a few, and survives. Judging whole activities rather than deleting pixels is what makes this robust to a person who moves: an overlay's edge pixels are individually ambiguous, but an activity built almost entirely out of them is not. Lower = more aggressive (a real activity overlapping the webcam gets vetoed too); higher = a webcam activity with a few stray nodes elsewhere sneaks through.",
   },
   {
     key: "minSizeFrac", label: "Min activity size (frac)", step: 0.005,

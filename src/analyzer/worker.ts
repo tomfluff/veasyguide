@@ -9,7 +9,7 @@
 // ranges, not one frontier.
 
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from "mediabunny";
-import { componentRegions, contentScore, diffMask, dilate, toGray } from "./pipeline";
+import { componentRegions, contentScore, diffMask, dilate, toGray, updateOccupancy } from "./pipeline";
 import { GLAnalyzer } from "./glPipeline";
 import { computeFeatures } from "./features";
 import { StreamingClusterer, type RawActivity } from "./graph";
@@ -98,10 +98,17 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
 
   const distTh = params.distRatio * Math.sqrt(aw * aw + ah * ah);
 
-  // Enrich a raw cluster into an Activity: validity heuristic (Python
-  // RoIActivity._is_valid, c3/c4), always-on feature vector, opt-in node log.
+  // Enrich a raw cluster into an Activity: validity heuristics, always-on feature vector,
+  // opt-in node log. Two validity rules:
+  //  - size (Python RoIActivity._is_valid, c3/c4): the box is neither a speck nor the frame.
+  //  - structural motion: most of this activity's nodes sit in frame area that never stops
+  //    moving — a talking-head webcam overlay, an animated logo. That is not something the
+  //    instructor did, so it must never be highlighted. It's a per-activity verdict rather
+  //    than a per-pixel veto because an overlay's edge pixels aren't individually damning;
+  //    what damns it is that essentially every node it ever produced is in that patch.
   const finalize = (a: RawActivity): Activity => {
     const detailed = a.log.map((n) => ({ t: n.t, region: n.detail! }));
+    const features = computeFeatures(detailed, params.persistFrac);
     return {
       id: a.id,
       start: a.start,
@@ -110,8 +117,9 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
       nodeCount: a.nodeCount,
       isValid:
         a.box.w >= params.minSizeFrac * aw && a.box.w <= params.maxSizeFrac * aw &&
-        a.box.h >= params.minSizeFrac * ah && a.box.h <= params.maxSizeFrac * ah,
-      features: computeFeatures(detailed),
+        a.box.h >= params.minSizeFrac * ah && a.box.h <= params.maxSizeFrac * ah &&
+        features.flaggedFrac < params.persistInvalidFrac,
+      features,
       ...(collectNodes ? { nodes: detailed } : {}),
     };
   };
@@ -132,6 +140,10 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
   async function analyzeSegment(from: number) {
     const clusterer = new StreamingClusterer(params.spanTh, distTh);
     gpu?.reset(); // a segment never diffs across its own start
+    // Per-pixel change occupancy, for persistent-motion suppression (see pipeline.ts).
+    // Per-segment, like the clusterer: a segment is independent and re-learns the webcam
+    // in its first ~20 frames.
+    const occ = new Float32Array(aw * ah);
     let prevGray: Uint8Array | null = null;
     let prevRgba: Uint8ClampedArray | null = null;
     let sceneStart = from;
@@ -206,8 +218,11 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
       }
 
       // A cut's own frame pair is a whole-frame change, not instructor activity — skip it.
+      // (Skipping it here also keeps it out of the occupancy EMA, which a whole-frame
+      // change would otherwise poison by nudging every pixel toward "always moving".)
       if (mask && mag && gray && !isCut) {
-        const regions = componentRegions(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac, mag);
+        updateOccupancy(mask, occ);
+        const regions = componentRegions(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac, mag, occ);
         const boxes = regions.map((r) => r.box);
         for (const r of regions) {
           for (const act of clusterer.add({ t, box: r.box, detail: r })) {
@@ -216,12 +231,15 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
         }
 
         if (debugCanvas && debugCtx) {
-          // Composite: grayscale frame, diff-mask pixels tinted red. WebP-encoded so a
-          // whole video's frames fit in memory for after-the-fact scrubbing.
+          // Composite: grayscale frame, diff-mask pixels tinted red, habitually-moving pixels
+          // tinted blue — the blue is the learned occupancy map, i.e. where the analyzer
+          // thinks the frame moves on its own. WebP-encoded so a whole video's frames fit in
+          // memory for after-the-fact scrubbing.
           const comp = new Uint8ClampedArray(aw * ah * 4);
           for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
             const g = gray[i];
             if (mask[i]) { comp[p] = 255; comp[p + 1] = g >> 2; comp[p + 2] = g >> 2; }
+            else if (occ[i] >= params.persistFrac) { comp[p] = g >> 2; comp[p + 1] = g >> 2; comp[p + 2] = 255; }
             else { comp[p] = g; comp[p + 1] = g; comp[p + 2] = g; }
             comp[p + 3] = 255;
           }

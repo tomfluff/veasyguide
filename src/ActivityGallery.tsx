@@ -256,6 +256,9 @@ function ActivityCard({
           sh {f.meanShapeDiff.toFixed(2)}
         </span>
         <span title="mean per-pixel change magnitude">Δ {f.meanDiff.toFixed(0)}</span>
+        <span title="share of nodes in habitually-moving frame area (webcam overlay ≈ 1; ink ≈ 0), mean change-occupancy in brackets">
+          occ {f.flaggedFrac.toFixed(2)} ({f.meanOcc.toFixed(2)})
+        </span>
       </div>
     </div>
   );

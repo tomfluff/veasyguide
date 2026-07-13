@@ -1,6 +1,6 @@
 // Runnable self-check for the pure pipeline + clusterer logic (no browser needed).
 // Run: node --experimental-strip-types src/analyzer/selfcheck.ts
-import { componentRegions, contentScore, diffMask, dilate, toGray, type Region } from "./pipeline.ts";
+import { componentRegions, contentScore, diffMask, dilate, toGray, updateOccupancy, type Region } from "./pipeline.ts";
 import { computeFeatures, shapeDiff, type DetailedNode } from "./features.ts";
 import { StreamingClusterer } from "./graph.ts";
 import { selectActivity } from "./select.ts";
@@ -52,6 +52,74 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
   const { mask: raw } = diffMask(a, a, W, H);
   const mask = dilate(raw, W, H);
   assert(componentRegions(mask, W, H).length === 0, "identical frames -> 0 components");
+}
+
+// 2b. Structural motion: a talking-head webcam in the corner is flagged and its activity
+// invalidated, while the instructor writing elsewhere stays valid.
+//
+// The head DRIFTS rather than flickering in place — that's the case that matters. Only its
+// core sits still enough to change on every frame; the silhouette edges move around, so a
+// per-pixel "always changes" veto misses them and the corner still produces regions. What
+// separates it from ink is that ALL of its pixels move far more often than ink's ever do.
+{
+  // Head: a 20x20 patch near (72,72) that wobbles a few px each frame. Pen: an 8x8 mark
+  // written at a fresh spot, left there afterwards (ink accumulates, it doesn't churn).
+  const frame = (i: number, pen?: { x: number; y: number }) => {
+    const rgba = new Uint8ClampedArray(W * H * 4);
+    const hx = 72 + (i % 3), hy = 72 + ((i * 2) % 3);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        let v = 20;
+        if (x >= hx && x < hx + 20 && y >= hy && y < hy + 20) v = 200;
+        if (pen && x >= pen.x && x < pen.x + 8 && y >= pen.y && y < pen.y + 8) v = 255;
+        const p = (y * W + x) * 4;
+        rgba[p] = rgba[p + 1] = rgba[p + 2] = v;
+        rgba[p + 3] = 255;
+      }
+    return rgba;
+  };
+  const occ = new Float32Array(W * H);
+  const step = (a: Uint8ClampedArray, b: Uint8ClampedArray): Region[] => {
+    const { mask: raw, mag } = diffMask(toGray(a, W, H), toGray(b, W, H), W, H);
+    const mask = dilate(raw, W, H);
+    updateOccupancy(mask, occ);
+    return componentRegions(mask, W, H, 0.00015, 0.5, mag, occ);
+  };
+
+  const FLAG = 0.35, VETO = 0.5;
+  const head: DetailedNode[] = [];
+  let prev = frame(0);
+  for (let i = 1; i <= 60; i++) {
+    const cur = frame(i);
+    for (const r of step(prev, cur)) head.push({ t: i * 0.2, region: r });
+    prev = cur;
+  }
+  assert(head.length > 0, "a drifting head still produces regions (a per-pixel veto would not catch it)");
+  const headFeat = computeFeatures(head, FLAG);
+  assert(
+    headFeat.flaggedFrac >= VETO,
+    `webcam activity is mostly flagged nodes -> invalid (flaggedFrac=${headFeat.flaggedFrac.toFixed(2)}, occ=${headFeat.meanOcc.toFixed(2)})`
+  );
+
+  // The instructor now writes, one fresh 8x8 mark at a time, away from the head.
+  const pen: DetailedNode[] = [];
+  for (let i = 61; i <= 70; i++) {
+    const cur = frame(i, { x: 10 + (i - 61) * 4, y: 20 });
+    for (const r of step(prev, cur)) {
+      if (r.box.x < 50) pen.push({ t: i * 0.2, region: r }); // the pen's regions, not the head's
+    }
+    prev = cur;
+  }
+  assert(pen.length > 0, "pen strokes are still detected beside the webcam");
+  const penFeat = computeFeatures(pen, FLAG);
+  assert(
+    penFeat.flaggedFrac < VETO,
+    `writing survives the veto (flaggedFrac=${penFeat.flaggedFrac.toFixed(2)}, occ=${penFeat.meanOcc.toFixed(2)})`
+  );
+  assert(
+    penFeat.meanOcc < headFeat.meanOcc / 2,
+    `ink churns far less than a webcam (ink occ=${penFeat.meanOcc.toFixed(2)} vs head occ=${headFeat.meanOcc.toFixed(2)})`
+  );
 }
 
 // 3. Clusterer: two nodes within spanTh + distTh merge; a far-future node finalizes them.

@@ -117,6 +117,30 @@ export function dilate(mask: Uint8Array, w: number, h: number, iters = 3): Uint8
   return cur;
 }
 
+// Change occupancy. `occ[i]` is an EMA of "did pixel i change?" — roughly, the fraction of
+// recent frames in which it did. It's what separates *structural* motion (a talking-head
+// webcam overlay, an animated logo, a scrolling ticker, a blinking caret) from instructor
+// activity: a pen crosses a given pixel for a frame or two and then leaves it alone, so its
+// pixels sit near zero, while an overlay keeps its pixels churning for the whole video.
+//
+// It is deliberately a per-pixel SCORE and not a per-pixel veto. Zeroing high-occupancy
+// pixels out of the mask was the first thing tried and it doesn't hold up on real video: a
+// person moves, so only the core of the head sits at ~0.9 while the silhouette edges hover
+// around 0.3-0.5. Delete the core and the edges still form regions in the corner, and the
+// highlight stays right where it was. What's reliable is not "this pixel always changes" but
+// "every pixel in this region changes far more often than ink does" — a region-level, then
+// activity-level judgement. See componentRegions' `occ` and ActivityFeatures.flaggedFrac.
+//
+// Updated from the raw mask each frame, before any region work.
+export function updateOccupancy(mask: Uint8Array, occ: Float32Array, alpha = OCC_ALPHA): void {
+  for (let i = 0; i < mask.length; i++) occ[i] += alpha * (mask[i] - occ[i]);
+}
+
+// EMA weight: ~20-frame memory, so an overlay is learned within ~4 s of a segment's start at
+// the default 0.2 s sampling, and a layout change re-adapts about as fast.
+// ponytail: fixed; promote to a parameter only if a real video needs a different memory.
+const OCC_ALPHA = 0.05;
+
 // A changed region: bbox plus the stats ML will want later, all computed during the
 // same flood-fill pass (this data is unrecoverable after analysis — capture at source).
 export type Region = {
@@ -126,6 +150,9 @@ export type Region = {
   cy: number;
   hu: number[]; // 7 Hu moment invariants of the mask shape (what cv2.matchShapes used)
   meanDiff: number; // mean |frame delta| over the region's pixels (cursor≈subtle, ink≈strong)
+  occ: number; // mean change-occupancy over the region's pixels, 0..1 — how habitually this
+  // patch of frame moves. Ink is ~0.05 (a pixel is written once and then left alone); a
+  // webcam overlay is ~0.4-0.9 (its pixels never stop). See updateOccupancy.
 };
 
 // Connected-component regions via iterative flood fill (4-connectivity).
@@ -136,7 +163,8 @@ export function componentRegions(
   h: number,
   areaLowFrac = 0.00015,
   areaHighFrac = 0.5,
-  mag?: Uint8Array
+  mag?: Uint8Array,
+  occ?: Float32Array
 ): Region[] {
   const seen = new Uint8Array(w * h);
   const regions: Region[] = [];
@@ -149,6 +177,7 @@ export function componentRegions(
     // Raw moments m[p][q] = sum x^p y^q over mask pixels, up to 3rd order.
     let m00 = 0, m10 = 0, m01 = 0, m20 = 0, m11 = 0, m02 = 0, m30 = 0, m21 = 0, m12 = 0, m03 = 0;
     let magSum = 0;
+    let occSum = 0;
     stack.length = 0;
     stack.push(start);
     seen[start] = 1;
@@ -164,6 +193,7 @@ export function componentRegions(
       m20 += x * x; m11 += x * y; m02 += y * y;
       m30 += x * x * x; m21 += x * x * y; m12 += x * y * y; m03 += y * y * y;
       if (mag) magSum += mag[i];
+      if (occ) occSum += occ[i];
       if (x > 0 && mask[i - 1] && !seen[i - 1]) { seen[i - 1] = 1; stack.push(i - 1); }
       if (x < w - 1 && mask[i + 1] && !seen[i + 1]) { seen[i + 1] = 1; stack.push(i + 1); }
       if (y > 0 && mask[i - w] && !seen[i - w]) { seen[i - w] = 1; stack.push(i - w); }
@@ -180,6 +210,7 @@ export function componentRegions(
         cy: m01 / m00,
         hu: huMoments(m00, m10, m01, m20, m11, m02, m30, m21, m12, m03),
         meanDiff: mag ? magSum / m00 : 0,
+        occ: occ ? occSum / m00 : 0,
       });
     }
   }
