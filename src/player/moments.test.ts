@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { timelineMarkers, nextMoment, prevMoment, seekTargetFor, MIN_MARKER_PX } from "./moments";
+import { timelineMarkers, stepMoment, seekTargetFor, MIN_MARKER_PX } from "./moments";
 import type { Activity } from "../analyzer/types";
 
 const act = (id: number, start: number, end: number) =>
@@ -49,28 +49,53 @@ describe("timelineMarkers", () => {
 
 describe("stepping", () => {
   const valid = [act(1, 10, 14), act(2, 30, 34), act(3, 50, 54)];
+  const LEAD = 1;
+  // What a press actually does: pick the target, then seek to its cue.
+  const press = (t: number, dir: 1 | -1) => {
+    const target = stepMoment(valid, t, LEAD, dir);
+    return target ? { id: target.id, landsAt: seekTargetFor(target, LEAD) } : null;
+  };
 
-  it("steps forward past the moment you are already in", () => {
-    expect(nextMoment(valid, 12)?.id).toBe(2); // inside moment 1 → next is 2
-    expect(nextMoment(valid, 0)?.id).toBe(1);
+  it("keeps stepping forward on repeated presses instead of sticking", () => {
+    // THE regression this exists for. A jump lands at start-lead, which is BEFORE the moment
+    // it jumped to. Step off the raw playhead and the next press finds that same moment
+    // again — you press ] four times and never leave moment 2.
+    let t = 0;
+    const visited: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const r = press(t, 1);
+      if (!r) break;
+      visited.push(r.id);
+      t = r.landsAt;
+    }
+    expect(visited).toEqual([1, 2, 3]); // then null at the end, not a fourth
+  });
+
+  it("steps forward past the moment you are playing inside", () => {
+    expect(press(12, 1)?.id).toBe(2); // inside moment 1 → next is 2
+    expect(press(0, 1)?.id).toBe(1);
   });
 
   it("replays the moment you are inside, then steps back on a second press", () => {
-    // Deliberate, and it matters. A viewer who missed what was just written presses Previous
-    // because they want to see THAT moment again — not the one before it. So from inside
-    // moment 2 we return moment 2, and the seek lands at its start (minus the lead), which
-    // replays it. Pressing Previous again from there steps properly back to moment 1.
-    // This is the media-player convention, and it falls out of "the last moment that started
-    // before the playhead" for free.
-    expect(prevMoment(valid, 31)?.id).toBe(2); // inside moment 2 → replay it
-    expect(prevMoment(valid, 29)?.id).toBe(1); // now parked before it → step back
+    // A viewer who missed what was just written presses Previous because they want to see
+    // THAT moment again — not the one before it. A second press steps properly back.
+    const first = press(31, -1); // inside moment 2
+    expect(first?.id).toBe(2);
+    expect(first?.landsAt).toBe(29);
+    expect(press(29, -1)?.id).toBe(1); // now parked at its cue → back to moment 1
+  });
+
+  it("returns you where you were: ] then [ is a round trip", () => {
+    const fwd = press(12, 1); // inside moment 1 → jump to moment 2, landing at 29
+    expect(fwd).toEqual({ id: 2, landsAt: 29 });
+    expect(press(fwd!.landsAt, -1)?.id).toBe(1); // and straight back to moment 1
   });
 
   it("is a no-op at the ends rather than wrapping", () => {
-    expect(nextMoment(valid, 60)).toBeNull();
-    expect(prevMoment(valid, 0)).toBeNull();
-    expect(nextMoment([], 10)).toBeNull();
-    expect(prevMoment([], 10)).toBeNull();
+    expect(press(60, 1)).toBeNull();
+    expect(press(0, -1)).toBeNull();
+    expect(stepMoment([], 10, LEAD, 1)).toBeNull();
+    expect(stepMoment([], 10, LEAD, -1)).toBeNull();
   });
 });
 

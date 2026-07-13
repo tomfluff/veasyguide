@@ -60,25 +60,48 @@ export function timelineMarkers(
   return out;
 }
 
-// Stepping. `t` is the playhead; a moment counts as "next" only if it starts after it, so
-// pressing ] repeatedly walks forward instead of sticking on the current one.
 const EPS = 0.05;
-
-export function nextMoment(valid: readonly Activity[], t: number): Activity | null {
-  return valid.find((a) => a.start > t + EPS) ?? null;
-}
-
-export function prevMoment(valid: readonly Activity[], t: number): Activity | null {
-  // The last moment that starts before the playhead. Walking backwards from where you are.
-  for (let i = valid.length - 1; i >= 0; i--) {
-    if (valid[i].start < t - EPS) return valid[i];
-  }
-  return null;
-}
 
 // Where a click on a moment lands. Seeking to `start` means the pre-activity cue is already
 // over and the highlight snaps on at the same instant you arrive — the viewer never gets the
 // moment to orient that `lead` exists to give them.
 export function seekTargetFor(a: Activity, lead: number): number {
   return Math.max(0, a.start - lead);
+}
+
+// Which moment the playhead is "at" — the last one whose CUE has begun. The cue, not the
+// start: jumping to a moment lands you at `start - lead`, and from there you are already at
+// that moment, not still at the one before it.
+export function momentIndexAt(valid: readonly Activity[], t: number, lead: number): number {
+  let idx = -1;
+  for (let i = 0; i < valid.length; i++) {
+    if (valid[i].start - lead <= t + EPS) idx = i;
+    else break; // sorted by start, so nothing later can qualify
+  }
+  return idx;
+}
+
+// Step to the next or previous moment.
+//
+// This works off the moment INDEX, not the raw playhead, and that is the whole trick. A jump
+// lands at `start - lead`, which is BEFORE the moment it jumped to — so "the next moment
+// after the playhead" would find that same moment again and every press after the first would
+// stick in place.
+//
+// Backwards has one deliberate asymmetry: if you are already inside a moment (past its
+// start), Previous replays it rather than skipping past it. Someone who missed what was just
+// written wants to see THAT again. Press it a second time — you are now parked at the cue,
+// before the start — and it steps properly back.
+export function stepMoment(
+  valid: readonly Activity[],
+  t: number,
+  lead: number,
+  dir: 1 | -1
+): Activity | null {
+  const i = momentIndexAt(valid, t, lead);
+  if (dir === 1) return valid[i + 1] ?? null;
+  if (i < 0) return null;
+  const current = valid[i];
+  if (t > current.start + EPS) return current; // inside it → replay it
+  return valid[i - 1] ?? null; // parked at its cue → step back
 }

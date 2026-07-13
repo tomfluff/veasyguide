@@ -13,15 +13,10 @@
   box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.5);
 }
 
-.video-container.theater,
 .video-container.fullscreen {
   max-width: initial;
   width: 100%;
   margin-top: 0;
-}
-
-.video-container.theater {
-  max-height: 80vh;
 }
 
 .video-container.fullscreen {
@@ -34,25 +29,21 @@
   aspect-ratio: 16/9;
 }
 
+/* An OPAQUE surface, not a gradient. The gradient faded to nothing at the top, so against a
+   white lecture slide the controls sat on almost no background and the icons were unreadable
+   — the exact failure this app exists to prevent. Tokens from DESIGN.md. */
 .video-controls-container {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 50;
+  padding: 10px 12px 12px;
+  background-color: #12161d;
+  border-top: 1px solid #333a45;
+  color: #f2f4f7;
   opacity: 1;
   transition: opacity 150ms ease-in-out;
-}
-
-.video-controls-container::before {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
-  aspect-ratio: 6/1;
-  z-index: -1;
-  pointer-events: none;
 }
 
 .video-container.paused .video-controls-container {
@@ -64,25 +55,29 @@
 }
 
 .video-controls-container .controls button {
-  color: white;
-  height: 2rem;
-  width: 2rem;
+  color: #f2f4f7;
+  height: 44px;   /* WCAG 2.5.5 target size. Was 2rem/32px. */
+  width: 44px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-controls-container .controls button:hover {
+  background-color: #21262f;
+}
+
+.video-controls-container .controls button:focus-visible {
+  outline: 3px solid #6fb3ff;
+  outline-offset: 2px;
 }
 
 .video-controls-container .controls button svg {
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  margin: 0;
+  width: 22px;
+  height: 22px;
 }
 
-.controls button {
-  opacity: 0.85;
-}
-
-.controls button:hover {
-  opacity: 1;
-}
 
 .controls button:disabled {
   opacity: 0.5;
@@ -95,66 +90,51 @@
   gap: 0.5rem;
 }
 
+/* Always visible. It used to expand from 0px on hover — invisible to a keyboard or
+   screen-reader user, and undiscoverable on a touch screen. */
 .volume-container .volume-slider {
-  width: 0px;
-  transform-origin: left;
-  transform: scaleX(0);
-  transition: width 150ms ease-in-out, transform 150ms ease-in-out;
-}
-
-.volume-container:hover .volume-slider,
-.volume-container:focus-within .volume-slider {
-  width: 100px;
-  transform: scaleX(1);
-}
-
-.duration-container {
-  color: white;
-  flex-grow: 1;
+  width: 84px;
 }
 
 .timeline-container {
-  height: 0.75rem;
-  margin-inline: 0.5rem;
+  height: 20px;
   cursor: pointer;
   display: flex;
   align-items: center;
 }
 
+/* A constant, usable height. It used to be 8px, growing to 12px ON HOVER — which meant the
+   scrubber was at its least usable for anyone who cannot hover. */
 .timeline {
-  background-color: rgba(100, 100, 100, 0.75);
-  height: 0.5rem;
+  background-color: #39414d;
+  height: 12px;
   width: 100%;
   position: relative;
-  transition: height 150ms ease-in-out;
+  border-radius: 6px;
 }
 
-.timeline-container:hover .timeline {
-  height: 100%;
-}
-
+/* Purple, not red. The moment marks are red (--activity); if progress is red too, the two
+   most important things in the timeline are the same colour and mean different things. */
 .timeline-progress {
   position: absolute;
   top: 0;
   left: 0;
   bottom: 0;
-  background-color: rgba(215, 31, 31, 0.75);
+  background-color: #d27cf7;
+  border-radius: 6px;
 }
 
+/* Always visible. It used to be scale(0) until hover — you could not see where the playhead
+   was unless you happened to be pointing at it. */
 .timeline-thumb {
-  --scale: 0;
   position: absolute;
-  height: 200%;
-  top: -50%;
+  height: 18px;
+  width: 18px;
+  top: 50%;
   border-radius: 50%;
-  transform: translateX(-50%) scale(var(--scale));
-  transition: transform 100ms ease-out;
-  background-color: rgba(215, 31, 31, 1);
-  aspect-ratio: 1/1;
-}
-
-.timeline-container:hover .timeline-thumb {
-  --scale: 1;
+  transform: translate(-50%, -50%);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.5);
 }
 
 .timeline-tooltip {
@@ -321,13 +301,8 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.35),
-    rgba(255, 255, 255, 0.35) 4px,
-    rgba(255, 255, 255, 0.15) 4px,
-    rgba(255, 255, 255, 0.15) 8px
-  );
+  background-color: #4d5765;
+  border-radius: 6px;
 }
 
 .video-overlay .overlay-gate,
@@ -393,7 +368,6 @@
 .moment-lane {
   position: relative;
   height: 24px;
-  margin-inline: 0.5rem;
 }
 
 .moment-mark {
@@ -431,7 +405,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 6px 0.5rem 0;
+  margin-top: 6px;
   padding: 8px 10px;
   border-radius: 8px;
   background-color: rgba(24, 29, 38, 0.92);
@@ -465,4 +439,26 @@
 .video-container.collapsed .now-line,
 .video-container.collapsed .collapse-hide {
   display: none;
+}
+
+/* The volume slider was rendering in Mantine's default blue — a colour that appears nowhere
+   else in the product. Brand purple, per DESIGN.md. */
+.volume-slider .mantine-Slider-bar {
+  background-color: #d27cf7;
+}
+
+.volume-slider .mantine-Slider-thumb {
+  border-color: #ffffff;
+  background-color: #ffffff;
+}
+
+.volume-slider .mantine-Slider-track::before {
+  background-color: #39414d;
+}
+
+.duration-container {
+  color: #f2f4f7;
+  font-variant-numeric: tabular-nums; /* the timecode must not jitter as digits change */
+  flex-grow: 1;
+  padding-left: 10px;
 }

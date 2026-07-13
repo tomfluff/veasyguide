@@ -38,8 +38,6 @@ import {
   IconVolume2 as IconVolumeLow,
   IconVolumeOff as IconVolumeMute,
   IconZoomInAreaFilled,
-  IconArrowAutofitWidth,
-  IconArrowAutofitContent,
   IconArrowBigLeftLineFilled,
   IconArrowBigRightLineFilled,
   IconZoom,
@@ -56,7 +54,7 @@ import { isAnalyzed } from "../analyzer/ranges";
 import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
-import { timelineMarkers, nextMoment, prevMoment, seekTargetFor } from "./moments";
+import { timelineMarkers, stepMoment, seekTargetFor } from "./moments";
 import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
@@ -120,7 +118,6 @@ const VideoPlayer = (props: Props) => {
   const [isMuted, handleIsMuted] = useDisclosure(false);
   const [isZoomIn, handleIsZoomIn] = useDisclosure(false);
   const [isFullscreen, handleIsFullscreen] = useDisclosure(false);
-  const [isTheaterMode, handleIsTheaterMode] = useDisclosure(false);
   const [hideControls, handleHideControls] = useDisclosure(false);
   const [collapsed, handleCollapsed] = useDisclosure(false);
   const [popoverOpacity, setPopoverOpacity] = useState(0.5);
@@ -137,7 +134,6 @@ const VideoPlayer = (props: Props) => {
     paused: !isPlaying,
     collapsed,
     fullscreen: isFullscreen,
-    theater: isTheaterMode,
   });
 
   // Hooks and interactivity
@@ -161,7 +157,6 @@ const VideoPlayer = (props: Props) => {
   useHotkeys([
     ["Space", () => handlePlayPause()],
     ["F", () => handleFullscreen()],
-    ["T", () => handleTheaterMode()],
     ["M", () => handleMute()],
     ["Z", () => handleZoom()],
     ["ArrowLeft", () => handleTimeShift(-5)],
@@ -194,7 +189,7 @@ const VideoPlayer = (props: Props) => {
   // Which moment is current, taken from the player's own selection rather than re-derived —
   // otherwise the lit-up mark and the highlight on the video disagree by `lead` seconds.
   const currIndex = currActivity ? props.activities.indexOf(currActivity) : -1;
-  const upcoming = nextMoment(props.activities, currTime);
+  const upcoming = stepMoment(props.activities, currTime, props.selectOpts.lead, 1);
   // "Next at ..." is a lie while the video after the playhead is still unanalyzed: the next
   // moment by time may simply not exist yet. Say nothing rather than point at the wrong one.
   const nextIsKnown = props.done || isAnalyzed(props.ranges, upcoming?.start ?? currTime);
@@ -212,10 +207,20 @@ const VideoPlayer = (props: Props) => {
   const handleStepMoment = (dir: 1 | -1) => {
     const video = videoRef.current;
     if (!video || !props.canPlay) return;
-    const target = dir === 1 ? nextMoment(props.activities, currTime) : prevMoment(props.activities, currTime);
+    // Read the playhead from the ELEMENT, not from `currTime`. That state is throttled to
+    // ~10Hz and only catches up when the video presents a frame — so while paused, or on
+    // rapid repeated presses, it is stale, and every press after the first recomputes from
+    // the same old time and lands on the same moment. The element is always current.
+    const t = video.currentTime;
+    const target = stepMoment(props.activities, t, props.selectOpts.lead, dir);
     if (!target) return; // at the ends: a no-op, not a wrap-around
     showControls();
-    video.currentTime = seekTargetFor(target, props.selectOpts.lead);
+    const seekTo = seekTargetFor(target, props.selectOpts.lead);
+    video.currentTime = seekTo;
+    // Keep the chrome in step immediately rather than waiting for the next presented frame,
+    // so the now-line and the lit mark move with the key rather than a beat behind it.
+    chromeTimeRef.current = seekTo;
+    setCurrTime(seekTo);
   };
 
   // Core per-time update: selection, stable activity, scene tracking. Kept in a ref
@@ -316,8 +321,6 @@ const VideoPlayer = (props: Props) => {
       e.stopPropagation();
     }
   };
-
-  const handleTheaterMode = () => handleIsTheaterMode.toggle();
 
   const handleFullscreen = () => {
     if (isFullscreen) {
@@ -540,7 +543,7 @@ const VideoPlayer = (props: Props) => {
           </Box>
         )}
 
-        <Group className="controls" gap="sm" align="center" px="xs">
+        <Group className="controls" gap={6} align="center" mt={8}>
           <UnstyledButton
             onClick={handlePlayPause}
             onKeyDown={stopPlayerHotkeys}
@@ -628,6 +631,9 @@ const VideoPlayer = (props: Props) => {
               <HighlightIndicatorSettings />
             </Popover.Dropdown>
           </Popover>
+          <UnstyledButton onClick={handleFullscreen} aria-label="Fullscreen">
+            {isFullscreen ? <IconMaximizeOff /> : <IconMaximize />}
+          </UnstyledButton>
           <UnstyledButton
             onClick={() => handleCollapsed.toggle()}
             onKeyDown={stopPlayerHotkeys}
@@ -635,12 +641,6 @@ const VideoPlayer = (props: Props) => {
             aria-expanded={!collapsed}
           >
             {collapsed ? <IconChevronUp /> : <IconChevronDown />}
-          </UnstyledButton>
-          <UnstyledButton className="collapse-hide" onClick={handleTheaterMode} aria-label="Theater mode">
-            {isTheaterMode ? <IconArrowAutofitContent /> : <IconArrowAutofitWidth />}
-          </UnstyledButton>
-          <UnstyledButton onClick={handleFullscreen} aria-label="Fullscreen">
-            {isFullscreen ? <IconMaximizeOff /> : <IconMaximize />}
           </UnstyledButton>
         </Group>
       </Box>
