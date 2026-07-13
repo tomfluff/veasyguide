@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Range, type Scene, type WorkerMsg } from "./analyzer/types";
 import { coverage, isAnalyzed } from "./analyzer/ranges";
+import { validActivities } from "./analyzer/select";
 import VideoPlayer from "./player/VideoPlayer";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
@@ -303,13 +304,22 @@ export default function App() {
     setCurrentTime(t);
   }
 
+  // The moments, filtered and sorted, computed ONCE and shared. This lives in App rather than
+  // in VideoPlayer because the moments sidebar will mount here, beside the player, and both
+  // must agree about which moments exist and what number each one has.
+  //
+  // `activitiesRef` is a ref that the worker appends to in place, so its identity never
+  // changes and it can never be a memo key. `activityCount` is the state that does change on
+  // every append — that is what makes this recompute. (Key it on the ref and the list is
+  // computed once, at mount, and stays empty forever.)
+  const activities = useMemo(
+    () => validActivities(activitiesRef.current, params.minDuration),
+    [activityCount, params.minDuration]
+  );
+
   const selectOpts = useMemo(
-    () => ({
-      lead: params.highlightLead,
-      linger: params.highlightLinger,
-      minDuration: params.minDuration,
-    }),
-    [params.highlightLead, params.highlightLinger, params.minDuration]
+    () => ({ lead: params.highlightLead, linger: params.highlightLinger }),
+    [params.highlightLead, params.highlightLinger]
   );
 
   const progressPct = meta ? coverage(ranges, meta.duration) * 100 : 0;
@@ -336,7 +346,7 @@ export default function App() {
               key={videoUrl}
               src={videoUrl}
               meta={meta}
-              activitiesRef={activitiesRef}
+              activities={activities}
               scenes={scenes}
               ranges={ranges}
               done={done}

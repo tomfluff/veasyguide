@@ -64,8 +64,10 @@ import "./player.css";
 type Props = {
   src: string;
   meta: AnalysisMeta;
-  // Streaming-appended analyzer activities; a ref so appends don't re-render the player.
-  activitiesRef: React.RefObject<Activity[]>;
+  // The moments: already filtered and sorted by App (analyzer/select.ts `validActivities`).
+  // The player, the timeline markers and the moments sidebar all read this same list, so
+  // they cannot disagree about which moments exist or what each one is numbered.
+  activities: Activity[];
   scenes: Scene[];
   ranges: Range[];
   done: boolean;
@@ -73,6 +75,11 @@ type Props = {
   selectOpts: SelectOpts;
   onSeeked?: (t: number) => void;
   onTimeChange?: (t: number) => void;
+  // Fires only when the highlighted moment CHANGES — not per frame. The moments sidebar
+  // needs to know which card is current, and only the player derives that (it runs
+  // selectActivity on the rVFC loop; App sees time at a 0.2s throttle). Re-deriving it in
+  // App would let the highlighted card drift from the highlight on the video.
+  onActivityChange?: (activity: Activity | null) => void;
   // Assigned a seek function so external UI (debug views) can move the playhead.
   seekFnRef?: React.MutableRefObject<(t: number) => void>;
   extraHud?: ReactNode;
@@ -114,6 +121,7 @@ const VideoPlayer = (props: Props) => {
   const [sceneNotice, setSceneNotice] = useState(false);
   const currSceneIdRef = useRef<number | null>(null);
   const prevTimeRef = useRef(0);
+  const lastReportedActivityRef = useRef<number | null>(null);
 
   const videoContainerClasses = classNames("video-container", {
     clear: hideControls,
@@ -172,9 +180,15 @@ const VideoPlayer = (props: Props) => {
     setCurrTime(t);
     handleIsEnded.close();
 
-    const activity = selectActivity(props.activitiesRef.current ?? [], t, props.selectOpts);
+    const activity = selectActivity(props.activities, t, props.selectOpts);
     if (activity) setStableActivity(activity);
     setCurrActivity(activity);
+
+    // Publish only on change, not on every presented frame.
+    if ((activity?.id ?? null) !== lastReportedActivityRef.current) {
+      lastReportedActivityRef.current = activity?.id ?? null;
+      props.onActivityChange?.(activity);
+    }
 
     // Scene change: tell the viewer, but don't touch their zoom. Yanking them out of a
     // magnified view is a bigger disruption than a briefly stale target — and scene
