@@ -101,11 +101,28 @@ const HighlightIndicator = (props: Props) => {
       : {}),
   };
 
+  // The indicator is drawn scaled by --indicator-scale (and the pulse scales it further),
+  // but the enhance canvas used to stay at the activity's unscaled rect — so at 200% size
+  // the "bolder ink" covered only the centre quarter of the box, and during a pulse the
+  // border throbbed around a frozen crop. The canvas instead covers the SCALED box, with
+  // its source rect expanded by the same factor so the pixels stay 1:1 with the video
+  // underneath. (A source poking past the frame edge is fine: GL clamps to edge, and 2D
+  // drawImage clips.) The pulse itself is transform-only, so the canvas mirrors it with
+  // its own animation; the interior magnifies with the throb, which is the point.
+  const indicatorScale = settings.base_scale + 0.05;
+  const enhanceSource = {
+    x: currActivity.pos.x + (currActivity.dim.width * (1 - indicatorScale)) / 2,
+    y: currActivity.pos.y + (currActivity.dim.height * (1 - indicatorScale)) / 2,
+    width: currActivity.dim.width * indicatorScale,
+    height: currActivity.dim.height * indicatorScale,
+  };
+
   return (
     <Box
       className="highlight-wrapper"
       style={{
         ["--highlight-opacity" as string]: highlightOpacity,
+        ["--pulse-duration" as string]: `${1 / settings.animation_speed}s`,
         position: "absolute",
         left: `${scaleRatio * currActivity.pos.x + leftShift}px`,
         top: `${scaleRatio * currActivity.pos.y + topShift}px`,
@@ -129,17 +146,16 @@ const HighlightIndicator = (props: Props) => {
       }}
     >
       <EnhanceCanvas
-        className="highlight-enhance"
+        className={
+          settings.animation_style !== "none"
+            ? "highlight-enhance pulsing"
+            : "highlight-enhance"
+        }
         videoRef={props.videoRef}
         filters={filters}
-        source={{
-          x: currActivity.pos.x,
-          y: currActivity.pos.y,
-          width: currActivity.dim.width,
-          height: currActivity.dim.height,
-        }}
-        width={scaleRatio * currActivity.dim.width}
-        height={scaleRatio * currActivity.dim.height}
+        source={enhanceSource}
+        width={scaleRatio * enhanceSource.width}
+        height={scaleRatio * enhanceSource.height}
       />
       <Box className="highlight-indicator" style={indicatorStyle} />
       <Box className="highlight-pointer" style={pointerStyle}>

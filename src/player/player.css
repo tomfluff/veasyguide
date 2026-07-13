@@ -245,12 +245,16 @@
 }
 
 /* Enhance layer: a canvas copy of the video region under the highlight, filtered.
-   Sits beneath the indicator's fill/border so those still read on top. */
+   Sits beneath the indicator's fill/border so those still read on top.
+   It is LARGER than the wrapper — sized to the scaled indicator box, with its source rect
+   expanded to match — so it is centred here rather than inset:0. Centring uses the
+   `translate` property, NOT transform: the pulse animation below owns `transform`, and
+   putting the centring translate inside transform would be wiped by its first keyframe. */
 .highlight-enhance {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
   pointer-events: none;
 }
 
@@ -263,6 +267,34 @@
   }
   100% {
     transform: scale(var(--indicator-scale));
+  }
+}
+
+/* The canvas already has --indicator-scale baked into its geometry (element size and
+   source rect), so its pulse starts from 1 and throbs by the same 1.25 ratio, in step
+   with the indicator's animation above. */
+@keyframes pulse-enhance {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.highlight-enhance.pulsing {
+  animation: pulse-enhance var(--pulse-duration, 1s) ease-in-out forwards 3;
+}
+
+/* The Appearance sheet promises "your system's reduce-motion setting is respected" — this
+   is the line that keeps that promise. Only the pulse is motion; the opacity fades stay. */
+@media (prefers-reduced-motion: reduce) {
+  .highlight-indicator,
+  .highlight-enhance.pulsing {
+    animation: none;
   }
 }
 
