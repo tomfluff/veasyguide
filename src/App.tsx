@@ -15,6 +15,8 @@ const DEBUG = QUERY.get("debug") === "1";
 const RESEARCH = QUERY.get("research") === "1";
 // Preset the gallery's snippet toggle (visual crops of each activity).
 const SNIPPETS = QUERY.get("snippets") === "1";
+// Force the CPU pipeline (`?cpu=1`) — the reference the GPU path is checked against.
+const FORCE_CPU = QUERY.get("cpu") === "1";
 // In-memory cap for stored analyzer frames (~25 KB each => ~150 MB worst case).
 const MAX_DEBUG_FRAMES = 6000;
 
@@ -170,7 +172,6 @@ export default function App() {
   const [openClusters, setOpenClusters] = useState(0);
   const [framesCount, setFramesCount] = useState(0);
   const [viewIdx, setViewIdx] = useState(-1); // -1 = follow the frontier
-  const [playheadNodes, setPlayheadNodes] = useState<Box[]>([]);
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -202,7 +203,7 @@ export default function App() {
     framesBytesRef.current = 0;
     followRef.current = true;
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
-    setDone(false); setError(null); setOpenClusters(0); setPlayheadNodes([]);
+    setDone(false); setError(null); setOpenClusters(0);
     setFramesCount(0); setViewIdx(-1); setScenes([]); setRanges([]);
     setStage("Starting worker…");
 
@@ -248,7 +249,7 @@ export default function App() {
         }
       }
     };
-    worker.postMessage({ type: "start", file, params: p, debug: cap, collectNodes: RESEARCH });
+    worker.postMessage({ type: "start", file, params: p, debug: cap, collectNodes: RESEARCH, forceCpu: FORCE_CPU });
     workerRef.current = worker;
   }
 
@@ -284,18 +285,12 @@ export default function App() {
   }
 
   // The player reports time per presented frame (rVFC); throttle App re-renders,
-  // which only feed the HUD and the debug node overlay.
+  // which only feed the HUD.
   const lastTimeRef = useRef(-1);
   function onTimeChange(t: number) {
     if (Math.abs(t - lastTimeRef.current) < 0.2) return;
     lastTimeRef.current = t;
     setCurrentTime(t);
-    if (DEBUG) {
-      // Raw nodes detected near the playhead — what the pipeline saw, pre-clustering.
-      setPlayheadNodes(
-        framesRef.current.filter((s) => Math.abs(s.t - t) <= 0.6).flatMap((s) => s.boxes)
-      );
-    }
   }
 
   const selectOpts = useMemo(
@@ -337,7 +332,6 @@ export default function App() {
               done={done}
               canPlay={canPlay}
               selectOpts={selectOpts}
-              debugNodes={DEBUG ? playheadNodes : undefined}
               onSeeked={onSeeked}
               onTimeChange={onTimeChange}
               seekFnRef={seekFnRef}
@@ -528,7 +522,6 @@ export default function App() {
           <div className="debug-legend">
             <span><i className="sw red" /> diff mask (post-dilate)</span>
             <span><i className="sw green" /> node boxes (this sample)</span>
-            <span><i className="sw blue" /> raw nodes near playhead (on video)</span>
             <span>{openClusters} open clusters</span>
             <span>{framesCount}{framesCount >= MAX_DEBUG_FRAMES ? " (capped)" : ""} frames · {(framesBytesRef.current / 1048576).toFixed(1)} MB in memory (cleared on refresh)</span>
             {viewIdx >= 0 && (

@@ -10,6 +10,7 @@
 
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from "mediabunny";
 import { componentRegions, contentScore, diffMask, dilate, toGray } from "./pipeline";
+import { GLAnalyzer } from "./glPipeline";
 import { computeFeatures } from "./features";
 import { StreamingClusterer, type RawActivity } from "./graph";
 import { addRange, isAnalyzed, nextGap } from "./ranges";
@@ -18,6 +19,7 @@ import type { Activity, AnalysisMeta, InMsg, Range, WorkerMsg } from "./types";
 const post = (m: WorkerMsg) => (self as unknown as Worker).postMessage(m);
 
 let seekRequest: number | null = null; // set by the main thread; aborts the current segment
+let activeGpu: GLAnalyzer | null = null; // disposed when the next run starts
 
 self.onmessage = async (e: MessageEvent<InMsg>) => {
   const msg = e.data;
@@ -34,7 +36,7 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
   }
 };
 
-async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type: "start" }>) {
+async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMsg, { type: "start" }>) {
   post({ type: "status", stage: "Reading container…" });
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
 
@@ -86,6 +88,14 @@ async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type:
   const debugCtx = debugCanvas?.getContext("2d") ?? null;
   const sink = new VideoSampleSink(track);
 
+  // GPU path. A rotated track stays on the CPU: sample.draw() applies the rotation
+  // metadata, a raw VideoFrame texture upload would not. Disposing the previous run's
+  // analyzer here matters: re-analyzing (new params) would otherwise leak a WebGL context
+  // per run, and browsers only allow a handful.
+  activeGpu?.dispose();
+  const gpu = (activeGpu = !forceCpu && track.rotation === 0 ? GLAnalyzer.create(aw, ah) : null);
+  post({ type: "status", stage: gpu ? "Analyzing (GPU)…" : "Analyzing (CPU)…" });
+
   const distTh = params.distRatio * Math.sqrt(aw * aw + ah * ah);
 
   // Enrich a raw cluster into an Activity: validity heuristic (Python
@@ -111,12 +121,15 @@ async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type:
   let sceneId = 0;
   let analyzedSec = 0; // video-seconds actually analyzed (for an honest x-realtime)
   const wallStart = performance.now();
+  // ponytail: temporary — where the wall time actually goes. Logged at done, drop once we know.
+  const cost = { decode: 0, readback: 0, math: 0 };
 
   // Analyze forward from `from` until: a seek is requested, we run into already-analyzed
   // video, or the video ends. Each segment is independent — fresh clusterer, and its start
   // is treated as a scene start (as a cut would be).
   async function analyzeSegment(from: number) {
     const clusterer = new StreamingClusterer(params.spanTh, distTh);
+    gpu?.reset(); // a segment never diffs across its own start
     let prevGray: Uint8Array | null = null;
     let prevRgba: Uint8ClampedArray | null = null;
     let sceneStart = from;
@@ -133,8 +146,10 @@ async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type:
       ranges = addRange(ranges, { start: from, end: segEnd });
     };
 
+    let mark = performance.now();
     for await (const sample of sink.samplesAtTimestamps(timestamps)) {
-      if (!sample) continue;
+      cost.decode += performance.now() - mark;
+      if (!sample) { mark = performance.now(); continue; }
       const t = sample.timestamp;
 
       // The viewer jumped somewhere unanalyzed: drop this segment and go serve them.
@@ -144,30 +159,52 @@ async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type:
       // loop would pick it forever without ever producing a sample from it.
       if (t > from && isAnalyzed(ranges, t)) { sample.close(); segEnd = t; flushSegment(); return; }
 
-      sample.draw(ctx, 0, 0, aw, ah);
-      sample.close(); // release the decoded frame (readback already done via draw)
-      const rgba = ctx.getImageData(0, 0, aw, ah).data;
-      const gray = toGray(rgba, aw, ah);
+      // Decode the frame into the mask/mag/gray this sample contributes, plus its scene
+      // score against the previous sample. Everything here is null on a segment's first
+      // frame — there is nothing to diff against yet.
+      const tMath = performance.now();
+      let mask: Uint8Array | null = null;
+      let mag: Uint8Array | null = null;
+      let gray: Uint8Array | null = null;
+      let score: number | null = null;
+
+      if (gpu) {
+        const frame = sample.toVideoFrame();
+        sample.close();
+        const out = gpu.process(frame, params.diffThresh, params.dilateIters);
+        frame.close();
+        if (out) ({ mask, mag, gray, score } = out);
+      } else {
+        const tRead = performance.now();
+        sample.draw(ctx, 0, 0, aw, ah);
+        sample.close(); // release the decoded frame (readback already done via draw)
+        const rgba = ctx.getImageData(0, 0, aw, ah).data;
+        cost.readback += performance.now() - tRead;
+        gray = toGray(rgba, aw, ah);
+        if (prevGray && prevRgba) {
+          score = contentScore(prevRgba, rgba);
+          const d = diffMask(prevGray, gray, aw, ah, params.diffThresh);
+          mask = dilate(d.mask, aw, ah, params.dilateIters);
+          mag = d.mag;
+        }
+        prevGray = gray;
+        prevRgba = rgba;
+      }
 
       // Scene cut? Score the HSV content change against the previous sample.
       let isCut = false;
-      if (prevRgba) {
-        const score = contentScore(prevRgba, rgba);
-        if (score >= params.sceneThreshold && t - lastCut >= params.sceneMinLen) {
-          isCut = true;
-          lastCut = t;
-          post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: t } });
-          sceneStart = t;
-          // Activities must not span a cut: the Python analyzer generated frame pairs
-          // per scene, so no diff ever crossed a boundary. Close everything open.
-          for (const act of clusterer.flush()) post({ type: "activity", activity: finalize(act) });
-        }
+      if (score !== null && score >= params.sceneThreshold && t - lastCut >= params.sceneMinLen) {
+        isCut = true;
+        lastCut = t;
+        post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: t } });
+        sceneStart = t;
+        // Activities must not span a cut: the Python analyzer generated frame pairs
+        // per scene, so no diff ever crossed a boundary. Close everything open.
+        for (const act of clusterer.flush()) post({ type: "activity", activity: finalize(act) });
       }
 
       // A cut's own frame pair is a whole-frame change, not instructor activity — skip it.
-      if (prevGray && !isCut) {
-        const { mask: rawMask, mag } = diffMask(prevGray, gray, aw, ah, params.diffThresh);
-        const mask = dilate(rawMask, aw, ah, params.dilateIters);
+      if (mask && mag && gray && !isCut) {
         const regions = componentRegions(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac, mag);
         const boxes = regions.map((r) => r.box);
         for (const r of regions) {
@@ -191,10 +228,10 @@ async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type:
           post({ type: "debugFrame", t, blob, w: aw, h: ah, boxes });
         }
       }
-      prevGray = gray;
-      prevRgba = rgba;
       analyzedSec += params.sampleInterval;
       segEnd = t;
+      cost.math += performance.now() - tMath;
+      mark = performance.now();
 
       if (t - lastProgress >= 0.5) {
         const wallSec = (performance.now() - wallStart) / 1000;
@@ -236,6 +273,11 @@ async function run({ file, params, debug, collectNodes }: Extract<InMsg, { type:
   }
 
   const wallMs = performance.now() - wallStart;
+  const pct = (ms: number) => `${(ms / 1000).toFixed(1)}s (${((ms / wallMs) * 100).toFixed(0)}%)`;
+  console.log(
+    `[analyzer] ${gpu ? "GPU" : "CPU"} — wall ${(wallMs / 1000).toFixed(1)}s, decode ${pct(cost.decode)}, ` +
+      `readback ${pct(cost.readback)}, pixel math ${pct(cost.math)}`
+  );
   post({ type: "done", wallMs, xRealtime: analyzedSec / (wallMs / 1000), ranges });
   input.dispose?.();
 }

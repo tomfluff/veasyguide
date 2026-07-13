@@ -44,7 +44,7 @@ import classNames from "classnames";
 import { convertSecondsToTimecode } from "../utils/misc";
 import { selectActivity, type SelectOpts } from "../analyzer/select";
 import { isAnalyzed } from "../analyzer/ranges";
-import type { Activity, AnalysisMeta, Box as ABox, Range, Scene } from "../analyzer/types";
+import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
@@ -65,8 +65,6 @@ type Props = {
   done: boolean;
   canPlay: boolean;
   selectOpts: SelectOpts;
-  // Debug: raw detection nodes near the playhead, in analysis-res px.
-  debugNodes?: ABox[];
   onSeeked?: (t: number) => void;
   onTimeChange?: (t: number) => void;
   // Assigned a seek function so external UI (debug views) can move the playhead.
@@ -447,18 +445,6 @@ const VideoPlayer = (props: Props) => {
           activity={playerActivity}
           videoRef={videoRef}
         />
-        {props.debugNodes?.map((b, i) => (
-          <Box
-            key={i}
-            className="node-box"
-            style={{
-              left: `${scaleRatio * b.x * props.meta.scale + leftShift}px`,
-              top: `${scaleRatio * b.y * props.meta.scale + topShift}px`,
-              width: `${scaleRatio * b.w * props.meta.scale}px`,
-              height: `${scaleRatio * b.h * props.meta.scale}px`,
-            }}
-          />
-        ))}
       </Box>
       <Box className="video-magnification">
         <MagnificationOverlay

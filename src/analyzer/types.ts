@@ -106,6 +106,8 @@ export type StartMsg = {
   debug: boolean;
   // Research mode: include the per-node region logs on emitted activities.
   collectNodes?: boolean;
+  // Force the CPU pipeline even where WebGL2 is available (?cpu=1) — the A/B reference.
+  forceCpu?: boolean;
 };
 export type SeekMsg = { type: "seek"; t: number }; // analyze from here next, abandoning current segment
 export type InMsg = StartMsg | SeekMsg;

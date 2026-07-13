@@ -1,6 +1,6 @@
 /* Ported from VeasyGuide: VideoPlayer.css + HighlightIndicator.css +
    MagnificationOverlay.css, combined. Additions for streaming analysis at the
-   bottom (.timeline-analyzed, .overlay-gate, .overlay-catching-up, .node-box). */
+   bottom (.timeline-analyzed, .overlay-gate, .overlay-catching-up). */
 
 .video-container {
   width: 100%;
@@ -352,11 +352,4 @@
 
 .video-overlay .overlay-catching-up {
   top: 0.75rem;
-}
-
-.video-highlights .node-box {
-  position: absolute;
-  border: 1.5px solid #2979ff;
-  pointer-events: none;
-  z-index: 11;
 }
