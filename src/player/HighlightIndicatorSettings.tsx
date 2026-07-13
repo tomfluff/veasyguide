@@ -14,7 +14,7 @@ import {
   Group,
   Button,
   NativeSelect,
-  Tooltip,
+  Stack,
 } from "@mantine/core";
 import {
   useHighlightSettingsStore,
@@ -262,16 +262,18 @@ const HighlightIndicatorSettings = () => {
             <Text size="xs" c="dimmed" mb={6}>
               Applied to the video inside the highlighted region.
             </Text>
-            <Group gap="xs">
+            <Stack gap={6}>
               {filterStyleOptions.map((option) => {
                 const on = settingsStore.filter_style.includes(option);
                 return (
-                  <Tooltip key={option} label={filterStyleLabels[option].hint} withArrow>
+                  <Group key={option} gap="xs" wrap="nowrap" align="center">
                     <Button
                       variant={on ? "filled" : "default"}
                       size="xs"
                       px={8}
                       py={0}
+                      style={{ flex: "none", minWidth: 184 }}
+                      aria-pressed={on}
                       onClick={() =>
                         setHighlightSettings({
                           filter_style: on
@@ -286,10 +288,16 @@ const HighlightIndicatorSettings = () => {
                     >
                       {filterStyleLabels[option].label}
                     </Button>
-                  </Tooltip>
+                    {/* Visible, not a tooltip. This is the ONLY explanation of what the
+                        filter does, and a hover tooltip hides it from every keyboard and
+                        screen-reader user — the audience. */}
+                    <Text size="xs" c="dimmed">
+                      {filterStyleLabels[option].hint}
+                    </Text>
+                  </Group>
                 );
               })}
-            </Group>
+            </Stack>
           </Grid.Col>
         </Grid>
       </Tabs.Panel>

@@ -1,5 +1,5 @@
 // Ported from VeasyGuide unchanged (Container/Stack wrappers trimmed).
-import { Grid, Slider, Title, Space, Switch, Button, Group, Tooltip } from "@mantine/core";
+import { Stack, Grid, Slider, Text, Title, Space, Switch, Button, Group } from "@mantine/core";
 import {
   useMagnificationSettingsStore,
   setMagnificationSettings,
@@ -68,33 +68,42 @@ const MagnificationOverlaySettings = () => {
         <Title order={6}>Enhance</Title>
       </Grid.Col>
       <Grid.Col span={8}>
-        <Group gap="xs">
-          {filterStyleOptions.map((option) => {
-            const on = settingsStore.filter_style.includes(option);
-            return (
-              <Tooltip key={option} label={filterStyleLabels[option].hint} withArrow>
-                <Button
-                  variant={on ? "filled" : "default"}
-                  size="xs"
-                  px={8}
-                  py={0}
-                  onClick={() =>
-                    setMagnificationSettings({
-                      filter_style: on
-                        ? settingsStore.filter_style.filter((f) => f !== option)
-                        : [...settingsStore.filter_style, option].sort(
-                            (a, b) =>
-                              filterStyleOptions.indexOf(a) - filterStyleOptions.indexOf(b)
-                          ),
-                    })
-                  }
-                >
-                  {filterStyleLabels[option].label}
-                </Button>
-              </Tooltip>
-            );
-          })}
-        </Group>
+<Stack gap={6}>
+  {filterStyleOptions.map((option) => {
+    const on = settingsStore.filter_style.includes(option);
+    return (
+      <Group key={option} gap="xs" wrap="nowrap" align="center">
+        <Button
+          variant={on ? "filled" : "default"}
+          size="xs"
+          px={8}
+          py={0}
+          style={{ flex: "none", minWidth: 184 }}
+          aria-pressed={on}
+          onClick={() =>
+            setMagnificationSettings({
+              filter_style: on
+                ? settingsStore.filter_style.filter((f) => f !== option)
+                : [...settingsStore.filter_style, option].sort(
+                    (a, b) =>
+                      filterStyleOptions.indexOf(a) -
+                      filterStyleOptions.indexOf(b)
+                  ),
+            })
+          }
+        >
+          {filterStyleLabels[option].label}
+        </Button>
+        {/* Visible, not a tooltip. This is the ONLY explanation of what the
+            filter does, and a hover tooltip hides it from every keyboard and
+            screen-reader user — the audience. */}
+        <Text size="xs" c="dimmed">
+          {filterStyleLabels[option].hint}
+        </Text>
+      </Group>
+    );
+  })}
+</Stack>
       </Grid.Col>
       <Grid.Col span={4}>
         <Title order={6}>Contrast</Title>

@@ -441,17 +441,8 @@
   display: none;
 }
 
-/* The volume slider was rendering in Mantine's default blue — a colour that appears nowhere
-   else in the product. Brand purple, per DESIGN.md. */
-.volume-slider .mantine-Slider-bar {
-  background-color: #d27cf7;
-}
-
-.volume-slider .mantine-Slider-thumb {
-  border-color: #ffffff;
-  background-color: #ffffff;
-}
-
+/* Only the track needs overriding — the bar and thumb come from the theme's brand colour.
+   The track sits on the dark bar, so it cannot use Mantine's light-surface default. */
 .volume-slider .mantine-Slider-track::before {
   background-color: #39414d;
 }
@@ -461,4 +452,42 @@
   font-variant-numeric: tabular-nums; /* the timecode must not jitter as digits change */
   flex-grow: 1;
   padding-left: 10px;
+}
+
+/* The settings panels are long. Constrain them and let them scroll internally, or the top of
+   the panel goes off the screen — which is where the section headings live. */
+.mantine-Popover-dropdown {
+  max-height: min(58vh, 420px);
+  overflow-y: auto;
+}
+
+/* --- Narrow viewports / high zoom -----------------------------------------
+   At a 320px CSS width (400% browser zoom, WCAG 1.4.10's reflow target) the video is only
+   180px tall, and the control bar wraps to three rows — so an overlaid bar covers the entire
+   lecture. Below this width the bar leaves the overlay and sits BELOW the video in flow.
+
+   This is free precisely because the overlay geometry measures the <video> element rather
+   than the container: the video's box is unchanged, so the highlight and the magnifier do
+   not move. (Measuring the container, as the code used to, would have drifted them.)
+
+   Fullscreen keeps the overlay — there the viewport is large and the video fills it. */
+@media (max-width: 520px) {
+  .video-container:not(.fullscreen) {
+    flex-direction: column;
+  }
+
+  .video-container:not(.fullscreen) .video-controls-container {
+    position: static;
+    order: 2; /* the controls div precedes <video> in the DOM; in column flow it would
+                 otherwise stack ABOVE the lecture */
+  }
+
+  .video-container:not(.fullscreen) video {
+    order: 1;
+  }
+
+  /* With the bar out of the way, there is nothing to hide from. */
+  .video-container:not(.fullscreen).clear .video-controls-container {
+    opacity: 1;
+  }
 }

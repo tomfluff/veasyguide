@@ -120,7 +120,6 @@ const VideoPlayer = (props: Props) => {
   const [isFullscreen, handleIsFullscreen] = useDisclosure(false);
   const [hideControls, handleHideControls] = useDisclosure(false);
   const [collapsed, handleCollapsed] = useDisclosure(false);
-  const [popoverOpacity, setPopoverOpacity] = useState(0.5);
   const [sceneNotice, setSceneNotice] = useState(false);
   const currSceneIdRef = useRef<number | null>(null);
   const prevTimeRef = useRef(0);
@@ -601,33 +600,23 @@ const VideoPlayer = (props: Props) => {
             <Text>{convertSecondsToTimecode(totalTime)}</Text>
           </Group>
           {props.extraHud}
-          <Popover width={360} position="top-end" shadow="md">
+          <Popover width={360} position="top-end" shadow="md" withinPortal={false}>
             <Popover.Target>
               <UnstyledButton className="collapse-hide" aria-label="Magnification settings">
                 <IconZoomInAreaFilled />
               </UnstyledButton>
             </Popover.Target>
-            <Popover.Dropdown
-              style={{ transition: "opacity 0.2s" }}
-              opacity={popoverOpacity}
-              onMouseEnter={() => setPopoverOpacity(1)}
-              onMouseLeave={() => setPopoverOpacity(0.5)}
-            >
+            <Popover.Dropdown>
               <MagnificationOverlaySettings />
             </Popover.Dropdown>
           </Popover>
-          <Popover width={420} position="top-end" shadow="md">
+          <Popover width={420} position="top-end" shadow="md" withinPortal={false}>
             <Popover.Target>
               <UnstyledButton className="collapse-hide" aria-label="Highlight settings">
                 <IconSparkles />
               </UnstyledButton>
             </Popover.Target>
-            <Popover.Dropdown
-              style={{ transition: "opacity 0.2s" }}
-              opacity={popoverOpacity}
-              onMouseEnter={() => setPopoverOpacity(1)}
-              onMouseLeave={() => setPopoverOpacity(0.5)}
-            >
+            <Popover.Dropdown>
               <HighlightIndicatorSettings />
             </Popover.Dropdown>
           </Popover>
