@@ -24,6 +24,7 @@ import {
   useElementSize,
   useDisclosure,
   useHotkeys,
+  useMergedRef,
   useMouse,
   useTimeout,
 } from "@mantine/hooks";
@@ -50,6 +51,7 @@ import { selectActivity, type SelectOpts } from "../analyzer/select";
 import { isAnalyzed } from "../analyzer/ranges";
 import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
+import { computeLetterbox } from "./geometry";
 import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
@@ -82,11 +84,17 @@ const SCENE_NOTICE_MS = 2500;
 const VideoPlayer = (props: Props) => {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Fullscreen is requested on the container; the overlay geometry measures the <video>
+  // element. They are the same rectangle today (the video is the container's only in-flow
+  // child), but only by accident — anything else placed in that flow would break the
+  // container measurement while the video measurement stays correct.
+  const containerRef = useRef<HTMLDivElement>(null);
   const {
-    ref: containerRef,
-    width: containerWidth,
-    height: containerHeight,
-  } = useElementSize<HTMLDivElement>();
+    ref: videoSizeRef,
+    width: boxWidth,
+    height: boxHeight,
+  } = useElementSize<HTMLVideoElement>();
+  const videoMergedRef = useMergedRef(videoRef, videoSizeRef);
 
   // State
   const [volume, setVolume] = useState(1);
@@ -144,21 +152,10 @@ const VideoPlayer = (props: Props) => {
   const totalTime = props.meta.duration;
   const videoWidth = props.meta.videoWidth;
   const videoHeight = props.meta.videoHeight;
-  const [leftShift, topShift, scaleRatio] = useMemo(() => {
-    const containerAspectRatio = containerWidth / containerHeight;
-    const videoAspectRatio = videoWidth / videoHeight;
-
-    let left = 0;
-    let top = 0;
-    const scale = Math.min(containerWidth / videoWidth, containerHeight / videoHeight);
-
-    if (videoAspectRatio > containerAspectRatio) {
-      top = Math.round((containerHeight - videoHeight * scale) / 2);
-    } else {
-      left = Math.round((containerWidth - videoWidth * scale) / 2);
-    }
-    return [left, top, scale];
-  }, [videoWidth, videoHeight, containerWidth, containerHeight]);
+  const { leftShift, topShift, scaleRatio } = useMemo(
+    () => computeLetterbox(boxWidth, boxHeight, videoWidth, videoHeight),
+    [boxWidth, boxHeight, videoWidth, videoHeight]
+  );
 
   const atUnanalyzed = !props.done && !isAnalyzed(props.ranges, currTime);
 
@@ -447,7 +444,7 @@ const VideoPlayer = (props: Props) => {
         </Group>
       </Box>
       <video
-        ref={videoRef}
+        ref={videoMergedRef}
         src={props.src}
         onTimeUpdate={() => {
           // Fallback for browsers without rVFC + covers paused seeks.

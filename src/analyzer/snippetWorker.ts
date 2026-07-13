@@ -68,10 +68,13 @@ async function run({ file, reqs }: SnippetInMsg) {
   let done = 0;
 
   for await (const sample of sink.samplesAtTimestamps(timestamps)) {
-    if (!sample) continue;
-    // samplesAtTimestamps yields in request order, so pair by index.
+    // samplesAtTimestamps yields one entry per requested timestamp, in request order —
+    // including a null when a timestamp has no frame. The index must advance even for a
+    // null, or every crop after it pairs with the wrong timestamp (and so with the wrong
+    // activity).
     const t = timestamps[done];
     done++;
+    if (!sample) continue;
 
     // Draw the decoded frame once at native size, then crop out each activity's window.
     sample.draw(frameCtx, 0, 0, frame.width, frame.height);
