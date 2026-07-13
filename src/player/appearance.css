@@ -18,7 +18,9 @@
   --ap-raise: #1b2029;
   --ap-brand: #d27cf7;             /* brand-300: the only purple legible on this surface */
   --ap-brand-ink: #17061f;
-  width: 340px;
+  /* Wide enough that "High contrast" fits a tile name on one line — a wrapped name made
+     that tile taller than its three siblings and broke the row's alignment. */
+  width: 396px;
   padding: 12px;
   font-size: 14px;
 }
@@ -26,10 +28,12 @@
 .ap-title { font-size: 15px; font-weight: 650; }
 .ap-hint { font-size: 12px; color: var(--ap-muted); line-height: 1.45; margin-bottom: 10px; }
 .ap-status { font-size: 12px; color: var(--ap-muted); margin: 8px 0 10px; min-height: 17px; }
+/* No negative-margin bleed: it made the sheet a few px taller than the dropdown, so the
+   dropdown grew its own scrollbar on top of .ap-body's — two nested scrollbars. */
 .ap-foot {
   font-size: 11px; color: var(--ap-muted);
   border-top: 1px solid var(--ap-line);
-  margin: 10px -12px -12px; padding: 8px 12px;
+  margin-top: 10px; padding-top: 8px;
 }
 
 /* ---- preset tiles ------------------------------------------------------ */
@@ -59,7 +63,10 @@
 
 .ap-mini-box { position: absolute; left: 16%; top: 19px; width: 56%; height: 17px; }
 .ap-mini-fill { position: absolute; inset: 0; }
-.ap-mini-ptr { position: absolute; left: 62%; top: 28px; line-height: 1; }
+/* Anchored where the player anchors it: the bottom-left corner of the highlight box
+   (HighlightIndicator puts it at left 0, top 100% of the box), growing down-right. */
+.ap-mini-ptr { position: absolute; left: 16%; top: 34px; }
+.ap-mini-ptr img { width: 100%; height: 100%; display: block; }
 
 .ap-tile-name {
   display: block; padding: 4px 3px 5px;

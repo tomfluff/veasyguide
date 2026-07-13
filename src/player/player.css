@@ -454,12 +454,8 @@
   padding-left: 10px;
 }
 
-/* The settings panels are long. Constrain them and let them scroll internally, or the top of
-   the panel goes off the screen — which is where the section headings live. */
-.mantine-Popover-dropdown {
-  max-height: min(46vh, 330px);
-  overflow-y: auto;
-}
+/* No max-height here: the Appearance sheet (the only popover) is fixed-size and scrolls
+   its own body. Capping the dropdown too stacked a second scrollbar around the first. */
 
 /* --- Narrow viewports / high zoom -----------------------------------------
    At a 320px CSS width (400% browser zoom, WCAG 1.4.10's reflow target) the video is only

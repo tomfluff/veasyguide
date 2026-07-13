@@ -5,6 +5,7 @@
 // inverts the whole point of the product. Each tile renders a miniature slide with the
 // highlight drawn at that preset's own settings, so the choice is made by sight.
 import type { Preset } from "./presets";
+import IndicatorPointer from "./IndicatorPointer";
 
 // Border width does NOT scale linearly into the tile. A 4px border on a ~900px-wide video is
 // 0.4px in a 90px tile — invisible, and all four presets would look identical. This maps the
@@ -46,12 +47,15 @@ export default function PresetTile({
             style={{ backgroundColor: h.fill_color, opacity: h.fill_opacity }}
           />
         </span>
+        {/* The same SVG the player draws (IndicatorPointer), anchored at the box's
+            bottom-left corner exactly as HighlightIndicator anchors it. An emoji stand-in
+            here would make the preview lie about what you will get. */}
         {h.pointer_style !== "none" && (
           <span
             className="ap-mini-ptr"
-            style={{ fontSize: `${11 * h.pointer_scale}px` }}
+            style={{ width: `${14 * h.pointer_scale}px`, height: `${14 * h.pointer_scale}px` }}
           >
-            {h.pointer_style === "hand" ? "✋" : "➤"}
+            <IndicatorPointer style={h.pointer_style} />
           </span>
         )}
       </span>
