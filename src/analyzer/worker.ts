@@ -121,7 +121,9 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
   let sceneId = 0;
   let analyzedSec = 0; // video-seconds actually analyzed (for an honest x-realtime)
   const wallStart = performance.now();
-  // ponytail: temporary — where the wall time actually goes. Logged at done, drop once we know.
+  // Where the wall time actually goes. Logged at done under ?debug=1 — it's what tells you
+  // whether a slow analysis is decode-bound, readback-bound, or pixel-math-bound, which is
+  // the first question worth asking before optimizing anything here.
   const cost = { decode: 0, readback: 0, math: 0 };
 
   // Analyze forward from `from` until: a seek is requested, we run into already-analyzed
@@ -273,11 +275,13 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
   }
 
   const wallMs = performance.now() - wallStart;
-  const pct = (ms: number) => `${(ms / 1000).toFixed(1)}s (${((ms / wallMs) * 100).toFixed(0)}%)`;
-  console.log(
-    `[analyzer] ${gpu ? "GPU" : "CPU"} — wall ${(wallMs / 1000).toFixed(1)}s, decode ${pct(cost.decode)}, ` +
-      `readback ${pct(cost.readback)}, pixel math ${pct(cost.math)}`
-  );
+  if (debug) {
+    const pct = (ms: number) => `${(ms / 1000).toFixed(1)}s (${((ms / wallMs) * 100).toFixed(0)}%)`;
+    console.log(
+      `[analyzer] ${gpu ? "GPU" : "CPU"} — wall ${(wallMs / 1000).toFixed(1)}s, decode ${pct(cost.decode)}, ` +
+        `readback ${pct(cost.readback)}, pixel math ${pct(cost.math)}`
+    );
+  }
   post({ type: "done", wallMs, xRealtime: analyzedSec / (wallMs / 1000), ranges });
   input.dispose?.();
 }
