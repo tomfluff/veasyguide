@@ -1,0 +1,91 @@
+/* The Appearance sheet renders INSIDE .video-controls-container (the popover is not
+   portaled, so it survives fullscreen). That container sets a near-white text colour for the
+   dark bar — which lands as white-on-white inside this light panel. Reset it. */
+.mantine-Popover-dropdown {
+  color: var(--mantine-color-text);
+}
+
+.appearance-sheet {
+  max-width: 100%;
+}
+
+.ap-preset {
+  min-height: 44px; /* WCAG 2.5.5 */
+}
+
+/* Custom is derived, never chosen: it reports that the settings match no preset. Rendering it
+   as a disabled button made it look broken, so it is a status chip. */
+.ap-custom {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--mantine-radius-default);
+  border: 2px dashed var(--mantine-color-default-border);
+  color: var(--mantine-color-dimmed);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ap-custom.sel {
+  border-color: #2f9e5f;
+  color: #1c7a45;
+  background-color: #eefaf2;
+}
+
+.ap-customize {
+  align-self: flex-start;
+  min-height: 44px;
+}
+
+.ap-groups section + section {
+  border-top: 1px solid var(--mantine-color-default-border);
+  padding-top: 12px;
+}
+
+.ap-groups h4 {
+  font-size: 13px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dimmed);
+  margin-bottom: 8px;
+}
+
+.ap-row {
+  margin-bottom: 8px;
+}
+
+.ap-label {
+  flex: none;
+  width: 108px;
+  font-size: 14px;
+  color: var(--mantine-color-dimmed);
+}
+
+.ap-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.ap-value {
+  flex: none;
+  width: 48px;
+  text-align: right;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ap-swatch {
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.ap-swatch.sel {
+  border-color: var(--mantine-color-bright);
+  box-shadow: 0 0 0 2px var(--mantine-primary-color-filled);
+}
+
+.ap-swatch:focus-visible {
+  outline: 3px solid #6fb3ff;
+  outline-offset: 2px;
+}

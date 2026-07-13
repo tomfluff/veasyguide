@@ -54,7 +54,7 @@
   opacity: 0;
 }
 
-.video-controls-container .controls button {
+.video-controls-container .controls > button {
   color: #f2f4f7;
   height: 44px;   /* WCAG 2.5.5 target size. Was 2rem/32px. */
   width: 44px;
@@ -64,22 +64,22 @@
   justify-content: center;
 }
 
-.video-controls-container .controls button:hover {
+.video-controls-container .controls > button:hover {
   background-color: #21262f;
 }
 
-.video-controls-container .controls button:focus-visible {
+.video-controls-container .controls > button:focus-visible {
   outline: 3px solid #6fb3ff;
   outline-offset: 2px;
 }
 
-.video-controls-container .controls button svg {
+.video-controls-container .controls > button svg {
   width: 22px;
   height: 22px;
 }
 
 
-.controls button:disabled {
+.controls > button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -457,7 +457,7 @@
 /* The settings panels are long. Constrain them and let them scroll internally, or the top of
    the panel goes off the screen — which is where the section headings live. */
 .mantine-Popover-dropdown {
-  max-height: min(58vh, 420px);
+  max-height: min(46vh, 330px);
   overflow-y: auto;
 }
 
@@ -490,4 +490,20 @@
   .video-container:not(.fullscreen).clear .video-controls-container {
     opacity: 1;
   }
+}
+
+/* Says out loud that we moved the playhead for the appearance preview. Without it, the jump
+   reads as the player glitching. */
+.video-overlay .overlay-preview-jump {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 30;
+  padding: 6px 11px;
+  border-radius: 8px;
+  background: rgba(20, 26, 20, 0.95);
+  border: 1px solid #2b5c3c;
+  color: #7ee3a4;
+  font-size: 14px;
+  pointer-events: none;
 }

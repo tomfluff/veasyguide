@@ -37,7 +37,6 @@ import {
   IconVolume as IconVolumeHigh,
   IconVolume2 as IconVolumeLow,
   IconVolumeOff as IconVolumeMute,
-  IconZoomInAreaFilled,
   IconArrowBigLeftLineFilled,
   IconArrowBigRightLineFilled,
   IconZoom,
@@ -55,11 +54,10 @@ import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
 import { timelineMarkers, stepMoment, seekTargetFor } from "./moments";
+import AppearanceSheet from "./AppearanceSheet";
 import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
-import HighlightIndicatorSettings from "./HighlightIndicatorSettings";
-import MagnificationOverlaySettings from "./MagnificationOverlaySettings";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
 
 import "./player.css";
@@ -125,6 +123,10 @@ const VideoPlayer = (props: Props) => {
   const prevTimeRef = useRef(0);
   const lastReportedActivityRef = useRef<number | null>(null);
   const chromeTimeRef = useRef(-1);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [previewJumped, setPreviewJumped] = useState(false);
+  // Where the viewer was before we jumped them to a moment to preview against.
+  const preAppearanceTimeRef = useRef<number | null>(null);
 
   const videoContainerClasses = classNames("video-container", {
     // The bar only ever hides while playing. Paused, it stays — you paused BECAUSE you want
@@ -310,6 +312,35 @@ const VideoPlayer = (props: Props) => {
   };
 
   const handleMute = () => handleIsMuted.toggle();
+
+  // Opening Appearance while parked on nothing means every slider changes a box that is not
+  // on screen — you would be tuning blind. So if the video is paused and no moment is
+  // showing, jump to the nearest one, and step back to where the viewer was when they close.
+  // Never move the playhead while the video is playing: that would be the app yanking them
+  // out of the lecture.
+  const handleAppearanceOpen = (open: boolean) => {
+    const video = videoRef.current;
+    setAppearanceOpen(open);
+    if (!video) return;
+
+    if (open) {
+      if (!isPlaying && !currActivity && props.activities.length > 0) {
+        const target =
+          stepMoment(props.activities, video.currentTime, props.selectOpts.lead, 1) ??
+          stepMoment(props.activities, video.currentTime, props.selectOpts.lead, -1);
+        if (target) {
+          preAppearanceTimeRef.current = video.currentTime;
+          const t = seekTargetFor(target, props.selectOpts.lead) + props.selectOpts.lead + 0.2;
+          video.currentTime = t;
+          setPreviewJumped(true);
+        }
+      }
+    } else if (preAppearanceTimeRef.current !== null) {
+      video.currentTime = preAppearanceTimeRef.current;
+      preAppearanceTimeRef.current = null;
+      setPreviewJumped(false);
+    }
+  };
 
   // Mantine's useHotkeys ignores events from inputs and textareas — NOT from buttons. So
   // without this, Space on a focused control both activates it AND toggles play/pause, and
@@ -600,24 +631,28 @@ const VideoPlayer = (props: Props) => {
             <Text>{convertSecondsToTimecode(totalTime)}</Text>
           </Group>
           {props.extraHud}
-          <Popover width={360} position="top-end" shadow="md" withinPortal={false}>
+          <Popover
+            width={430}
+            position="top-end"
+            shadow="md"
+            withinPortal={false}
+            opened={appearanceOpen}
+            onChange={handleAppearanceOpen}
+            trapFocus
+          >
             <Popover.Target>
-              <UnstyledButton className="collapse-hide" aria-label="Magnification settings">
-                <IconZoomInAreaFilled />
-              </UnstyledButton>
-            </Popover.Target>
-            <Popover.Dropdown>
-              <MagnificationOverlaySettings />
-            </Popover.Dropdown>
-          </Popover>
-          <Popover width={420} position="top-end" shadow="md" withinPortal={false}>
-            <Popover.Target>
-              <UnstyledButton className="collapse-hide" aria-label="Highlight settings">
+              <UnstyledButton
+                className="collapse-hide"
+                onClick={() => handleAppearanceOpen(!appearanceOpen)}
+                onKeyDown={stopPlayerHotkeys}
+                aria-label="Appearance"
+                aria-expanded={appearanceOpen}
+              >
                 <IconSparkles />
               </UnstyledButton>
             </Popover.Target>
             <Popover.Dropdown>
-              <HighlightIndicatorSettings />
+              <AppearanceSheet />
             </Popover.Dropdown>
           </Popover>
           <UnstyledButton onClick={handleFullscreen} aria-label="Fullscreen">
@@ -688,6 +723,12 @@ const VideoPlayer = (props: Props) => {
         )}
         {props.canPlay && atUnanalyzed && (
           <Box className="overlay-catching-up">Analyzing this part…</Box>
+        )}
+        {/* Moving someone's playhead without saying so feels like a glitch. Say so. */}
+        {previewJumped && (
+          <Box className="overlay-preview-jump" role="status">
+            Jumped to a moment so you can see your changes · returns when you close
+          </Box>
         )}
         {sceneNotice && (
           <Box className={classNames("overlay-scene", { stacked: atUnanalyzed })} role="status">

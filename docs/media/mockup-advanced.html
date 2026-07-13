@@ -1,0 +1,180 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Customize — three shapes</title>
+<style>
+:root{
+  --brand:#d27cf7; --activity:#ff5a4d; --bg:#0d0f13; --surface:#12161d; --surface2:#21262f;
+  --line:#333a45; --text:#f2f4f7; --muted:#a7b0bd; --focus:#6fb3ff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#08090c;color:#e8eaee;font:16px/1.5 "Atkinson Hyperlegible","Segoe UI",sans-serif;padding:22px}
+.wrap{max-width:1040px;margin:0 auto}
+h1{font-size:24px;margin-bottom:4px}
+.lede{color:var(--muted);font-size:15px;margin-bottom:24px;max-width:84ch}
+.h2{font-size:19px;font-weight:650;margin:30px 0 3px}
+.cap{color:var(--muted);font-size:14px;margin-bottom:12px;max-width:84ch}
+
+.box{position:relative;height:430px;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.vid{position:absolute;left:0;right:0;top:0;height:250px;
+     background:url("highlight-on-annotation.png") top center/100% auto no-repeat #fff}
+.hl{position:absolute;left:56%;top:31%;width:22%;height:13%;border:4px solid #ff0000;
+    background:rgba(255,204,0,.16);border-radius:3px}
+.hl .ptr{position:absolute;left:-14px;bottom:-14px;font-size:18px}
+
+.bar{position:absolute;left:0;right:0;top:250px;bottom:0;background:var(--surface);
+     border-top:1px solid var(--line);padding:10px 12px;overflow:hidden}
+.track{position:relative;height:10px;background:#39414d;border-radius:5px;margin-bottom:5px}
+.track i{position:absolute;inset:0 auto 0 0;width:30%;background:var(--brand);border-radius:5px}
+.track b{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;background:#fff;border-radius:50%;left:30%}
+.lane{position:relative;height:16px;margin-bottom:8px}
+.lane b{position:absolute;top:3px;bottom:3px;min-width:5px;background:var(--activity);border-radius:2px}
+.lane b.now{background:#ffc233}
+
+/* the customize sheet */
+.sheet{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;padding-top:6px}
+.presets{grid-column:1/-1;display:flex;gap:8px;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.pcard{height:38px;padding:0 12px;display:inline-flex;align-items:center;border-radius:8px;
+       background:var(--surface2);border:2px solid var(--line);font-size:14px;font-weight:600;color:var(--text)}
+.pcard.sel{border-color:var(--brand)}
+.pcard.custom{border-style:dashed;border-color:#7ee3a4;color:#7ee3a4}
+.grp{min-width:0}
+.grp h4{font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:6px 0 4px}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:14px}
+.row label{width:88px;flex:none;color:var(--muted)}
+.sl{flex:1;height:6px;background:#39414d;border-radius:3px;position:relative}
+.sl i{position:absolute;inset:0 auto 0 0;width:55%;background:var(--brand);border-radius:3px}
+.sl b{position:absolute;top:50%;left:55%;width:14px;height:14px;margin:-7px 0 0 -7px;background:#fff;border-radius:50%}
+.sw{display:flex;gap:4px}
+.sw i{width:22px;height:22px;border-radius:5px;display:inline-block}
+.chip{height:26px;padding:0 9px;display:inline-flex;align-items:center;border-radius:6px;font-size:13px;
+      background:var(--surface2);border:1px solid var(--line);color:var(--text)}
+.chip.on{background:var(--brand);color:#1b0a26;border-color:var(--brand)}
+.note{font-size:12px;color:var(--muted);font-style:italic}
+
+.stamp{position:absolute;right:10px;top:10px;z-index:5;font-size:12px;padding:4px 9px;
+       background:rgba(10,13,18,.9);border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+.toast{position:absolute;left:12px;top:210px;z-index:5;font-size:13px;padding:5px 10px;border-radius:8px;
+       background:rgba(20,26,20,.95);border:1px solid #2b5c3c;color:#7ee3a4}
+
+/* C: takeover */
+.take{position:absolute;inset:0;background:rgba(6,8,11,.55)}
+.take .vidfull{position:absolute;inset:0;background:url("highlight-on-annotation.png") top center/100% auto no-repeat #fff}
+.take .hl2{position:absolute;left:56%;top:28%;width:22%;height:12%;border:10px solid #000;background:rgba(255,255,0,.45)}
+.take .strip{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(8,10,14,.96) 34%);padding:56px 14px 12px}
+.take .fr{display:flex;gap:8px;align-items:center}
+.take .big{height:44px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;border-radius:9px;
+           background:rgba(33,38,47,.95);border:1px solid var(--line);font-size:15px;color:var(--text)}
+.take .big.on{border-color:var(--brand);outline:2px solid var(--brand)}
+.take .kbd{font-size:11px;background:#262c36;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+</style></head><body>
+<div class="wrap">
+<h1>What does “Customize…” open?</h1>
+<p class="lede">Same 17 controls in all three. The ink filters stay per-surface (highlight vs magnifier), so that group appears twice, labeled by where it applies. Presets row is always the front door; touching any control lights up <b>Custom</b>.</p>
+
+<!-- ================= A ================= -->
+<div class="h2">A · One sheet, grouped by intent — playhead stays put</div>
+<p class="cap">Both popovers die. One flat panel in the bar area, grouped by the question you're asking, with a scroll. The video above shows wherever you happen to be — here, a moment is on screen only if you parked on one.</p>
+<div class="box">
+  <div class="vid"></div><div class="hl"><span class="ptr">👆</span></div>
+  <div class="bar">
+    <div class="track"><i></i><b></b></div>
+    <div class="lane"><b style="left:4%;width:5%"></b><b style="left:13%"></b><b class="now" style="left:27%;width:7%"></b><b style="left:41%;width:6%"></b><b style="left:59%"></b></div>
+    <div class="sheet">
+      <div class="presets">
+        <span class="pcard sel">Standard</span><span class="pcard">Bold</span><span class="pcard">High contrast</span><span class="pcard">Minimal</span><span class="pcard custom">Custom</span>
+        <span class="note" style="margin-left:auto">change anything → Custom</span>
+      </div>
+      <div class="grp">
+        <h4>The box</h4>
+        <div class="row"><label>Border</label><div class="sl"><i></i><b></b></div><span class="note">4px</span></div>
+        <div class="row"><label>Border color</label><span class="sw"><i style="background:#ff0000;outline:2px solid #fff"></i><i style="background:#000"></i><i style="background:#0057ff"></i><i style="background:#ffcc00"></i></span></div>
+        <div class="row"><label>Fill</label><div class="sl"><i style="width:15%"></i><b style="left:15%"></b></div><span class="note">15%</span></div>
+        <div class="row"><label>Shape</label><span class="chip on">Follows the ink</span><span class="chip">Fixed circle</span></div>
+      </div>
+      <div class="grp">
+        <h4>The zoom</h4>
+        <div class="row"><label>Strength</label><div class="sl"><i style="width:50%"></i><b style="left:50%"></b></div><span class="note">1.5×</span></div>
+        <div class="row"><label>Speed</label><div class="sl"><i style="width:40%"></i><b style="left:40%"></b></div><span class="note">1×</span></div>
+        <div class="row"><label>Pause on zoom</label><span class="chip">off</span></div>
+      </div>
+      <div class="grp">
+        <h4>The pointer</h4>
+        <div class="row"><label>Style</label><span class="chip on">Hand</span><span class="chip">Cursor</span><span class="chip">None</span></div>
+        <div class="row"><label>Size</label><div class="sl"><i style="width:33%"></i><b style="left:33%"></b></div><span class="note">100%</span></div>
+      </div>
+      <div class="grp">
+        <h4>Ink — in the highlight</h4>
+        <div class="row"><span class="chip">Bolder ink</span><span class="chip">Sharpen</span><span class="chip">Invert</span></div>
+        <h4>Ink — in the zoom</h4>
+        <div class="row"><span class="chip on">Sharpen</span><span class="chip">Bolder ink</span><span class="chip">Invert</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= B ================= -->
+<div class="h2">B · The same sheet + preview jump</div>
+<p class="cap">Identical panel — the difference is the moment you open it: if you're paused on nothing, the player seeks to the nearest moment (using the same seek-to-cue the [ ] keys use). Every slider now visibly changes the frame above. Closing steps back to where you were.</p>
+<div class="box">
+  <div class="vid"></div><div class="hl" style="border-width:10px;border-color:#000;background:rgba(255,255,0,.45)"><span class="ptr">👆</span></div>
+  <div class="toast">Jumped to Moment 9 so you can see your changes · will return on close</div>
+  <div class="stamp">paused · previewing</div>
+  <div class="bar">
+    <div class="track"><i></i><b></b></div>
+    <div class="lane"><b style="left:4%;width:5%"></b><b style="left:13%"></b><b class="now" style="left:27%;width:7%"></b><b style="left:41%;width:6%"></b><b style="left:59%"></b></div>
+    <div class="sheet">
+      <div class="presets">
+        <span class="pcard">Standard</span><span class="pcard">Bold</span><span class="pcard sel">High contrast</span><span class="pcard">Minimal</span><span class="pcard custom">Custom</span>
+        <span class="note" style="margin-left:auto">the frame above IS the preview</span>
+      </div>
+      <div class="grp">
+        <h4>The box</h4>
+        <div class="row"><label>Border</label><div class="sl"><i style="width:90%"></i><b style="left:90%"></b></div><span class="note">10px</span></div>
+        <div class="row"><label>Border color</label><span class="sw"><i style="background:#000;outline:2px solid #fff"></i><i style="background:#ff0000"></i><i style="background:#0057ff"></i><i style="background:#ffcc00"></i></span></div>
+        <div class="row"><label>Fill</label><div class="sl"><i style="width:45%"></i><b style="left:45%"></b></div><span class="note">45%</span></div>
+        <div class="row"><label>Shape</label><span class="chip on">Follows the ink</span><span class="chip">Fixed circle</span></div>
+      </div>
+      <div class="grp">
+        <h4>The zoom</h4>
+        <div class="row"><label>Strength</label><div class="sl"><i style="width:70%"></i><b style="left:70%"></b></div><span class="note">1.7×</span></div>
+        <div class="row"><label>Speed</label><div class="sl"><i style="width:40%"></i><b style="left:40%"></b></div><span class="note">1×</span></div>
+        <div class="row"><label>Pause on zoom</label><span class="chip">off</span></div>
+      </div>
+      <div class="grp">
+        <h4>The pointer</h4>
+        <div class="row"><label>Style</label><span class="chip on">Hand</span><span class="chip">Cursor</span><span class="chip">None</span></div>
+        <div class="row"><label>Size</label><div class="sl"><i style="width:50%"></i><b style="left:50%"></b></div><span class="note">150%</span></div>
+      </div>
+      <div class="grp">
+        <h4>Ink — in the highlight</h4>
+        <div class="row"><span class="chip on">Bolder ink</span><span class="chip on">Sharpen</span><span class="chip">Invert</span></div>
+        <h4>Ink — in the zoom</h4>
+        <div class="row"><span class="chip on">Sharpen</span><span class="chip">Bolder ink</span><span class="chip">Invert</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= C ================= -->
+<div class="h2">C · Full-screen takeover — the frame is the preview</div>
+<p class="cap">Customize covers the player. The paused frame fills everything; one control is focused at a time and ←/→ changes its value live. The strongest possible preview, and the strongest claim to “judge it at the size you'll watch it” — but it hides the player chrome, needs a focus trap, and is a new surface where A/B reuse the bar.</p>
+<div class="box">
+  <div class="take">
+    <div class="vidfull"></div>
+    <div class="hl2"></div>
+    <div class="strip">
+      <div style="font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Customize — Border width · <span class="kbd">←</span> <span class="kbd">→</span> to change, <span class="kbd">Tab</span> next control, <span class="kbd">Esc</span> done</div>
+      <div class="fr">
+        <span class="big">Presets</span>
+        <span class="big on">Border 10px</span>
+        <span class="big">Border color</span>
+        <span class="big">Fill 45%</span>
+        <span class="big">Zoom 1.7×</span>
+        <span class="big">Pointer</span>
+        <span class="big">Ink…</span>
+        <span class="big" style="margin-left:auto">Done <span class="kbd">Esc</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div></body></html>
