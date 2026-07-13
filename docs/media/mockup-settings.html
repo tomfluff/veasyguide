@@ -1,0 +1,396 @@
+<meta charset="utf-8">
+<title>Appearance menu — five directions</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d0f13;
+  --bar: #12161d;          /* the real control-bar colour */
+  --line: #333a45;
+  --surface-2: #1b2029;
+  --text: #f2f4f7;
+  --muted: #a7b0bd;
+  --brand: #D27CF7;        /* brand-300, the dark-theme purple */
+  --brand-dim: #7B2CBF;
+  --focus: #6fb3ff;
+}
+body {
+  background: var(--bg); color: var(--text);
+  font: 16px/1.5 "Segoe UI", system-ui, sans-serif;
+  padding: 32px; -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 24px; font-weight: 650; margin-bottom: 4px; }
+.lede { color: var(--muted); font-size: 15px; margin-bottom: 28px; max-width: 900px; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 34px 30px; }
+.cell { min-width: 0; }
+.cap { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--brand); margin-bottom: 4px; font-weight: 700; }
+.name { font-size: 19px; font-weight: 650; margin-bottom: 4px; }
+.why { color: var(--muted); font-size: 14px; margin-bottom: 14px; min-height: 42px; }
+.note { color: var(--muted); font-size: 13px; margin-top: 10px; }
+.note b { color: var(--text); font-weight: 600; }
+
+/* ---- the player shell ---------------------------------------------- */
+.player {
+  position: relative; width: 100%; aspect-ratio: 16/9;
+  background: #fff url(highlight-on-annotation.png) no-repeat top center;
+  background-size: 100% auto;
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+/* the source PNG carries an old control bar in its bottom ~14% — cover it */
+.player::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 15%;
+  background: #fff;
+}
+
+/* the real bottom bar, collapsed height */
+.bar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+  height: 52px; display: flex; align-items: center; gap: 10px;
+  padding: 0 10px; background: var(--bar); border-top: 1px solid var(--line);
+}
+.bar .scrub { position: absolute; top: -3px; left: 0; right: 0; height: 6px; background: #2a303a; }
+.bar .scrub i { display: block; height: 100%; width: 27%; background: var(--brand); }
+.bar .scrub b { position: absolute; top: -3px; left: 27%; width: 12px; height: 12px; border-radius: 50%; background: var(--brand); }
+.ico {
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border: 0; background: transparent; color: var(--text); border-radius: 8px; cursor: pointer;
+}
+.ico.on { background: var(--brand); color: #17061f; }
+.t { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.spacer { flex: 1; }
+
+/* the highlight drawn on the frame, in Standard */
+.hl {
+  position: absolute; z-index: 1;
+  left: 57%; top: 33%; width: 34%; height: 12%;
+  border: 3px solid #ff0000; background: rgba(255,204,0,.15);
+}
+
+/* ================= 1 · drill-in ====================================== */
+.menu {
+  position: absolute; z-index: 4; right: 10px; bottom: 60px; width: 264px;
+  background: var(--bar); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.55); overflow: hidden;
+}
+.menu h4 {
+  font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+  padding: 10px 14px 8px; font-weight: 700; border-bottom: 1px solid var(--line);
+}
+.mrow {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  height: 44px; padding: 0 12px; border: 0; background: transparent;
+  color: var(--text); font: inherit; font-size: 14px; cursor: pointer; text-align: left;
+}
+.mrow:hover { background: var(--surface-2); }
+.mrow .lbl { flex: 1; }
+.mrow .val { color: var(--muted); font-size: 13px; }
+.mrow svg { flex: none; opacity: .75; }
+/* the drilled-in state, offset behind */
+.menu.sub {
+  right: 24px; bottom: 74px; width: 264px; z-index: 5;
+  box-shadow: 0 18px 44px rgba(0,0,0,.7);
+}
+.back { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px;
+  border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+.swatches { display: flex; gap: 8px; padding: 10px 12px; }
+.sw { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.sw.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--brand); }
+.steps { display: flex; align-items: center; gap: 10px; padding: 4px 12px 12px; }
+.step { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--text); font-size: 18px; cursor: pointer; }
+.stepval { flex: 1; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* ================= 2 · live preset cards ============================ */
+.sheet {
+  position: absolute; z-index: 4; left: 10px; right: 10px; bottom: 60px;
+  background: var(--bar); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.55); padding: 12px;
+}
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tile {
+  border: 2px solid var(--line); border-radius: 10px; overflow: hidden;
+  background: #fff; cursor: pointer; padding: 0;
+}
+.tile.sel { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(210,124,247,.35); }
+.mini { position: relative; height: 62px; background: #fff; }
+/* fake slide text under the highlight */
+.mini::before, .mini::after {
+  content: ""; position: absolute; left: 10%; height: 4px; border-radius: 2px; background: #c9cfd8;
+}
+.mini::before { top: 14px; width: 62%; }
+.mini::after  { top: 42px; width: 46%; }
+.mbox { position: absolute; left: 18%; top: 24px; width: 52%; height: 20px; }
+.mptr { position: absolute; font-size: 13px; line-height: 1; }
+.tname { display: block; padding: 5px 6px 6px; font-size: 12px; font-weight: 650;
+  color: var(--muted); background: var(--bar); text-align: center; }
+.tile.sel .tname { color: var(--text); }
+.tune {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  height: 40px; width: 100%; padding: 0 12px; border-radius: 9px;
+  border: 1px solid var(--line); background: transparent; color: var(--text);
+  font: inherit; font-size: 14px; cursor: pointer;
+}
+.tune .val { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+/* ================= 3 · on-canvas ==================================== */
+.hl.live { border-color: var(--brand); box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+.grab { position: absolute; width: 12px; height: 12px; border-radius: 3px;
+  background: var(--brand); border: 2px solid #17061f; }
+.grab.tl { left: -7px; top: -7px; } .grab.tr { right: -7px; top: -7px; }
+.grab.bl { left: -7px; bottom: -7px; } .grab.br { right: -7px; bottom: -7px; }
+.chips {
+  position: absolute; z-index: 5; left: 55%; top: 20%;
+  display: flex; align-items: center; gap: 4px; padding: 5px;
+  background: var(--bar); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.chip { height: 34px; min-width: 34px; padding: 0 8px; display: grid; place-items: center;
+  border: 0; border-radius: 7px; background: transparent; color: var(--text);
+  font: inherit; font-size: 13px; cursor: pointer; }
+.chip.on { background: var(--brand); color: #17061f; }
+.chips .div { width: 1px; height: 22px; background: var(--line); }
+.dots { display: flex; gap: 4px; padding: 0 4px; }
+.dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.dot.sel { border-color: #fff; }
+
+/* ================= 4 · icon rail ==================================== */
+.rail-panel {
+  position: absolute; z-index: 4; right: 10px; bottom: 60px; width: 344px; height: 196px;
+  display: flex; background: var(--bar); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 12px 34px rgba(0,0,0,.55); overflow: hidden;
+}
+.rail { flex: none; width: 52px; border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; padding: 6px 0; gap: 2px; background: #0f131a; }
+.rail button { width: 44px; height: 40px; margin: 0 4px; display: grid; place-items: center;
+  border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.rail button.on { background: var(--brand); color: #17061f; }
+.pane { flex: 1; padding: 12px 14px; min-width: 0; }
+.pane h5 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px; font-weight: 700; }
+.prow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.prow .k { width: 56px; font-size: 13px; color: var(--muted); flex: none; }
+.track { flex: 1; height: 6px; border-radius: 3px; background: #2a303a; position: relative; }
+.track i { position: absolute; inset: 0 auto 0 0; width: 38%; border-radius: 3px; background: var(--brand); }
+.track b { position: absolute; left: 38%; top: -5px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--brand); border: 2px solid #17061f; }
+.prow .v { width: 34px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+</style>
+
+<h1>The Appearance menu — five directions</h1>
+<p class="lede">Same player, same frame, same settings underneath. What changes is how the menu presents itself. Today's version is a white Mantine panel roughly 470&nbsp;px tall; every one of these is under 200&nbsp;px and speaks the player's own language (bar colour <code>#12161d</code>, brand purple, Tabler glyphs).</p>
+
+<div class="grid">
+
+  <!-- ================= 1 ================= -->
+  <div class="cell">
+    <div class="cap">Direction 1</div>
+    <div class="name">Drill-in</div>
+    <p class="why">One short list. Each row shows its current value; tapping it swaps the panel for that group. The panel never grows — you go <em>deeper</em>, not longer. This is how YouTube, Netflix and every TV remote UI does it.</p>
+    <div class="player">
+      <div class="hl"></div>
+
+      <div class="menu">
+        <h4>Appearance</h4>
+        <button class="mrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/></svg><span class="lbl">Look</span><span class="val">Standard</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="mrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1"/></svg><span class="lbl">The box</span><span class="val">Red · 4px</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="mrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 8-6 2-2 6z"/></svg><span class="lbl">Pointer</span><span class="val">Hand</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="mrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"/><path d="M15 15l5 5"/></svg><span class="lbl">Zoom</span><span class="val">1.5×</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="mrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12c2-6 4 6 6 0s4 6 6 0 4 6 6 0"/></svg><span class="lbl">Motion</span><span class="val">Off</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+
+      <div class="bar">
+        <div class="scrub"><i></i><b></b></div>
+        <button class="ico">▶</button>
+        <button class="ico">🔊</button>
+        <span class="t">1:30 / 5:32</span>
+        <span class="spacer"></span>
+        <button class="ico">[</button><button class="ico">]</button>
+        <button class="ico on">✨</button>
+        <button class="ico">⛶</button>
+      </div>
+    </div>
+    <p class="note"><b>Costs:</b> two taps to reach a slider instead of one. <b>Buys:</b> the panel is 236&nbsp;px and never changes size, so it never covers the highlight.</p>
+  </div>
+
+  <!-- ================= 2 ================= -->
+  <div class="cell">
+    <div class="cap">Direction 2</div>
+    <div class="name">Live preset cards</div>
+    <p class="why">The four presets stop being words and become <em>pictures of themselves</em> — each tile draws a miniature highlight at its own settings. You choose by looking, not by reading. Everything else hides behind one Fine-tune row.</p>
+    <div class="player">
+      <div class="hl"></div>
+
+      <div class="sheet">
+        <div class="tiles">
+          <button class="tile sel">
+            <div class="mini">
+              <div class="mbox" style="border:2px solid #ff0000;background:rgba(255,204,0,.15)"></div>
+              <div class="mptr" style="left:64%;top:36px">✋</div>
+            </div>
+            <span class="tname">Standard</span>
+          </button>
+          <button class="tile">
+            <div class="mini">
+              <div class="mbox" style="border:5px solid #ff0000;background:rgba(255,204,0,.30)"></div>
+              <div class="mptr" style="left:64%;top:34px;font-size:18px">✋</div>
+            </div>
+            <span class="tname">Bold</span>
+          </button>
+          <button class="tile">
+            <div class="mini">
+              <div class="mbox" style="border:5px solid #000;background:rgba(255,255,0,.75)"></div>
+              <div class="mptr" style="left:64%;top:34px;font-size:18px">✋</div>
+            </div>
+            <span class="tname">High contrast</span>
+          </button>
+          <button class="tile">
+            <div class="mini">
+              <div class="mbox" style="border:1px solid #ff0000"></div>
+            </div>
+            <span class="tname">Minimal</span>
+          </button>
+        </div>
+        <button class="tune">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="#12161d"/><circle cx="15" cy="12" r="2" fill="#12161d"/><circle cx="7" cy="18" r="2" fill="#12161d"/></svg>
+          Fine-tune
+          <span class="val">6 groups</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="bar">
+        <div class="scrub"><i></i><b></b></div>
+        <button class="ico">▶</button>
+        <button class="ico">🔊</button>
+        <span class="t">1:30 / 5:32</span>
+        <span class="spacer"></span>
+        <button class="ico">[</button><button class="ico">]</button>
+        <button class="ico on">✨</button>
+        <button class="ico">⛶</button>
+      </div>
+    </div>
+    <p class="note"><b>Costs:</b> four tiny renderers to build and keep truthful. <b>Buys:</b> a low-vision viewer picks their setting <em>by sight</em> — which is the entire product thesis.</p>
+  </div>
+
+  <!-- ================= 3 ================= -->
+  <div class="cell">
+    <div class="cap">Direction 3</div>
+    <div class="name">On-canvas</div>
+    <p class="why">Delete the panel. The highlight itself becomes editable: corner handles for size, a floating chip strip for thickness, colour and pointer. Nothing covers the video because there <em>is</em> no menu — you're touching the thing you're changing.</p>
+    <div class="player">
+      <div class="hl live">
+        <span class="grab tl"></span><span class="grab tr"></span>
+        <span class="grab bl"></span><span class="grab br"></span>
+      </div>
+      <div class="chips">
+        <button class="chip">−</button>
+        <span style="font-size:13px;min-width:30px;text-align:center">4px</span>
+        <button class="chip">+</button>
+        <span class="div"></span>
+        <span class="dots">
+          <span class="dot sel" style="background:#ff0000"></span>
+          <span class="dot" style="background:#000"></span>
+          <span class="dot" style="background:#0057ff"></span>
+          <span class="dot" style="background:#fff"></span>
+        </span>
+        <span class="div"></span>
+        <button class="chip on">✋</button>
+        <button class="chip">⌕</button>
+      </div>
+
+      <div class="bar">
+        <div class="scrub"><i></i><b></b></div>
+        <button class="ico">▶</button>
+        <button class="ico">🔊</button>
+        <span class="t">1:30 / 5:32</span>
+        <span class="spacer"></span>
+        <button class="ico">[</button><button class="ico">]</button>
+        <button class="ico on">✨</button>
+        <button class="ico">⛶</button>
+      </div>
+    </div>
+    <p class="note"><b>Costs:</b> drag targets are precision mouse work — the one interaction our audience is worst at. Keyboard and screen-reader paths need a parallel menu anyway. <b>Buys:</b> the purest WYSIWYG; zero occlusion.</p>
+  </div>
+
+  <!-- ================= 4 ================= -->
+  <div class="cell">
+    <div class="cap">Direction 4</div>
+    <div class="name">Icon rail</div>
+    <p class="why">A 52&nbsp;px column of Tabler glyphs on the left, one group's controls on the right. Everything stays one tap away — no drilling — but only one group is ever on screen, so the panel is fixed at 196&nbsp;px.</p>
+    <div class="player">
+      <div class="hl"></div>
+
+      <div class="rail-panel">
+        <nav class="rail">
+          <button class="on" title="The box"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
+          <button title="Pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 8-6 2-2 6z"/></svg></button>
+          <button title="Zoom"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"/><path d="M15 15l5 5"/></svg></button>
+          <button title="Motion"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12c2-6 4 6 6 0s4 6 6 0 4 6 6 0"/></svg></button>
+          <button title="Ink"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v16" fill="currentColor"/></svg></button>
+        </nav>
+        <div class="pane">
+          <h5>The box</h5>
+          <div class="prow"><span class="k">Border</span><span class="track"><i></i><b></b></span><span class="v">4px</span></div>
+          <div class="prow"><span class="k">Colour</span>
+            <span class="dots" style="flex:1">
+              <span class="dot sel" style="background:#ff0000"></span>
+              <span class="dot" style="background:#000"></span>
+              <span class="dot" style="background:#0057ff"></span>
+              <span class="dot" style="background:#00a3a3"></span>
+              <span class="dot" style="background:#fff"></span>
+            </span>
+          </div>
+          <div class="prow"><span class="k">Fill</span><span class="track"><i style="width:15%"></i><b style="left:15%"></b></span><span class="v">15%</span></div>
+          <div class="prow"><span class="k">Size</span><span class="track"><i style="width:50%"></i><b style="left:50%"></b></span><span class="v">100%</span></div>
+        </div>
+      </div>
+
+      <div class="bar">
+        <div class="scrub"><i></i><b></b></div>
+        <button class="ico">▶</button>
+        <button class="ico">🔊</button>
+        <span class="t">1:30 / 5:32</span>
+        <span class="spacer"></span>
+        <button class="ico">[</button><button class="ico">]</button>
+        <button class="ico on">✨</button>
+        <button class="ico">⛶</button>
+      </div>
+    </div>
+    <p class="note"><b>Costs:</b> icon-only navigation is a memory test; five glyphs with no labels is exactly how our audience gets lost. <b>Buys:</b> flat — every group one tap away, panel size fixed.</p>
+  </div>
+
+  <!-- ================= 5 ================= -->
+  <div class="cell">
+    <div class="cap">Direction 5 · recommended</div>
+    <div class="name">Cards, then drill</div>
+    <p class="why">2 and 1 are not rivals — they are the two halves of one menu. The tiles are the front door, because 90% of people will pick one and leave. Fine-tune opens the same panel as a drill-in list, so the sheet never grows past its own height.</p>
+    <div class="player">
+      <div class="hl"></div>
+
+      <div class="sheet" style="left:auto;right:10px;width:330px;padding:10px">
+        <div class="back" style="border-bottom:1px solid var(--line);margin:-10px -10px 8px;padding:0 10px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+          Fine-tune
+        </div>
+        <button class="mrow" style="height:42px;padding:0 4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1"/></svg><span class="lbl">The box</span><span class="val">Red · 4px</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="mrow" style="height:42px;padding:0 4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 8-6 2-2 6z"/></svg><span class="lbl">The pointer</span><span class="val">Hand · 100%</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="mrow" style="height:42px;padding:0 4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="6"/><path d="M15 15l5 5"/></svg><span class="lbl">The zoom</span><span class="val">1.5×</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="mrow" style="height:42px;padding:0 4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12c2-6 4 6 6 0s4 6 6 0 4 6 6 0"/></svg><span class="lbl">Motion</span><span class="val">Off</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="mrow" style="height:42px;padding:0 4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg><span class="lbl">Ink</span><span class="val">None</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+
+      <div class="bar">
+        <div class="scrub"><i></i><b></b></div>
+        <button class="ico">▶</button>
+        <button class="ico">🔊</button>
+        <span class="t">1:30 / 5:32</span>
+        <span class="spacer"></span>
+        <button class="ico">[</button><button class="ico">]</button>
+        <button class="ico on">✨</button>
+        <button class="ico">⛶</button>
+      </div>
+    </div>
+    <p class="note">Tiles are the first screen (shown in Direction 2). This is the second — one back-arrow away, same 330&nbsp;px sheet, never taller. <b>Ink</b> folds the two duplicate filter groups into one row that owns the split internally.</p>
+  </div>
+
+</div>

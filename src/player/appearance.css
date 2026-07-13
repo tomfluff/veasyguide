@@ -1,91 +1,182 @@
-/* The Appearance sheet renders INSIDE .video-controls-container (the popover is not
-   portaled, so it survives fullscreen). That container sets a near-white text colour for the
-   dark bar — which lands as white-on-white inside this light panel. Reset it. */
-.mantine-Popover-dropdown {
-  color: var(--mantine-color-text);
+/* The Appearance sheet speaks the control bar's language, not Mantine's.
+   It renders INSIDE .video-controls-container (the popover is not portaled, so that it
+   survives fullscreen), so it inherits the bar's near-white text — which is exactly what we
+   want now that the sheet is dark too. The old light panel had to fight that inheritance. */
+
+.ap-pop.mantine-Popover-dropdown {
+  padding: 0;
+  background: #12161d;              /* the bar */
+  border: 1px solid #333a45;
+  border-radius: 12px;
+  color: #f2f4f7;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
 }
 
-.appearance-sheet {
-  max-width: 100%;
-}
-
-.ap-preset {
-  min-height: 44px; /* WCAG 2.5.5 */
-}
-
-/* Custom is derived, never chosen: it reports that the settings match no preset. Rendering it
-   as a disabled button made it look broken, so it is a status chip. */
-.ap-custom {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 14px;
-  border-radius: var(--mantine-radius-default);
-  border: 2px dashed var(--mantine-color-default-border);
-  color: var(--mantine-color-dimmed);
+.ap-sheet {
+  --ap-line: #333a45;
+  --ap-muted: #a7b0bd;
+  --ap-raise: #1b2029;
+  --ap-brand: #d27cf7;             /* brand-300: the only purple legible on this surface */
+  --ap-brand-ink: #17061f;
+  width: 340px;
+  padding: 12px;
   font-size: 14px;
-  font-weight: 600;
 }
 
-.ap-custom.sel {
-  border-color: #2f9e5f;
-  color: #1c7a45;
-  background-color: #eefaf2;
+.ap-title { font-size: 15px; font-weight: 650; }
+.ap-hint { font-size: 12px; color: var(--ap-muted); line-height: 1.45; margin-bottom: 10px; }
+.ap-status { font-size: 12px; color: var(--ap-muted); margin: 8px 0 10px; min-height: 17px; }
+.ap-foot {
+  font-size: 11px; color: var(--ap-muted);
+  border-top: 1px solid var(--ap-line);
+  margin: 10px -12px -12px; padding: 8px 12px;
 }
 
-.ap-customize {
-  align-self: flex-start;
-  min-height: 44px;
-}
+/* ---- preset tiles ------------------------------------------------------ */
+.ap-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 
-.ap-groups section + section {
-  border-top: 1px solid var(--mantine-color-default-border);
-  padding-top: 12px;
+.ap-tile {
+  padding: 0; cursor: pointer; overflow: hidden;
+  background: #12161d;
+  border: 2px solid var(--ap-line);
+  border-radius: 9px;
 }
-
-.ap-groups h4 {
-  font-size: 13px;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--mantine-color-dimmed);
-  margin-bottom: 8px;
+.ap-tile.sel {
+  border-color: var(--ap-brand);
+  box-shadow: 0 0 0 3px rgba(210, 124, 247, 0.3);
 }
+.ap-tile:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
 
-.ap-row {
-  margin-bottom: 8px;
+/* the miniature slide each tile draws itself onto */
+.ap-mini { position: relative; display: block; height: 54px; background: #fff; }
+.ap-mini::before,
+.ap-mini::after {
+  content: ""; position: absolute; left: 10%; height: 3px;
+  border-radius: 2px; background: #c9cfd8;
 }
+.ap-mini::before { top: 10px; width: 62%; }
+.ap-mini::after { top: 38px; width: 44%; }
 
-.ap-label {
-  flex: none;
-  width: 108px;
-  font-size: 14px;
-  color: var(--mantine-color-dimmed);
+.ap-mini-box { position: absolute; left: 16%; top: 19px; width: 56%; height: 17px; }
+.ap-mini-fill { position: absolute; inset: 0; }
+.ap-mini-ptr { position: absolute; left: 62%; top: 28px; line-height: 1; }
+
+.ap-tile-name {
+  display: block; padding: 4px 3px 5px;
+  font-size: 11px; font-weight: 650; text-align: center;
+  color: var(--ap-muted); background: #12161d;
 }
+.ap-tile.sel .ap-tile-name { color: #f2f4f7; }
 
-.ap-control {
-  flex: 1;
-  min-width: 0;
+/* ---- drill navigation -------------------------------------------------- */
+.ap-nav {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; height: 44px; padding: 0 12px;
+  background: var(--ap-raise); border: 1px solid var(--ap-line); border-radius: 9px;
+  color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer;
 }
+.ap-nav:hover { background: #232935; }
+.ap-nav:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-nav-label { flex: 1; font-weight: 600; }
+.ap-nav-value { color: var(--ap-muted); font-size: 13px; }
 
+.ap-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.ap-back {
+  display: flex; align-items: center; gap: 4px;
+  height: 32px; padding: 0 10px 0 6px;
+  background: transparent; border: 1px solid var(--ap-line); border-radius: 8px;
+  color: inherit; font: inherit; font-size: 13px; cursor: pointer;
+}
+.ap-back:hover { background: var(--ap-raise); }
+.ap-back:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-head-title { font-size: 15px; font-weight: 650; }
+
+/* The five groups stay reachable from any group — drilling in should not mean drilling
+   back out and in again to compare the box against the pointer. */
+.ap-tabs { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; }
+.ap-tab {
+  flex: none; height: 30px; padding: 0 9px;
+  background: transparent; border: 1px solid transparent; border-radius: 7px;
+  color: var(--ap-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.ap-tab:hover { background: var(--ap-raise); color: #f2f4f7; }
+.ap-tab.sel { background: var(--ap-brand); color: var(--ap-brand-ink); }
+.ap-tab:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+
+/* A fixed body height is the whole point of drilling: the sheet occludes the SAME band of
+   video no matter which group is open. Long groups scroll inside it; they never push down. */
+.ap-body { height: 196px; overflow-y: auto; padding-right: 2px; }
+
+/* ---- rows -------------------------------------------------------------- */
+.ap-row { display: flex; align-items: center; gap: 8px; min-height: 38px; }
+.ap-label { flex: none; width: 62px; font-size: 13px; color: var(--ap-muted); }
+.ap-control { flex: 1; min-width: 0; display: flex; align-items: center; }
 .ap-value {
-  flex: none;
-  width: 48px;
-  text-align: right;
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
+  flex: none; width: 44px; text-align: right;
+  font-size: 13px; font-variant-numeric: tabular-nums;
 }
 
+/* ---- native range ------------------------------------------------------ */
+/* appearance:none on the INPUT is what unlocks ::-webkit-slider-thumb below. Without it the
+   pseudo-element rules are silently ignored and the thumb stays Chrome's default blue. */
+.ap-range {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1; min-width: 0; height: 24px; background: transparent; cursor: pointer;
+}
+.ap-range:disabled { opacity: 0.4; cursor: default; }
+.ap-range:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; border-radius: 4px; }
+
+.ap-range::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px; background: #2a303a;
+}
+.ap-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; margin-top: -6px;
+  border-radius: 50%; background: var(--ap-brand); border: 2px solid var(--ap-brand-ink);
+}
+.ap-range::-moz-range-track { height: 6px; border-radius: 3px; background: #2a303a; }
+.ap-range::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--ap-brand); border: 2px solid var(--ap-brand-ink);
+}
+
+/* ---- segmented choice --------------------------------------------------- */
+.ap-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.ap-seg-btn {
+  height: 30px; padding: 0 10px;
+  background: transparent; border: 1px solid var(--ap-line); border-radius: 7px;
+  color: var(--ap-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.ap-seg-btn:hover { background: var(--ap-raise); color: #f2f4f7; }
+.ap-seg-btn.sel {
+  background: var(--ap-brand); border-color: var(--ap-brand); color: var(--ap-brand-ink);
+}
+.ap-seg-btn:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+
+/* ---- swatches ----------------------------------------------------------- */
+.ap-swatches { display: flex; gap: 6px; }
 .ap-swatch {
-  cursor: pointer;
-  border: 2px solid transparent;
+  width: 26px; height: 26px; padding: 0; cursor: pointer;
+  border: 2px solid var(--ap-line); border-radius: 50%;
 }
+.ap-swatch.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--ap-brand); }
+.ap-swatch:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
 
-.ap-swatch.sel {
-  border-color: var(--mantine-color-bright);
-  box-shadow: 0 0 0 2px var(--mantine-primary-color-filled);
+/* ---- ink chips ---------------------------------------------------------- */
+.ap-chips { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.ap-chip {
+  display: block; width: 100%; padding: 7px 10px; text-align: left; cursor: pointer;
+  background: transparent; border: 1px solid var(--ap-line); border-radius: 8px;
+  color: inherit; font: inherit;
 }
-
-.ap-swatch:focus-visible {
-  outline: 3px solid #6fb3ff;
-  outline-offset: 2px;
+.ap-chip:hover { background: var(--ap-raise); }
+.ap-chip.sel,
+.ap-chip.on {
+  background: var(--ap-brand); border-color: var(--ap-brand); color: var(--ap-brand-ink);
 }
+.ap-chip:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-chip-name { display: block; font-size: 13px; font-weight: 650; }
+.ap-chip-hint { display: block; font-size: 11px; color: var(--ap-muted); }
+.ap-chip.on .ap-chip-hint { color: rgba(23, 6, 31, 0.75); }

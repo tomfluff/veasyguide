@@ -632,10 +632,9 @@ const VideoPlayer = (props: Props) => {
           </Group>
           {props.extraHud}
           <Popover
-            width={430}
             position="top-end"
-            shadow="md"
             withinPortal={false}
+            classNames={{ dropdown: "ap-pop" }}
             opened={appearanceOpen}
             onChange={handleAppearanceOpen}
             trapFocus
@@ -651,7 +650,10 @@ const VideoPlayer = (props: Props) => {
                 <IconSparkles />
               </UnstyledButton>
             </Popover.Target>
-            <Popover.Dropdown>
+            {/* One guard for the whole sheet: every control inside it is a <button> or a
+                range, and Space/arrows on those would otherwise bubble to the player hotkeys
+                and toggle play or seek while you are adjusting a slider. */}
+            <Popover.Dropdown onKeyDown={stopPlayerHotkeys}>
               <AppearanceSheet />
             </Popover.Dropdown>
           </Popover>
