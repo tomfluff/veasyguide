@@ -353,3 +353,33 @@
 .video-overlay .overlay-catching-up {
   top: 0.75rem;
 }
+
+/* Scene-change notice. Amber rather than the neutral black of the analysis notices: those
+   report on us, this one is a caution about the video — enhancements were tuned to the
+   previous shot and may be stale. Stacks below the catching-up pill when both are up. */
+.video-overlay .overlay-scene {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(146, 64, 14, 0.85);
+  color: #fef3c7;
+  padding: 0.35rem 0.9rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  z-index: 25;
+  pointer-events: none;
+  animation: overlay-scene-in 200ms ease-out;
+}
+
+.video-overlay .overlay-scene.stacked {
+  top: 3rem;
+}
+
+@keyframes overlay-scene-in {
+  from { opacity: 0; transform: translate(-50%, -0.35rem); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

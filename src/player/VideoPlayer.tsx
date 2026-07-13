@@ -5,8 +5,6 @@
 // - `leftShirt` typo; duplicated allowControls check in handleTimeShift
 // - fullscreen requested on the player container, not document.body (the original
 //   README documents a Chrome bug where body-fullscreen shifts non-16:9 video)
-// - stableActivity is now cleared on scene change (it used to survive, so zoom
-//   could target a region from the previous slide)
 // - timeline tooltip guarded against NaN% before the container ref exists
 // - settings popover width fixed (was window.devicePixelRatio * 17.5vw — the
 //   panel width depended on the user's display scaling)
@@ -15,6 +13,11 @@
 //
 // New for streaming: analyzed-ranges shading in the timeline, playback gate and
 // "analyzing this part" state, activity selection via analyzer/select.ts.
+//
+// A scene change notifies the viewer and otherwise leaves the player alone. It used to
+// force a zoom-out and drop the stable activity; that traded a stale highlight for a
+// worse disruption — being yanked out of a magnified view mid-explanation — and scene
+// detection is a heuristic that fires on build animations and camera moves too.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Box, Text, Group, UnstyledButton, Slider, Popover } from "@mantine/core";
 import {
@@ -39,6 +42,7 @@ import {
   IconArrowBigLeftLineFilled,
   IconArrowBigRightLineFilled,
   IconZoom,
+  IconSwitchHorizontal,
 } from "@tabler/icons-react";
 import classNames from "classnames";
 import { convertSecondsToTimecode } from "../utils/misc";
@@ -73,6 +77,7 @@ type Props = {
 };
 
 const FLASH_SPEED = 250;
+const SCENE_NOTICE_MS = 2500;
 
 const VideoPlayer = (props: Props) => {
   // Refs
@@ -98,7 +103,9 @@ const VideoPlayer = (props: Props) => {
   const [isTheaterMode, handleIsTheaterMode] = useDisclosure(false);
   const [hideControls, handleHideControls] = useDisclosure(false);
   const [popoverOpacity, setPopoverOpacity] = useState(0.5);
+  const [sceneNotice, setSceneNotice] = useState(false);
   const currSceneIdRef = useRef<number | null>(null);
+  const prevTimeRef = useRef(0);
 
   const videoContainerClasses = classNames("video-container", {
     clear: hideControls,
@@ -117,6 +124,10 @@ const VideoPlayer = (props: Props) => {
     useTimeout(() => setForwardShiftRequest(false), FLASH_SPEED);
   const { start: startHideControlsTimeout, clear: clearHideControlsTimeout } =
     useTimeout(() => handleHideControls.open(), 2000);
+  const { start: startSceneNoticeTimeout, clear: clearSceneNoticeTimeout } = useTimeout(
+    () => setSceneNotice(false),
+    SCENE_NOTICE_MS
+  );
   useHotkeys([
     ["Space", () => handlePlayPause()],
     ["F", () => handleFullscreen()],
@@ -168,15 +179,25 @@ const VideoPlayer = (props: Props) => {
     if (activity) setStableActivity(activity);
     setCurrActivity(activity);
 
+    // Scene change: tell the viewer, but don't touch their zoom. Yanking them out of a
+    // magnified view is a bigger disruption than a briefly stale target — and scene
+    // detection is a heuristic, so it fires on things that aren't really slide changes
+    // (a build animation, a camera move). The enhancements re-target themselves as soon
+    // as the new scene produces an activity; the notice covers the gap.
+    // A seek lands in a different scene too, but the viewer did that on purpose and doesn't
+    // need to be told. Only a boundary crossed by playback itself is news, so ignore scene
+    // changes that coincide with a jump in the playhead.
+    const jumped = Math.abs(t - prevTimeRef.current) > 1;
+    prevTimeRef.current = t;
+
     const scene = props.scenes.find((s) => t >= s.start && t <= s.end) ?? null;
     if (scene && scene.id !== currSceneIdRef.current) {
       const isFirst = currSceneIdRef.current === null;
       currSceneIdRef.current = scene.id;
-      if (!isFirst) {
-        // Scene changed: the previous slide's regions are meaningless now.
-        handleIsZoomIn.close();
-        setCurrActivity(null);
-        setStableActivity(null); // fix: used to survive, letting zoom target the old slide
+      if (!isFirst && !jumped) {
+        setSceneNotice(true);
+        clearSceneNoticeTimeout();
+        startSceneNoticeTimeout();
       }
     }
 
@@ -294,6 +315,8 @@ const VideoPlayer = (props: Props) => {
   useEffect(() => {
     handleIsEnded.close();
     currSceneIdRef.current = null;
+    prevTimeRef.current = 0;
+    setSceneNotice(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.src]);
 
@@ -478,6 +501,12 @@ const VideoPlayer = (props: Props) => {
         )}
         {props.canPlay && atUnanalyzed && (
           <Box className="overlay-catching-up">Analyzing this part…</Box>
+        )}
+        {sceneNotice && (
+          <Box className={classNames("overlay-scene", { stacked: atUnanalyzed })} role="status">
+            <IconSwitchHorizontal size={16} />
+            Possible scene change
+          </Box>
         )}
       </Box>
       <SVGFilters />
