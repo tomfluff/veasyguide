@@ -439,7 +439,8 @@ export default function AppearanceSheet() {
           <>
             <p className="ap-hint">
               Off by default. A pulse can help you find the box — but it is motion, and motion
-              harms some viewers. Your system's reduce-motion setting is respected.
+              harms some viewers. Turning it on here overrides your system's reduce-motion
+              setting.
             </p>
             <Row label="Pulse">
               <Choice

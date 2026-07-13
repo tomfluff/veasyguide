@@ -289,14 +289,9 @@
   animation: pulse-enhance var(--pulse-duration, 1s) ease-in-out forwards 3;
 }
 
-/* The Appearance sheet promises "your system's reduce-motion setting is respected" — this
-   is the line that keeps that promise. Only the pulse is motion; the opacity fades stay. */
-@media (prefers-reduced-motion: reduce) {
-  .highlight-indicator,
-  .highlight-enhance.pulsing {
-    animation: none;
-  }
-}
+/* Deliberately NO prefers-reduced-motion override here: the pulse is off by default and is
+   only ever on because this viewer switched it on in the Appearance sheet, where the hint
+   says so. An explicit per-viewer choice outranks the OS-wide default. */
 
 @keyframes fade-in {
   0% {
