@@ -61,11 +61,13 @@
 .ap-mini::before { top: 10px; width: 62%; }
 .ap-mini::after { top: 38px; width: 44%; }
 
-.ap-mini-box { position: absolute; left: 16%; top: 19px; width: 56%; height: 17px; }
+/* z-index because the "text" lines are ::before/::after — as pseudo-children they paint
+   AFTER the real children, so the lower line drew on top of the pointer. */
+.ap-mini-box { position: absolute; z-index: 1; left: 16%; top: 19px; width: 56%; height: 17px; }
 .ap-mini-fill { position: absolute; inset: 0; }
 /* Anchored where the player anchors it: the bottom-left corner of the highlight box
    (HighlightIndicator puts it at left 0, top 100% of the box), growing down-right. */
-.ap-mini-ptr { position: absolute; left: 16%; top: 34px; }
+.ap-mini-ptr { position: absolute; z-index: 1; left: 16%; top: 34px; }
 .ap-mini-ptr img { width: 100%; height: 100%; display: block; }
 
 .ap-tile-name {
