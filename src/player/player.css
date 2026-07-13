@@ -469,12 +469,50 @@
 }
 
 /* --- Collapsed -----------------------------------------------------------
-   The biggest picture, without losing the ability to stop what you are hearing. Keeps the
-   scrubber, the moment marks, play/pause, volume and the way back; drops the now-line and
-   the moment buttons. The [ / ] keys still work. */
+   The biggest picture, without losing the ability to stop what you are hearing. One line:
+   play/pause, timecode, scrubber, fullscreen, expand. Everything else — the moment marks,
+   the now-line, volume, the moment steppers, Appearance — belongs to the expanded bar. The
+   [ / ] keys still work while collapsed. */
 .video-container.collapsed .now-line,
+.video-container.collapsed .moment-lane,
+.video-container.collapsed .volume-container,
 .video-container.collapsed .collapse-hide {
   display: none;
+}
+
+.video-container.collapsed .video-controls-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* display:contents dissolves the .controls wrapper so its buttons become flex items of the
+   bar itself. That is what lets the scrubber — a SIBLING of .controls in the DOM, and a
+   full-width row of its own when expanded — sit BETWEEN the timecode and the fullscreen
+   button here, without a second copy of the markup for the collapsed layout. */
+.video-container.collapsed .controls {
+  display: contents;
+}
+
+/* DOM order already gives play → timecode → fullscreen → expand. Only the scrubber is out of
+   place (it precedes them all), so it is the one thing that needs reordering, and the two
+   controls that must stay to its right are pushed past it. */
+.video-container.collapsed .timeline-container {
+  order: 1;
+  flex: 1;
+  /* The thumb is centred on the track, so at t=0 it hangs half its width off the left end —
+     straight over the timecode without this. */
+  margin: 0 10px;
+}
+
+.video-container.collapsed .collapse-end {
+  order: 2;
+}
+
+.video-container.collapsed .duration-container {
+  flex-grow: 0; /* expanded, it is the spacer that pushes the right-hand icons out; here the
+                   scrubber does that job */
+  padding-left: 4px;
 }
 
 /* Only the track needs overriding — the bar and thumb come from the theme's brand colour.

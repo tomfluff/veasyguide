@@ -657,10 +657,17 @@ const VideoPlayer = (props: Props) => {
               <AppearanceSheet />
             </Popover.Dropdown>
           </Popover>
-          <UnstyledButton onClick={handleFullscreen} aria-label="Fullscreen">
+          {/* collapse-end: the two controls that stay to the RIGHT of the scrubber when the bar
+              collapses to a single line. See the Collapsed block in player.css. */}
+          <UnstyledButton
+            className="collapse-end"
+            onClick={handleFullscreen}
+            aria-label="Fullscreen"
+          >
             {isFullscreen ? <IconMaximizeOff /> : <IconMaximize />}
           </UnstyledButton>
           <UnstyledButton
+            className="collapse-end"
             onClick={() => handleCollapsed.toggle()}
             onKeyDown={stopPlayerHotkeys}
             aria-label={collapsed ? "Expand controls" : "Collapse controls"}
