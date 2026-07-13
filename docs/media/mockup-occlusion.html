@@ -1,0 +1,133 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Where does the panel go?</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { padding: 22px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  .lede { color: var(--muted); font-size: 16px; margin-bottom: 22px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .opt { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .opt > h2 { font-size: 17px; padding: 12px 14px 2px; }
+  .opt > .why { font-size: 14px; color: var(--muted); padding: 0 14px 12px; }
+  .opt.rec { border-color: var(--accent); }
+  .tag { display: inline-block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+         padding: 2px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
+  .tag.good { background: #17361f; color: #7ee3a4; }
+  .tag.bad  { background: #3a1a1a; color: #ff9b90; }
+
+  /* the player box: fixed height so every option is compared on the same canvas */
+  .box { position: relative; height: 300px; background: #000; overflow: hidden; }
+  .vid {
+    position: absolute; left: 0; right: 0; top: 0;
+    background: url("highlight-on-annotation.png") top center / 100% auto no-repeat #fff;
+  }
+  .vid.full   { height: 300px; }          /* video fills the box */
+  /* letterbox: the WHOLE frame scales down to fit above the panel — nothing cropped */
+  .vid.shrunk { height: 172px; background-size: contain; background-position: center; background-color: #000; }
+  .lost {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(45deg, rgba(255,90,77,.16) 0 8px, transparent 8px 16px);
+    border-top: 2px dashed var(--activity);
+    display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
+    font-size: 13px; color: #ffb3ab; font-weight: 600;
+  }
+
+  .panel {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: rgba(10,13,18,.96); border-top: 1px solid var(--line);
+    padding: 10px 12px;
+  }
+  .tl { height: 10px; border-radius: 5px; background: #39414d; position: relative; }
+  .tl i { position: absolute; inset: 0 auto 0 0; width: 30%; background: var(--accent); border-radius: 5px; }
+  .st { position: relative; height: 22px; margin-top: 6px; }
+  .st b { position: absolute; top: 4px; bottom: 4px; background: var(--activity); border-radius: 3px; min-width: 6px; }
+  .st b.now { background: var(--accent); }
+  .nl { margin-top: 6px; padding: 7px 9px; border-radius: 7px; background: #1b202a; font-size: 13px; }
+  .row { display: flex; gap: 6px; margin-top: 6px; }
+  .k { height: 34px; min-width: 34px; padding: 0 10px; display: inline-flex; align-items: center;
+       background: #262c36; border: 1px solid var(--line); border-radius: 7px; font-size: 13px; }
+  .k.p { background: var(--accent); color: #1a1200; }
+  .mb { margin-top: 6px; padding: 8px 10px; border-radius: 7px; background: #1b202a; font-size: 13px; color: var(--accent); }
+
+  .ghost { opacity: .18; }
+  .stamp {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 650; color: #fff; text-shadow: 0 2px 10px #000;
+    background: rgba(0,0,0,.35);
+  }
+  .cost { padding: 10px 14px; font-size: 14px; border-top: 1px solid var(--line); }
+  .cost b { color: var(--text); }
+</style></head><body>
+<div class="wrap">
+  <h1>The panel has to live on top of the video (or fullscreen loses it). So how much video does it eat?</h1>
+  <p class="lede">Same lecture frame, same panel, four treatments. Red hatching = slide content the viewer cannot see.</p>
+
+  <div class="grid">
+
+    <!-- A -->
+    <div class="opt rec">
+      <h2>A · Video shrinks to fit above the panel <span class="tag good">nothing hidden</span></h2>
+      <p class="why">The video letterboxes. Panel is always there, always usable. You see the whole slide, just smaller.</p>
+      <div class="box">
+        <div class="vid shrunk"></div>
+        <div class="panel">
+          <div class="tl"><i></i></div>
+          <div class="st"><b style="left:4%;width:5%"></b><b style="left:13%;width:6px"></b><b class="now" style="left:25%;width:7%"></b><b style="left:41%;width:6%"></b><b style="left:59%;width:6px"></b><b style="left:82%;width:6px"></b></div>
+          <div class="nl">● Moment <b>3 of 23</b> · 1:30, 4.2s</div>
+          <div class="row"><span class="k p">▶</span><span class="k">⏮ Prev</span><span class="k">Next ⏭</span><span class="k">✨ Appearance</span><span class="k">⛶</span></div>
+          <div class="mb">▸ 23 moments in this lecture</div>
+        </div>
+      </div>
+      <div class="cost">Cost: <b>the video is smaller.</b> Gain: <b>you can see all of it.</b> Needs one geometry change (measure the video, not the container).</div>
+    </div>
+
+    <!-- B -->
+    <div class="opt">
+      <h2>B · Compact bar, sheets open on demand <span class="tag bad">still covers a third</span></h2>
+      <p class="why">Video stays full size. The panel is trimmed, but it still sits on the slide — and opening a sheet covers more.</p>
+      <div class="box">
+        <div class="vid full"></div>
+        <div class="lost" style="height:118px">↓ slide content hidden behind the panel ↓</div>
+        <div class="panel">
+          <div class="tl"><i></i></div>
+          <div class="st"><b style="left:4%;width:5%"></b><b style="left:13%;width:6px"></b><b class="now" style="left:25%;width:7%"></b><b style="left:41%;width:6%"></b><b style="left:59%;width:6px"></b><b style="left:82%;width:6px"></b></div>
+          <div class="nl">● Moment <b>3 of 23</b> · 1:30, 4.2s</div>
+          <div class="row"><span class="k p">▶</span><span class="k">⏮ Prev</span><span class="k">Next ⏭</span><span class="k">✨ Appearance</span><span class="k">⛶</span></div>
+        </div>
+      </div>
+      <div class="cost">Cost: <b>the bottom third of every slide.</b> Gain: full-size video, zero geometry risk.</div>
+    </div>
+
+    <!-- C -->
+    <div class="opt">
+      <h2>C · Auto-hides while playing <span class="tag bad">hover to reveal</span></h2>
+      <p class="why">The YouTube answer. Maximum video. But the moments and the presets vanish until you move the mouse — and a screen-reader or magnifier user never "moves the mouse".</p>
+      <div class="box">
+        <div class="vid full"></div>
+        <div class="panel ghost">
+          <div class="tl"><i></i></div>
+          <div class="st"><b style="left:4%;width:5%"></b><b class="now" style="left:25%;width:7%"></b><b style="left:41%;width:6%"></b></div>
+          <div class="nl">● Moment 3 of 23 · 1:30, 4.2s</div>
+          <div class="row"><span class="k p">▶</span><span class="k">⏮ Prev</span><span class="k">Next ⏭</span><span class="k">✨</span></div>
+        </div>
+        <div class="stamp">panel faded out — where did the moments go?</div>
+      </div>
+      <div class="cost">Cost: <b>the whole feature disappears</b> for the users it was built for. Gain: the most video.</div>
+    </div>
+
+    <!-- D -->
+    <div class="opt">
+      <h2>D · Panel below the video, outside the player <span class="tag bad">gone in fullscreen</span></h2>
+      <p class="why">Nothing is ever covered, and the layout is trivial. But fullscreen only shows the player container — so the strip, the moments and the presets are simply not there.</p>
+      <div class="box">
+        <div class="vid full"></div>
+        <div class="stamp">FULLSCREEN — no strip, no moments, no presets</div>
+      </div>
+      <div class="cost">Cost: <b>the feature does not exist in fullscreen</b>, the mode a low-vision viewer lives in. Gain: simplest layout.</div>
+    </div>
+
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>A — Under the player</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  /* Activity strip: time-aligned blocks, directly under the scrubber. */
+  .strip { position: relative; height: 34px; margin-top: 8px; background: #1c212a; border-radius: 8px; }
+  .blk {
+    position: absolute; top: 5px; bottom: 5px; min-width: 10px;
+    background: var(--activity); border-radius: 4px; border: none; cursor: pointer;
+  }
+  .blk.now { background: var(--accent); box-shadow: 0 0 0 3px rgba(255,194,51,.3); }
+  .blk.invalid { background: #4a5261; }
+
+  /* Collapsed moments row -> expands into a horizontal sheet. */
+  .moments-bar {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 14px; margin-top: 10px; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+    color: var(--text); font-size: 17px; font-weight: 550; text-align: left;
+  }
+  .moments-bar .count { color: var(--accent); }
+  .sheet { display: flex; gap: 12px; overflow-x: auto; padding: 14px 2px 6px; }
+  .sheet .card { flex: 0 0 176px; }
+
+  /* Appearance = bottom sheet across the player width. */
+  .appearance { border-top: 1px solid var(--line); background: #12161d; padding: 18px; }
+  .appearance h3 { font-size: 18px; margin-bottom: 4px; }
+  .appearance p  { color: var(--muted); font-size: 15px; margin-bottom: 14px; }
+  .presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .preset { background: var(--surface-2); border: 2px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; }
+  .preset.sel { border-color: var(--accent); }
+  .preset .pv {
+    height: 104px; position: relative;
+    background: url("highlight-on-annotation.png") -150px -110px / 300% auto no-repeat #fff;
+  }
+  .preset .pv .box { position: absolute; left: 26%; top: 22%; width: 44%; height: 42%; }
+  /* each preset shows the SAME real activity, rendered its own way */
+  .p1 .box { border: 4px solid var(--activity); background: rgba(255,194,51,.18); }
+  .p2 .box { border: 8px solid #000; background: rgba(255,235,0,.45); }
+  .p3 .pv  { filter: invert(1) contrast(1.25); }
+  .p3 .box { border: 6px solid #00e5ff; }
+  .p4 .box { border: 2px dashed rgba(0,0,0,.55); background: transparent; }
+  .preset .nm { padding: 10px; font-size: 15px; font-weight: 600; }
+  .preset .nm small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .customize {
+    margin-top: 14px; display: flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 15px;
+  }
+</style></head><body>
+<div class="wrap">
+  <div class="label">Approach A</div>
+  <div class="title">Under the player</div>
+  <div class="sub">Everything lives in the player column. The video never loses a pixel of width.</div>
+
+  <div class="app">
+    <div class="topbar">
+      <span class="brand">veasyguide</span>
+      <span class="file">rl-lecture-week3.mp4</span>
+      <span class="spacer"></span>
+      <span class="meter">analyzing <b>14.2×</b> · 63% done</span>
+    </div>
+
+    <div class="video">
+      <div class="hl" style="left:56%;top:33%;width:22%;height:14%"></div>
+    </div>
+
+    <div class="controls">
+      <div class="timeline">
+        <div class="analyzed" style="width:63%"></div>
+        <div class="played" style="width:27%"></div>
+        <div class="thumb" style="left:27%"></div>
+      </div>
+
+      <!-- Time-aligned activity blocks. Click to jump. Grey = filtered out. -->
+      <div class="strip">
+        <button class="blk" style="left:4%;width:5%"></button>
+        <button class="blk" style="left:13%;width:3%"></button>
+        <button class="blk now" style="left:25%;width:7%"></button>
+        <button class="blk invalid" style="left:36%;width:2%"></button>
+        <button class="blk" style="left:41%;width:6%"></button>
+        <button class="blk" style="left:52%;width:4%"></button>
+        <button class="blk" style="left:59%;width:3%"></button>
+      </div>
+
+      <div class="btnrow">
+        <button class="btn icon primary">▶</button>
+        <button class="btn icon" title="Previous moment">⏮</button>
+        <button class="btn icon" title="Next moment">⏭</button>
+        <span class="time">1:30 / 5:32</span>
+        <span class="spacer"></span>
+        <button class="btn on">✨ Appearance</button>
+        <button class="btn icon">🔍</button>
+        <button class="btn icon">🔊</button>
+        <button class="btn icon">⛶</button>
+      </div>
+
+      <button class="moments-bar">▸ <span class="count">23 moments</span> in this lecture</button>
+      <div class="sheet">
+        <div class="card"><div class="crop" style="background-position:-40px -30px"></div><div class="meta"><div class="t">0:12</div><div class="d">1.4s · pointing</div></div></div>
+        <div class="card"><div class="crop" style="background-position:-260px -70px"></div><div class="meta"><div class="t">0:41</div><div class="d">3.0s · writing</div></div></div>
+        <div class="card now"><div class="crop" style="background-position:-420px -150px"></div><div class="meta"><div class="t">1:30</div><div class="d">4.2s · writing</div></div></div>
+        <div class="card"><div class="crop" style="background-position:-160px -250px"></div><div class="meta"><div class="t">2:03</div><div class="d">2.1s · sketching</div></div></div>
+        <div class="card"><div class="crop" style="background-position:-560px -220px"></div><div class="meta"><div class="t">2:48</div><div class="d">1.8s · pointing</div></div></div>
+      </div>
+    </div>
+
+    <!-- Appearance sheet: opens across the player, pushes nothing sideways. -->
+    <div class="appearance">
+      <h3>Appearance</h3>
+      <p>Each preview shows a real moment from <b>this</b> lecture. Pick what you can see best.</p>
+      <div class="presets">
+        <div class="preset p1 sel"><div class="pv"><div class="box"></div></div><div class="nm">Default<small>Outline + soft fill</small></div></div>
+        <div class="preset p2"><div class="pv"><div class="box"></div></div><div class="nm">Bold<small>Thick border, strong fill</small></div></div>
+        <div class="preset p3"><div class="pv"><div class="box"></div></div><div class="nm">High contrast<small>Inverted, cyan outline</small></div></div>
+        <div class="preset p4"><div class="pv"><div class="box"></div></div><div class="nm">Subtle<small>Thin dashed, no fill</small></div></div>
+      </div>
+      <div class="customize">⚙ <u>Customize…</u> — opens the full 18 controls (border, fill, pointer, animation, zoom, enhance filters)</div>
+    </div>
+  </div>
+
+  <div class="note">
+    Cheapest to build: the strip and the moments sheet reuse ActivityGallery + snippets.ts, and the
+    Appearance sheet replaces the two 50%-opacity popovers. Cost: the page gets tall — the moments
+    sheet and the Appearance sheet both push content down, so on a laptop you scroll away from the video.
+  </div>
+</div>
+</body></html>

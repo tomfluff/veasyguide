@@ -1,0 +1,115 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>C — Summon</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .wrap { max-width: 940px; margin: 0 auto; }
+  .app + .app { margin-top: 22px; }
+
+  .strip { position: relative; height: 30px; margin-top: 8px; background: #1c212a; border-radius: 8px; }
+  .blk { position: absolute; top: 5px; bottom: 5px; min-width: 10px; background: var(--activity);
+         border-radius: 4px; border: none; cursor: pointer; }
+  .blk.now { background: var(--accent); box-shadow: 0 0 0 3px rgba(255,194,51,.3); }
+
+  .big { height: 56px; font-size: 17px; padding: 0 20px; }
+
+  /* --- summoned overlay: the preview IS the screen ----------------------- */
+  .overlay { position: relative; background: #000; }
+  .ov-video {
+    aspect-ratio: 830 / 388;
+    background: url("highlight-on-annotation.png") top center / 100% auto no-repeat #fff;
+    filter: invert(1) contrast(1.2);      /* the focused preset, applied for real */
+  }
+  .ov-video .box { position: absolute; left: 56%; top: 33%; width: 22%; height: 14%;
+                   border: 8px solid #00e5ff; background: rgba(0,229,255,.14); }
+  .ov-bar {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,.9) 32%);
+    padding: 60px 20px 20px;
+  }
+  .ov-title { font-size: 15px; color: var(--muted); margin-bottom: 10px; letter-spacing: .04em; text-transform: uppercase; }
+  .chips { display: flex; gap: 10px; align-items: center; }
+  .chip {
+    height: 56px; padding: 0 20px; display: inline-flex; align-items: center;
+    border-radius: 12px; border: 2px solid var(--line); background: rgba(20,24,31,.92);
+    color: var(--text); font-size: 17px; font-weight: 600; cursor: pointer;
+  }
+  .chip.sel { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+  .chip small { display: block; font-weight: 400; font-size: 13px; opacity: .75; }
+  .ov-help { margin-top: 12px; color: var(--muted); font-size: 15px; }
+  .ov-help kbd {
+    background: var(--surface-2); border: 1px solid var(--line); border-bottom-width: 2px;
+    border-radius: 5px; padding: 2px 7px; font: inherit; font-size: 14px;
+  }
+</style></head><body>
+<div class="wrap">
+  <div class="label">Approach C</div>
+  <div class="title">Summon</div>
+  <div class="sub">Nothing is small and nothing is hidden. Two big buttons summon full-screen surfaces; the Appearance surface is the live preview at full size.</div>
+
+  <!-- State 1: the player. Controls are large and permanent (no hover-hide). -->
+  <div class="app">
+    <div class="topbar">
+      <span class="brand">veasyguide</span>
+      <span class="file">rl-lecture-week3.mp4</span>
+      <span class="spacer"></span>
+      <span class="meter">analyzing <b>14.2×</b> · 63% done</span>
+    </div>
+    <div class="video">
+      <div class="hl" style="left:56%;top:33%;width:22%;height:14%"></div>
+    </div>
+    <div class="controls">
+      <div class="timeline">
+        <div class="analyzed" style="width:63%"></div>
+        <div class="played" style="width:27%"></div>
+        <div class="thumb" style="left:27%"></div>
+      </div>
+      <div class="strip">
+        <button class="blk" style="left:4%;width:5%"></button>
+        <button class="blk" style="left:13%;width:3%"></button>
+        <button class="blk now" style="left:25%;width:7%"></button>
+        <button class="blk" style="left:41%;width:6%"></button>
+        <button class="blk" style="left:52%;width:4%"></button>
+        <button class="blk" style="left:59%;width:3%"></button>
+      </div>
+      <div class="btnrow">
+        <button class="btn icon primary big" style="min-width:56px">▶</button>
+        <button class="btn icon big" style="min-width:56px" title="Previous moment">⏮</button>
+        <button class="btn icon big" style="min-width:56px" title="Next moment">⏭</button>
+        <span class="time">1:30 / 5:32</span>
+        <span class="spacer"></span>
+        <button class="btn big">☰ Moments <small style="opacity:.6;margin-left:6px">M</small></button>
+        <button class="btn big">✨ Appearance <small style="opacity:.6;margin-left:6px">A</small></button>
+        <button class="btn icon big" style="min-width:56px">⛶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- State 2: Appearance summoned. The whole frame IS the preview. -->
+  <div class="app overlay">
+    <div class="ov-video"><div class="box"></div></div>
+    <div class="ov-bar">
+      <div class="ov-title">Appearance — previewing on this lecture, paused at 1:30</div>
+      <div class="chips">
+        <button class="chip">Default<small>Outline + soft fill</small></button>
+        <button class="chip">Bold<small>Thick border, strong fill</small></button>
+        <button class="chip sel">High contrast<small>Inverted, cyan outline</small></button>
+        <button class="chip">Subtle<small>Thin dashed</small></button>
+        <span class="spacer"></span>
+        <button class="chip">⚙ Customize…</button>
+        <button class="chip">Done</button>
+      </div>
+      <div class="ov-help">
+        <kbd>←</kbd> <kbd>→</kbd> to try each preset — the video behind you changes for real. <kbd>Esc</kbd> to keep the one you're looking at.
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    The only approach that never asks a low-vision user to judge a preset from a 100px thumbnail —
+    the preview is the whole screen, at the size they'll actually watch it. Also the only one where
+    the answer to "does this work at 300% zoom" is trivially yes. Cost: the overlay hides the video
+    while open, the pattern is unfamiliar for a web video player, and it needs real focus-trap and
+    motion discipline to not be disorienting.
+  </div>
+</div>
+</body></html>

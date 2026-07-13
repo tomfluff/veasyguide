@@ -1,0 +1,309 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>A3 — the spec as reviewed</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; }
+  .app + .label { margin-top: 34px; }
+  .cap { color: var(--muted); font-size: 14px; margin: -10px 0 14px; font-style: italic; }
+
+  /* THE DOCKED PANEL — inside the player container, absolutely positioned over the
+     bottom of the video. This is what killed the layout rewrite: .video-controls-container
+     is already position:absolute;bottom:0 and already survives fullscreen. */
+  .stage { position: relative; }
+  .panel {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(transparent, rgba(8,10,14,.93) 26%);
+    padding: 44px 14px 12px;
+  }
+
+  .timeline { position: relative; height: 14px; background: rgba(255,255,255,.22); border-radius: 7px; }
+  .timeline .analyzed { position: absolute; inset: 0 auto 0 0; background: rgba(255,255,255,.4); border-radius: 7px; }
+  .timeline .played   { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 7px; }
+  .timeline .thumb    { position: absolute; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px;
+                        background: #fff; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0,0,0,.5); }
+
+  /* Strip: blocks have a 6px MINIMUM width and colliding blocks merge into one wider
+     mark. The strip is an approximate map, not a literal time axis. */
+  .strip { position: relative; height: 30px; margin-top: 8px; }
+  .blk {
+    position: absolute; top: 3px; bottom: 3px; min-width: 6px;
+    background: var(--activity); border: none; border-radius: 3px; cursor: pointer;
+    padding: 0;
+  }
+  .blk.now   { background: var(--accent); box-shadow: 0 0 0 3px rgba(255,194,51,.35); }
+  .blk.merged{ background: linear-gradient(90deg, var(--activity) 40%, #ff8a7d 40% 60%, var(--activity) 60%); }
+  .blk.foc   { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  /* The label is text, in a live region. No hover tooltip anywhere. */
+  .nowline {
+    display: flex; align-items: center; gap: 12px; margin-top: 8px;
+    padding: 10px 12px; border-radius: 10px;
+    background: rgba(20,24,31,.9); border: 1px solid var(--line);
+  }
+  .nowline .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+  .nowline .txt { font-size: 17px; }
+  .nowline .txt b { font-variant-numeric: tabular-nums; }
+  .nowline .nxt { color: var(--muted); font-size: 15px; margin-left: auto; }
+  .nowline .prov { color: var(--muted); font-size: 15px; margin-left: auto; font-style: italic; }
+
+  .btnrow { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .btn { height: 46px; }
+  .kbd { font-size: 12px; opacity: .6; margin-left: 6px; }
+
+  .mbar {
+    display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 8px;
+    padding: 12px 14px; border-radius: 10px; cursor: pointer; text-align: left;
+    background: rgba(20,24,31,.9); border: 1px solid var(--line); color: var(--text);
+    font-size: 16px; font-weight: 550;
+  }
+  .mbar .n { color: var(--accent); }
+  .mbar .prov { color: var(--muted); font-weight: 400; font-style: italic; }
+
+  /* Moments sheet: TEXT cards. No thumbnails, no decode. The position marker is a
+     miniature frame outline with the activity's bounding box drawn in it — geometry only. */
+  .sheet { display: flex; gap: 10px; overflow-x: auto; margin-top: 8px; padding-bottom: 4px; }
+  .mcard {
+    flex: 0 0 150px; display: flex; gap: 10px; align-items: center;
+    padding: 10px; border-radius: 10px; cursor: pointer; text-align: left;
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+  }
+  .mcard.now { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .mini { flex: none; width: 44px; height: 25px; border: 1px solid #5a6470; border-radius: 2px; position: relative; background: #0b0e12; }
+  .mini i { position: absolute; background: var(--activity); border-radius: 1px; }
+  .mcard .t { font-variant-numeric: tabular-nums; font-weight: 650; font-size: 16px; }
+  .mcard .d { color: var(--muted); font-size: 13px; }
+
+  /* Appearance sheet: 4 presets + a derived Custom. No motion, no enhance filters. */
+  .appear { margin-top: 8px; padding: 12px; border-radius: 10px; background: rgba(20,24,31,.94); border: 1px solid var(--line); }
+  .appear h4 { font-size: 15px; margin-bottom: 8px; }
+  .presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .preset { background: var(--surface-2); border: 2px solid var(--line); border-radius: 9px; overflow: hidden; cursor: pointer; }
+  .preset.sel { border-color: var(--accent); }
+  .preset .pv { height: 60px; position: relative; background: #f4f4f4; }
+  .preset .pv i { position: absolute; left: 20%; top: 25%; width: 55%; height: 45%; display: block; }
+  .p-std .pv i  { border: 2px solid #ff0000; background: rgba(255,204,0,.15); }
+  .p-bold .pv i { border: 5px solid #ff0000; background: rgba(255,204,0,.30); }
+  .p-hc .pv     { background: #f4f4f4; }
+  .p-hc .pv i   { border: 5px solid #000; background: rgba(255,255,0,.45); }
+  .p-min .pv i  { border: 1px solid #ff0000; background: none; }
+  .p-cus .pv    { background: repeating-linear-gradient(45deg,#2a2f38,#2a2f38 6px,#232830 6px,#232830 12px); }
+  .p-cus .pv i  { border: 3px dashed #7ee3a4; }
+  .preset .nm { padding: 7px 8px; font-size: 13px; font-weight: 600; }
+  .appear .more { margin-top: 10px; font-size: 14px; color: var(--muted); }
+
+  .empty {
+    margin-top: 8px; padding: 12px 14px; border-radius: 10px; font-size: 16px;
+    background: rgba(20,24,31,.9); border: 1px solid var(--line); color: var(--muted);
+  }
+
+  /* wait scrim */
+  .scrim { position: absolute; inset: 0; background: rgba(6,8,11,.84);
+           display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+  .scrim .h { font-size: 25px; font-weight: 650; }
+  .scrim .p { font-size: 16px; color: var(--muted); }
+  .prog { width: 58%; height: 12px; background: #2a303a; border-radius: 6px; overflow: hidden; }
+  .prog i { display: block; height: 100%; width: 34%; background: var(--accent); }
+  .scrim .fine { font-size: 15px; color: var(--muted); }
+  .scrim .fine b { color: var(--text); }
+</style></head><body>
+<div class="wrap">
+
+  <div class="label">Approach A · rebuilt against the reviewed spec</div>
+  <div class="title">1 · Playing — analysis done</div>
+  <div class="cap">The panel is docked INSIDE the player container (absolute, over the video bottom) — not below it in flow. That is what deleted the layout rewrite, and it is why all of this survives fullscreen.</div>
+
+  <div class="app">
+    <div class="topbar"><span class="brand">veasyguide</span><span class="file">rl-lecture-week3.mp4</span><span class="spacer"></span><span class="meter">analyzed · <b>23 moments</b></span></div>
+    <div class="stage">
+      <div class="video"><div class="hl" style="left:56%;top:33%;width:22%;height:14%"></div></div>
+      <div class="panel">
+        <div class="timeline">
+          <div class="analyzed" style="width:100%"></div>
+          <div class="played" style="width:27%"></div>
+          <div class="thumb" style="left:27%"></div>
+        </div>
+        <!-- min-width 6px; the pair at 36% is a MERGED mark (two moments too close to separate) -->
+        <div class="strip">
+          <button class="blk" style="left:4%;width:5%"></button>
+          <button class="blk" style="left:13%"></button>
+          <button class="blk now foc" style="left:25%;width:7%"></button>
+          <button class="blk merged" style="left:36%;width:11px"></button>
+          <button class="blk" style="left:41%;width:6%"></button>
+          <button class="blk" style="left:52%"></button>
+          <button class="blk" style="left:59%;width:3%"></button>
+          <button class="blk" style="left:70%;width:4%"></button>
+          <button class="blk" style="left:82%"></button>
+          <button class="blk" style="left:88%;width:5%"></button>
+        </div>
+        <div class="nowline" role="status">
+          <span class="dot"></span>
+          <span class="txt">Moment <b>3 of 23</b> · <b>1:30</b>, 4.2s</span>
+          <span class="nxt">Next at <b>2:03</b></span>
+        </div>
+        <div class="btnrow">
+          <button class="btn icon primary">▶</button>
+          <button class="btn">⏮ Previous<span class="kbd">[</span></button>
+          <button class="btn">Next ⏭<span class="kbd">]</span></button>
+          <span class="time">1:30 / 5:32</span>
+          <span class="spacer"></span>
+          <button class="btn">✨ Appearance</button>
+          <button class="btn icon">🔍</button>
+          <button class="btn icon">🔊</button>
+          <button class="btn icon">⛶</button>
+        </div>
+        <button class="mbar">▸ <span class="n">23 moments</span> in this lecture</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">2 · Playing — still analyzing</div>
+  <div class="title">The count is unknown, and says so</div>
+  <div class="cap">No "of 23" until analysis finishes. "Next at" is suppressed because the video after the playhead isn't analyzed yet — the next moment by time may not exist yet.</div>
+
+  <div class="app">
+    <div class="topbar"><span class="brand">veasyguide</span><span class="file">rl-lecture-week3.mp4</span><span class="spacer"></span><span class="meter">analyzing <b>14.2×</b> · 63%</span></div>
+    <div class="stage">
+      <div class="video"><div class="hl" style="left:56%;top:33%;width:22%;height:14%"></div></div>
+      <div class="panel">
+        <div class="timeline">
+          <div class="analyzed" style="width:63%"></div>
+          <div class="played" style="width:27%"></div>
+          <div class="thumb" style="left:27%"></div>
+        </div>
+        <div class="strip">
+          <button class="blk" style="left:4%;width:5%"></button>
+          <button class="blk" style="left:13%"></button>
+          <button class="blk now" style="left:25%;width:7%"></button>
+          <button class="blk" style="left:41%;width:6%"></button>
+          <button class="blk" style="left:52%"></button>
+          <button class="blk" style="left:59%;width:3%"></button>
+        </div>
+        <div class="nowline" role="status">
+          <span class="dot"></span>
+          <span class="txt">Moment <b>3</b> · <b>1:30</b>, 4.2s</span>
+          <span class="prov">still finding moments…</span>
+        </div>
+        <div class="btnrow">
+          <button class="btn icon primary">▶</button>
+          <button class="btn">⏮ Previous<span class="kbd">[</span></button>
+          <button class="btn">Next ⏭<span class="kbd">]</span></button>
+          <span class="time">1:30 / 5:32</span>
+          <span class="spacer"></span>
+          <button class="btn">✨ Appearance</button>
+          <button class="btn icon">⛶</button>
+        </div>
+        <button class="mbar">▸ <span class="n">7 moments</span> <span class="prov">so far — still looking…</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">3 · Moments sheet open</div>
+  <div class="title">Text cards, not thumbnails</div>
+  <div class="cap">No snippet worker, no second decode, no 220px smudge of a pointing gesture. The little rectangle is a scale drawing of the frame with the activity's bounding box in it — geometry we already have, zero decode.</div>
+
+  <div class="app">
+    <div class="topbar"><span class="brand">veasyguide</span><span class="file">rl-lecture-week3.mp4</span><span class="spacer"></span><span class="meter">analyzed · <b>23 moments</b></span></div>
+    <div class="stage">
+      <div class="video"><div class="hl" style="left:56%;top:33%;width:22%;height:14%"></div></div>
+      <div class="panel">
+        <div class="timeline"><div class="analyzed" style="width:100%"></div><div class="played" style="width:27%"></div><div class="thumb" style="left:27%"></div></div>
+        <div class="strip">
+          <button class="blk" style="left:4%;width:5%"></button>
+          <button class="blk" style="left:13%"></button>
+          <button class="blk now" style="left:25%;width:7%"></button>
+          <button class="blk" style="left:41%;width:6%"></button>
+          <button class="blk" style="left:59%;width:3%"></button>
+          <button class="blk" style="left:82%"></button>
+        </div>
+        <button class="mbar">▾ <span class="n">23 moments</span> in this lecture</button>
+        <div class="sheet">
+          <div class="mcard"><div class="mini"><i style="left:30%;top:20%;width:22%;height:16%"></i></div><div><div class="t">0:12</div><div class="d">1.4s</div></div></div>
+          <div class="mcard"><div class="mini"><i style="left:12%;top:55%;width:30%;height:22%"></i></div><div><div class="t">0:41</div><div class="d">3.0s</div></div></div>
+          <div class="mcard now"><div class="mini"><i style="left:56%;top:33%;width:22%;height:14%"></i></div><div><div class="t">1:30</div><div class="d">4.2s</div></div></div>
+          <div class="mcard"><div class="mini"><i style="left:20%;top:60%;width:18%;height:20%"></i></div><div><div class="t">2:03</div><div class="d">2.1s</div></div></div>
+          <div class="mcard"><div class="mini"><i style="left:66%;top:50%;width:20%;height:24%"></i></div><div><div class="t">2:48</div><div class="d">1.8s</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">4 · Appearance sheet open</div>
+  <div class="title">Four presets and a derived Custom</div>
+  <div class="cap">No preset turns on motion or an enhance filter — the default never moves and never mangles pixels. Customize... reaches the 16 controls; touching any of them selects Custom. The real video stays visible above, so the cards are a hint and the video is the preview.</div>
+
+  <div class="app">
+    <div class="topbar"><span class="brand">veasyguide</span><span class="file">rl-lecture-week3.mp4</span><span class="spacer"></span><span class="meter">analyzed · <b>23 moments</b></span></div>
+    <div class="stage">
+      <div class="video"><div class="hl" style="left:56%;top:33%;width:22%;height:14%"></div></div>
+      <div class="panel">
+        <div class="appear">
+          <h4>Appearance — pick what you can see best</h4>
+          <div class="presets">
+            <div class="preset p-std sel"><div class="pv"><i></i></div><div class="nm">Standard</div></div>
+            <div class="preset p-bold"><div class="pv"><i></i></div><div class="nm">Bold</div></div>
+            <div class="preset p-hc"><div class="pv"><i></i></div><div class="nm">High contrast</div></div>
+            <div class="preset p-min"><div class="pv"><i></i></div><div class="nm">Minimal</div></div>
+            <div class="preset p-cus"><div class="pv"><i></i></div><div class="nm">Custom</div></div>
+          </div>
+          <div class="more">⚙ <u>Customize…</u> — border, fill, pointer, zoom, animation, enhance filters (16 controls)</div>
+        </div>
+        <div class="btnrow">
+          <button class="btn icon primary">▶</button>
+          <span class="time">1:30 / 5:32</span>
+          <span class="spacer"></span>
+          <button class="btn on">✨ Appearance</button>
+          <button class="btn icon">⛶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">5 · Empty state</div>
+  <div class="title">A lecture with nothing to follow</div>
+  <div class="cap">A talking-head-only video, or a deck with no annotation. Not an error. And the copy does not promise manual zoom — with no activities, handleZoom returns early and zoom cannot be turned on at all.</div>
+
+  <div class="app">
+    <div class="topbar"><span class="brand">veasyguide</span><span class="file">seminar-panel.mp4</span><span class="spacer"></span><span class="meter">analyzed</span></div>
+    <div class="stage">
+      <div class="video"></div>
+      <div class="panel">
+        <div class="timeline"><div class="analyzed" style="width:100%"></div><div class="played" style="width:41%"></div><div class="thumb" style="left:41%"></div></div>
+        <div class="empty">No annotation moments found in this video — the highlight and magnifier have nothing to follow.</div>
+        <div class="btnrow">
+          <button class="btn icon primary">▶</button>
+          <span class="time">6:04 / 14:52</span>
+          <span class="spacer"></span>
+          <button class="btn icon">🔊</button>
+          <button class="btn icon">⛶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">6 · The wait</div>
+  <div class="title">Finding the moments</div>
+  <div class="cap">The only moment the app makes anyone sit still. Two code states (reading the file, then analyzing) styled as one continuous progression.</div>
+
+  <div class="app">
+    <div class="topbar"><span class="brand">veasyguide</span><span class="file">rl-lecture-week3.mp4</span><span class="spacer"></span></div>
+    <div class="stage">
+      <div class="video">
+        <div class="scrim">
+          <div class="h">Finding the moments…</div>
+          <div class="p">Playback starts as soon as the first 10 seconds are ready.</div>
+          <div class="prog"><i></i></div>
+          <div class="fine">running at <b>14.2× realtime</b> · <b>4 moments</b> found so far</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="timeline"><div class="analyzed" style="width:34%"></div></div>
+        <div class="btnrow">
+          <button class="btn icon" disabled style="opacity:.4">▶</button>
+          <span class="time">0:00 / 5:32</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body></html>

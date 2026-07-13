@@ -1,0 +1,173 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>A2 — landing, analyzing, labeled strip</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .wrap { max-width: 900px; margin: 0 auto; }
+  .app + .label { margin-top: 34px; }
+
+  /* --- landing ----------------------------------------------------------- */
+  .land { padding: 40px 36px 32px; }
+  .land h1 { font-size: 40px; line-height: 1.15; letter-spacing: -.02em; font-weight: 700; }
+  .land .lede { font-size: 19px; color: var(--muted); margin: 12px 0 28px; max-width: 60ch; }
+  .drop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    min-height: 200px; padding: 24px;
+    border: 3px dashed #4a5464; border-radius: 16px; background: #12161d;
+    cursor: pointer;
+  }
+  .drop:focus-visible, .drop.foc { border-color: var(--accent); outline: 3px solid var(--focus); outline-offset: 3px; }
+  .drop .big { font-size: 24px; font-weight: 600; }
+  .drop .small { font-size: 16px; color: var(--muted); }
+  .drop .or { margin-top: 6px; }
+  .privacy {
+    display: flex; gap: 12px; align-items: center; margin-top: 20px; padding: 16px 18px;
+    background: #12241a; border: 1px solid #2b5c3c; border-radius: 12px; font-size: 16px;
+  }
+  .privacy b { color: #7ee3a4; }
+  .steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 20px; }
+  .step { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .step .n { color: var(--accent); font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .step .s { font-size: 16px; }
+
+  /* --- analyzing (the first-run wait) ------------------------------------ */
+  .waitwrap { position: relative; }
+  .scrim {
+    position: absolute; inset: 0; background: rgba(6,8,11,.82);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    backdrop-filter: blur(2px);
+  }
+  .scrim .h { font-size: 26px; font-weight: 650; }
+  .scrim .p { font-size: 17px; color: var(--muted); }
+  .prog { width: 60%; height: 12px; background: #2a303a; border-radius: 6px; overflow: hidden; }
+  .prog i { display: block; height: 100%; width: 34%; background: var(--accent); }
+  .scrim .fine { font-size: 15px; color: var(--muted); }
+  .scrim .fine b { color: var(--text); }
+
+  /* --- labeled strip ----------------------------------------------------- */
+  .strip { position: relative; height: 30px; margin-top: 8px; background: #1c212a; border-radius: 8px; }
+  .blk { position: absolute; top: 4px; bottom: 4px; min-width: 12px; background: var(--activity);
+         border-radius: 4px; border: none; cursor: pointer; }
+  .blk.now { background: var(--accent); box-shadow: 0 0 0 3px rgba(255,194,51,.35); }
+  .blk.foc { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+  /* THE LABEL: a live text line, not a hover tooltip. Readable, announceable, always there. */
+  .nowline {
+    display: flex; align-items: center; gap: 14px; margin-top: 10px; padding: 12px 14px;
+    background: #12161d; border: 1px solid var(--line); border-radius: 10px;
+  }
+  .nowline .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); flex: none; }
+  .nowline .txt { font-size: 18px; }
+  .nowline .txt b { font-variant-numeric: tabular-nums; }
+  .nowline .nxt { color: var(--muted); font-size: 16px; }
+  .nowline .spacer { flex: 1; }
+  .peek {
+    width: 116px; height: 66px; flex: none; border-radius: 8px; border: 1px solid var(--line);
+    background: url("highlight-on-annotation.png") -420px -150px / 320% auto no-repeat;
+  }
+</style></head><body>
+<div class="wrap">
+
+  <div class="label">Approach A · revision 1 — the landing screen</div>
+  <div class="title">First contact</div>
+  <div class="sub">The privacy promise is the reason someone trusts a stranger's site with their lecture. It gets a real box, not a footnote.</div>
+
+  <div class="app">
+    <div class="topbar"><span class="brand">veasyguide</span><span class="spacer"></span></div>
+    <div class="land">
+      <h1>Watch lecture videos,<br>enhanced.</h1>
+      <p class="lede">Highlights and smart magnification that follow the instructor's pen, so you never lose the place they're pointing at. Built for low-vision learners.</p>
+      <div class="drop foc">
+        <div class="big">⬇ Drop a lecture video here</div>
+        <div class="small">MP4, WebM or MKV — playback starts in seconds while analysis keeps running</div>
+        <button class="btn primary or" style="height:52px;padding:0 22px;font-size:17px">Choose a file</button>
+      </div>
+      <div class="privacy">🔒 <span><b>Your video never leaves this device.</b> Every frame is analyzed in your browser. No upload, no account, no server.</span></div>
+      <div class="steps">
+        <div class="step"><div class="n">1</div><div class="s">Drop a video</div></div>
+        <div class="step"><div class="n">2</div><div class="s">We find every moment the instructor writes, points, or sketches</div></div>
+        <div class="step"><div class="n">3</div><div class="s">Watch it your way — pick how the highlight looks, jump between moments</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Approach A · revision 2 — the wait</div>
+  <div class="title">Analyzing (first ~10 seconds)</div>
+  <div class="sub">The only moment the app makes you wait. Say what it's doing, show it moving, and say when it ends.</div>
+
+  <div class="app">
+    <div class="topbar">
+      <span class="brand">veasyguide</span><span class="file">rl-lecture-week3.mp4</span><span class="spacer"></span>
+    </div>
+    <div class="video waitwrap">
+      <div class="scrim">
+        <div class="h">Finding the moments…</div>
+        <div class="p">Playback starts as soon as the first 10 seconds are ready.</div>
+        <div class="prog"><i></i></div>
+        <div class="fine">running at <b>14.2× realtime</b> · <b>4 moments</b> found so far</div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="timeline"><div class="analyzed" style="width:34%"></div></div>
+      <div class="btnrow">
+        <button class="btn icon" disabled style="opacity:.45">▶</button>
+        <span class="time">0:00 / 5:32</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Approach A · revision 3 — the strip, labeled</div>
+  <div class="title">Where am I, and what's next</div>
+  <div class="sub">The blocks are the map. The line under them is the label — always visible, readable at any zoom, announced by a screen reader when it changes. No hover tooltip anywhere.</div>
+
+  <div class="app">
+    <div class="topbar">
+      <span class="brand">veasyguide</span><span class="file">rl-lecture-week3.mp4</span><span class="spacer"></span>
+      <span class="meter">analyzing <b>14.2×</b> · 63% done</span>
+    </div>
+    <div class="video"><div class="hl" style="left:56%;top:33%;width:22%;height:14%"></div></div>
+    <div class="controls">
+      <div class="timeline">
+        <div class="analyzed" style="width:63%"></div>
+        <div class="played" style="width:27%"></div>
+        <div class="thumb" style="left:27%"></div>
+      </div>
+
+      <!-- Each block is a real button: >=12px wide, 22px tall, focusable, aria-labelled
+           "Moment 3 of 23 — writing, 1:30, 4.2 seconds". Tab/arrow moves between them. -->
+      <div class="strip">
+        <button class="blk" style="left:4%;width:5%"></button>
+        <button class="blk" style="left:13%;width:3%"></button>
+        <button class="blk now foc" style="left:25%;width:7%"></button>
+        <button class="blk" style="left:41%;width:6%"></button>
+        <button class="blk" style="left:52%;width:4%"></button>
+        <button class="blk" style="left:59%;width:3%"></button>
+      </div>
+
+      <div class="nowline" role="status">
+        <span class="dot"></span>
+        <span class="txt">Moment <b>3 of 23</b> — writing, <b>1:30</b>, 4.2s</span>
+        <span class="spacer"></span>
+        <span class="nxt">Next: sketching at <b>2:03</b></span>
+        <div class="peek" title="the moment itself"></div>
+      </div>
+
+      <div class="btnrow">
+        <button class="btn icon primary">▶</button>
+        <button class="btn">⏮ Previous moment</button>
+        <button class="btn">Next moment ⏭</button>
+        <span class="time">1:30 / 5:32</span>
+        <span class="spacer"></span>
+        <button class="btn">✨ Appearance</button>
+        <button class="btn icon">🔍</button>
+        <button class="btn icon">⛶</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    The strip alone is a row of identical rectangles — fine as a map, useless as a label. The line
+    below carries the meaning in text, so it survives a screen reader, 300% zoom, and a user who
+    never hovers. The little peek thumbnail is a bonus, not the mechanism.
+  </div>
+</div>
+</body></html>

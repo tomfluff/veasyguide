@@ -1,0 +1,114 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>B — Two-pane workspace</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .split { display: grid; grid-template-columns: 1fr 320px; }
+  .main { border-right: 1px solid var(--line); }
+
+  .strip { position: relative; height: 30px; margin-top: 8px; background: #1c212a; border-radius: 8px; }
+  .blk { position: absolute; top: 5px; bottom: 5px; min-width: 10px; background: var(--activity);
+         border-radius: 4px; border: none; cursor: pointer; }
+  .blk.now { background: var(--accent); box-shadow: 0 0 0 3px rgba(255,194,51,.3); }
+
+  /* Right rail: tabbed. Collapsed by default; shown open here. */
+  .rail { display: flex; flex-direction: column; background: #12161d; min-width: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tab {
+    flex: 1; height: 52px; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 16px; font-weight: 600;
+    border-bottom: 3px solid transparent;
+  }
+  .tab.sel { color: var(--text); border-bottom-color: var(--accent); background: var(--surface); }
+  .railbody { padding: 12px; overflow-y: auto; max-height: 560px; }
+  .railhead { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 2px 10px; }
+  .railhead .n { font-size: 15px; font-weight: 600; }
+  .railhead .x { color: var(--muted); font-size: 14px; }
+
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .list .card { display: grid; grid-template-columns: 104px 1fr; }
+  .list .crop { height: 62px; border-bottom: none; border-right: 1px solid var(--line); background-size: 300% auto; }
+  .list .meta { padding: 8px 10px; align-self: center; }
+
+  .collapsed-hint {
+    margin-top: 12px; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 10px;
+    color: var(--muted); font-size: 14px;
+  }
+</style></head><body>
+<div class="wrap">
+  <div class="label">Approach B</div>
+  <div class="title">Two-pane workspace</div>
+  <div class="sub">A collapsible right rail, tabbed between Moments and Appearance. Closed by default — the video is full width until you ask for more.</div>
+
+  <div class="app">
+    <div class="topbar">
+      <span class="brand">veasyguide</span>
+      <span class="file">rl-lecture-week3.mp4</span>
+      <span class="spacer"></span>
+      <span class="meter">analyzing <b>14.2×</b> · 63% done</span>
+    </div>
+
+    <div class="split">
+      <div class="main">
+        <div class="video">
+          <div class="hl" style="left:56%;top:33%;width:22%;height:14%"></div>
+        </div>
+        <div class="controls">
+          <div class="timeline">
+            <div class="analyzed" style="width:63%"></div>
+            <div class="played" style="width:27%"></div>
+            <div class="thumb" style="left:27%"></div>
+          </div>
+          <div class="strip">
+            <button class="blk" style="left:4%;width:5%"></button>
+            <button class="blk" style="left:13%;width:3%"></button>
+            <button class="blk now" style="left:25%;width:7%"></button>
+            <button class="blk" style="left:41%;width:6%"></button>
+            <button class="blk" style="left:52%;width:4%"></button>
+            <button class="blk" style="left:59%;width:3%"></button>
+          </div>
+          <div class="btnrow">
+            <button class="btn icon primary">▶</button>
+            <button class="btn icon" title="Previous moment">⏮</button>
+            <button class="btn icon" title="Next moment">⏭</button>
+            <span class="time">1:30 / 5:32</span>
+            <span class="spacer"></span>
+            <button class="btn icon">🔍</button>
+            <button class="btn icon">🔊</button>
+            <button class="btn icon">⛶</button>
+          </div>
+          <div class="collapsed-hint">
+            When the rail is closed, the video takes the full width and this row is gone. One button
+            (<b>☰ Moments</b>) in the control bar reopens it — the rail is opt-in, not a permanent tax.
+          </div>
+        </div>
+      </div>
+
+      <div class="rail">
+        <div class="tabs">
+          <button class="tab sel">Moments</button>
+          <button class="tab">Appearance</button>
+        </div>
+        <div class="railbody">
+          <div class="railhead"><span class="n">23 moments</span><span class="x">follows playhead</span></div>
+          <div class="list">
+            <div class="card"><div class="crop" style="background-position:-40px -30px"></div><div class="meta"><div class="t">0:12</div><div class="d">1.4s · pointing</div></div></div>
+            <div class="card"><div class="crop" style="background-position:-260px -70px"></div><div class="meta"><div class="t">0:41</div><div class="d">3.0s · writing</div></div></div>
+            <div class="card now"><div class="crop" style="background-position:-420px -150px"></div><div class="meta"><div class="t">1:30</div><div class="d">4.2s · writing</div></div></div>
+            <div class="card"><div class="crop" style="background-position:-160px -250px"></div><div class="meta"><div class="t">2:03</div><div class="d">2.1s · sketching</div></div></div>
+            <div class="card"><div class="crop" style="background-position:-560px -220px"></div><div class="meta"><div class="t">2:48</div><div class="d">1.8s · pointing</div></div></div>
+            <div class="card"><div class="crop" style="background-position:-330px -60px"></div><div class="meta"><div class="t">3:17</div><div class="d">2.6s · writing</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    The familiar shape — a course player with a chapter list. Scales: a third tab (Analysis, for the
+    research mode) costs nothing. Cost: the rail is a second layout mode to build and test, and at
+    300% OS zoom a 320px rail is one card wide, so it has to collapse to the A layout on narrow
+    viewports anyway. You end up building both.
+  </div>
+</div>
+</body></html>

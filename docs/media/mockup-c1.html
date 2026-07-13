@@ -1,0 +1,207 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>C1 — purple system, page sidebar, both themes</title>
+<style>
+/* ===== DESIGN.md tokens ===== */
+:root{
+  --brand-100:#F3E3FD; --brand-300:#D27CF7; --brand-500:#A94AE0; --brand-700:#7B2CBF; --brand-900:#4C1D95;
+  --activity:#FF5A4D; --ok:#7EE3A4; --warn:#FFB020;
+  --r-sm:6px; --r-md:8px; --r-lg:12px;
+  /* the overlay colors are USER SETTINGS, never the brand */
+  --hl-fill:rgba(255,204,0,.18); --hl-border:#ff0000;
+}
+.dark{ --bg:#0D0F13; --surface:#171B22; --surface-2:#21262F; --line:#333A45; --text:#F2F4F7; --muted:#A7B0BD; --accent:var(--brand-300); --on-accent:#1B0A26; }
+.light{ --bg:#FFFFFF; --surface:#F5F6F8; --surface-2:#EAECF0; --line:#D3D8E0; --text:#14181F; --muted:#55606E; --accent:var(--brand-700); --on-accent:#FFFFFF; }
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{ background:#08090c; padding:22px; font:17px/1.5 "Atkinson Hyperlegible","Segoe UI",sans-serif; color:#e8eaee; }
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:25px;margin-bottom:4px}
+.lede{color:#98a1ae;font-size:16px;margin-bottom:8px;max-width:82ch}
+.note{color:#98a1ae;font-size:14px;margin:20px 0 8px;font-style:italic}
+.tag{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-left:8px;vertical-align:3px}
+.tag.d{background:#1c1430;color:#D27CF7}
+.tag.l{background:#efe4fb;color:#5B21A8}
+
+/* ===== app shell — theme-scoped ===== */
+.app{ background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:14px; overflow:hidden; margin-bottom:26px; }
+.top{ display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--surface); }
+.brand{ font-weight:700; letter-spacing:-.01em; }
+.brand .v{ color:var(--accent); }
+.file{ color:var(--muted); font-size:15px; }
+.sp{flex:1}
+.meter{ font-size:14px; color:var(--muted); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:6px 12px; }
+.meter b{color:var(--text)}
+
+/* two-column: player + ALWAYS-VISIBLE page sidebar. The PAGE never scrolls; the sidebar does. */
+.main{ display:grid; grid-template-columns:1fr 300px; height:400px; }
+.left{ position:relative; background:#000; }
+.vid{ position:absolute; inset:0; background:url("highlight-on-annotation.png") top center/100% auto no-repeat #fff; }
+.hl{ position:absolute; left:56%; top:33%; width:22%; height:14%; border:4px solid var(--hl-border); background:var(--hl-fill); border-radius:3px; }
+
+.bar{ position:absolute; left:0; right:0; bottom:0; padding:34px 12px 10px;
+      background:linear-gradient(transparent, rgba(0,0,0,.9) 30%); }
+.light .bar{ background:linear-gradient(transparent, rgba(20,24,31,.9) 30%); }
+.track{ position:relative; height:12px; background:rgba(255,255,255,.25); border-radius:6px; }
+.track .an{ position:absolute; inset:0 auto 0 0; background:rgba(255,255,255,.42); border-radius:6px; }
+.track .pl{ position:absolute; inset:0 auto 0 0; background:var(--brand-300); border-radius:6px; }
+.track .th{ position:absolute; top:50%; width:18px; height:18px; margin:-9px 0 0 -9px; background:#fff; border-radius:50%; box-shadow:0 0 0 3px rgba(0,0,0,.55); }
+.lane{ position:relative; height:14px; margin-top:5px; }
+.lane b{ position:absolute; top:3px; bottom:3px; min-width:5px; background:var(--activity); border-radius:2px; }
+.lane b.now{ background:var(--brand-300); box-shadow:0 0 0 2px rgba(210,124,247,.45); }
+
+.nl{ margin-top:7px; padding:8px 10px; border-radius:var(--r-md); background:rgba(23,27,34,.95);
+     border:1px solid #3a4250; font-size:16px; display:flex; gap:9px; align-items:center; color:#F2F4F7; }
+.nl .dot{width:9px;height:9px;border-radius:50%;background:var(--brand-300);flex:none}
+.nl .nx{margin-left:auto;color:#A7B0BD;font-size:14px}
+
+.row{display:flex;gap:6px;align-items:center;margin-top:8px}
+.k{ height:44px; min-width:44px; padding:0 11px; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:rgba(33,38,47,.96); border:1px solid #3a4250; border-radius:var(--r-md); font:inherit; font-size:15px; color:#F2F4F7; }
+.k.p{ background:var(--brand-300); color:#1B0A26; border-color:var(--brand-300); }
+.k .kb{font-size:11px;opacity:.55}
+.vol{width:60px;height:6px;background:#4a515c;border-radius:3px;position:relative}
+.vol i{position:absolute;inset:0 auto 0 0;width:70%;background:#fff;border-radius:3px}
+svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.k.p svg{fill:currentColor;stroke:none}
+
+/* page sidebar — always there when windowed. Scrolls internally. */
+.side{ border-left:1px solid var(--line); background:var(--surface); display:flex; flex-direction:column; min-height:0; }
+.sh{ display:flex; align-items:center; gap:8px; padding:13px 12px; border-bottom:1px solid var(--line); }
+.sh .t{font-size:16px;font-weight:700}
+.sh .c{color:var(--muted);font-size:14px}
+.list{ overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:6px; }
+.mc{ display:flex; gap:9px; align-items:center; padding:9px; border-radius:var(--r-md);
+     background:var(--surface-2); border:1px solid var(--line); text-align:left; color:var(--text); font:inherit; cursor:pointer; }
+.mc.now{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+.mini{ flex:none; width:40px; height:23px; border:1px solid var(--muted); border-radius:2px; position:relative; }
+.mini i{ position:absolute; background:var(--activity); border-radius:1px; }
+.mc .t{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.mc .d{font-size:13px;color:var(--muted)}
+
+/* fullscreen: the sidebar cannot come with us — same list, summoned inside the player */
+.fs{ position:relative; height:400px; background:#000; border-radius:14px; overflow:hidden; border:1px solid #333A45; margin-bottom:26px; }
+.fsside{ position:absolute; right:0; top:0; bottom:0; width:300px; background:rgba(13,15,19,.97);
+         border-left:1px solid #333A45; display:flex; flex-direction:column; }
+.stamp{ position:absolute; left:12px; top:12px; z-index:5; font-size:13px; padding:5px 10px;
+        background:rgba(13,15,19,.92); border:1px solid #333A45; border-radius:999px; color:#A7B0BD; }
+</style></head><body>
+<div class="wrap">
+
+  <h1>Purple brand · Atkinson Hyperlegible · moments as a page sidebar · Tabler icons</h1>
+  <p class="lede">The sidebar is always visible on the page and scrolls inside itself — the page never scrolls. The highlight stays amber-on-red: those are the <b>user's</b> settings, tuned for their eyes, and must never be repainted in the brand color.</p>
+
+  <p class="note">Dark theme<span class="tag d">accent #D27CF7</span></p>
+
+  <div class="app dark">
+    <div class="top">
+      <span class="brand">v<span class="v">easy</span>guide</span>
+      <span class="file">rl-lecture-week3.mp4</span>
+      <span class="sp"></span>
+      <span class="meter">analyzed · <b>23 moments</b></span>
+    </div>
+    <div class="main">
+      <div class="left">
+        <div class="vid"></div><div class="hl"></div>
+        <div class="bar">
+          <div class="track"><div class="an" style="width:100%"></div><div class="pl" style="width:30%"></div><div class="th" style="left:30%"></div></div>
+          <div class="lane">
+            <b style="left:4%;width:5%"></b><b style="left:13%"></b><b class="now" style="left:27%;width:7%"></b>
+            <b style="left:41%;width:6%"></b><b style="left:59%"></b><b style="left:70%;width:4%"></b><b style="left:86%;width:3%"></b>
+          </div>
+          <div class="nl" role="status">
+            <span class="dot"></span><span>Moment <b>3 of 23</b> · <b>1:30</b>, 4.2s</span>
+            <span class="nx">Next at <b>2:03</b></span>
+          </div>
+          <div class="row">
+            <button class="k p" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg></button>
+            <button class="k" aria-label="Previous moment"><svg viewBox="0 0 24 24"><path d="M20 5v14l-12-7z"/><path d="M4 5v14"/></svg><span class="kb">[</span></button>
+            <button class="k" aria-label="Next moment"><svg viewBox="0 0 24 24"><path d="M4 5v14l12-7z"/><path d="M20 5v14"/></svg><span class="kb">]</span></button>
+            <button class="k" aria-label="Volume"><svg viewBox="0 0 24 24"><path d="M15 8a5 5 0 0 1 0 8"/><path d="M6 15H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2l3.5-4.5a.8.8 0 0 1 1.5.5v14a.8.8 0 0 1-1.5.5z"/></svg><span class="vol"><i></i></span></button>
+            <span class="k" style="border:none;background:none;font-variant-numeric:tabular-nums">1:30 / 5:32</span>
+            <span class="sp"></span>
+            <button class="k"><svg viewBox="0 0 24 24"><path d="M3 12h.01M3 6h.01M3 18h.01M8 6h13M8 12h13M8 18h13"/></svg> Appearance</button>
+            <button class="k" aria-label="Collapse controls"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+            <button class="k" aria-label="Fullscreen"><svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="sh"><span class="t">Moments</span><span class="c">23</span></div>
+        <div class="list">
+          <button class="mc"><span class="mini"><i style="left:30%;top:20%;width:22%;height:16%"></i></span><span><span class="t">0:12</span><br><span class="d">1.4s</span></span></button>
+          <button class="mc"><span class="mini"><i style="left:12%;top:55%;width:30%;height:22%"></i></span><span><span class="t">0:41</span><br><span class="d">3.0s</span></span></button>
+          <button class="mc now"><span class="mini"><i style="left:56%;top:33%;width:22%;height:14%"></i></span><span><span class="t">1:30</span><br><span class="d">4.2s</span></span></button>
+          <button class="mc"><span class="mini"><i style="left:20%;top:60%;width:18%;height:20%"></i></span><span><span class="t">2:03</span><br><span class="d">2.1s</span></span></button>
+          <button class="mc"><span class="mini"><i style="left:66%;top:50%;width:20%;height:24%"></i></span><span><span class="t">2:48</span><br><span class="d">1.8s</span></span></button>
+          <button class="mc"><span class="mini"><i style="left:40%;top:28%;width:26%;height:18%"></i></span><span><span class="t">3:17</span><br><span class="d">2.6s</span></span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">Light theme — the accent drops to #7B2CBF, because #D27CF7 is ~2:1 on white and fails<span class="tag l">accent #7B2CBF</span></p>
+
+  <div class="app light">
+    <div class="top">
+      <span class="brand">v<span class="v">easy</span>guide</span>
+      <span class="file">rl-lecture-week3.mp4</span>
+      <span class="sp"></span>
+      <span class="meter">analyzing <b>14.2×</b> · 63%</span>
+    </div>
+    <div class="main">
+      <div class="left">
+        <div class="vid"></div><div class="hl"></div>
+        <div class="bar">
+          <div class="track"><div class="an" style="width:63%"></div><div class="pl" style="width:30%"></div><div class="th" style="left:30%"></div></div>
+          <div class="lane">
+            <b style="left:4%;width:5%"></b><b style="left:13%"></b><b class="now" style="left:27%;width:7%"></b><b style="left:41%;width:6%"></b><b style="left:59%"></b>
+          </div>
+          <div class="nl" role="status">
+            <span class="dot"></span><span>Moment <b>3</b> · <b>1:30</b>, 4.2s</span>
+            <span class="nx">still finding moments…</span>
+          </div>
+          <div class="row">
+            <button class="k p" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg></button>
+            <button class="k" aria-label="Previous moment"><svg viewBox="0 0 24 24"><path d="M20 5v14l-12-7z"/><path d="M4 5v14"/></svg><span class="kb">[</span></button>
+            <button class="k" aria-label="Next moment"><svg viewBox="0 0 24 24"><path d="M4 5v14l12-7z"/><path d="M20 5v14"/></svg><span class="kb">]</span></button>
+            <span class="k" style="border:none;background:none;font-variant-numeric:tabular-nums">1:30 / 5:32</span>
+            <span class="sp"></span>
+            <button class="k"><svg viewBox="0 0 24 24"><path d="M3 12h.01M3 6h.01M3 18h.01M8 6h13M8 12h13M8 18h13"/></svg> Appearance</button>
+            <button class="k" aria-label="Collapse controls"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+            <button class="k" aria-label="Fullscreen"><svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="sh"><span class="t">Moments</span><span class="c">7 so far…</span></div>
+        <div class="list">
+          <button class="mc"><span class="mini"><i style="left:30%;top:20%;width:22%;height:16%"></i></span><span><span class="t">0:12</span><br><span class="d">1.4s</span></span></button>
+          <button class="mc"><span class="mini"><i style="left:12%;top:55%;width:30%;height:22%"></i></span><span><span class="t">0:41</span><br><span class="d">3.0s</span></span></button>
+          <button class="mc now"><span class="mini"><i style="left:56%;top:33%;width:22%;height:14%"></i></span><span><span class="t">1:30</span><br><span class="d">4.2s</span></span></button>
+          <button class="mc"><span class="mini"><i style="left:20%;top:60%;width:18%;height:20%"></i></span><span><span class="t">2:03</span><br><span class="d">2.1s</span></span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">Fullscreen — the page sidebar cannot come with us, so the same list is summoned inside the player (M / the Moments button). One component, two mounts.</p>
+
+  <div class="fs">
+    <div class="vid"></div><div class="hl"></div>
+    <span class="stamp">fullscreen · Moments summoned</span>
+    <div class="fsside">
+      <div class="sh" style="border-color:#333A45"><span class="t" style="color:#F2F4F7">Moments</span><span class="c" style="color:#A7B0BD">23</span>
+        <span class="sp"></span>
+        <button class="k" style="height:34px;min-width:34px;padding:0 8px" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="list">
+        <button class="mc" style="background:#21262F;border-color:#333A45;color:#F2F4F7"><span class="mini" style="border-color:#A7B0BD"><i style="left:30%;top:20%;width:22%;height:16%"></i></span><span><span class="t">0:12</span><br><span class="d" style="color:#A7B0BD">1.4s</span></span></button>
+        <button class="mc" style="background:#21262F;border-color:#333A45;color:#F2F4F7"><span class="mini" style="border-color:#A7B0BD"><i style="left:12%;top:55%;width:30%;height:22%"></i></span><span><span class="t">0:41</span><br><span class="d" style="color:#A7B0BD">3.0s</span></span></button>
+        <button class="mc now" style="background:#21262F;border-color:#D27CF7;box-shadow:0 0 0 1px #D27CF7;color:#F2F4F7"><span class="mini" style="border-color:#A7B0BD"><i style="left:56%;top:33%;width:22%;height:14%"></i></span><span><span class="t">1:30</span><br><span class="d" style="color:#A7B0BD">4.2s</span></span></button>
+        <button class="mc" style="background:#21262F;border-color:#333A45;color:#F2F4F7"><span class="mini" style="border-color:#A7B0BD"><i style="left:20%;top:60%;width:18%;height:20%"></i></span><span><span class="t">2:03</span><br><span class="d" style="color:#A7B0BD">2.1s</span></span></button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body></html>

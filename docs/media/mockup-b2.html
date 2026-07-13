@@ -1,0 +1,189 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>B2 — bar states + sidebar</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { padding: 22px; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 25px; margin-bottom: 4px; }
+  .lede { color: var(--muted); font-size: 16px; margin-bottom: 24px; max-width: 80ch; }
+  .h2 { font-size: 19px; font-weight: 650; margin: 28px 0 3px; }
+  .cap { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+  .rule { display:inline-block; font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+          background:#17361f; color:#7ee3a4; padding:3px 9px; border-radius:999px; margin-left:8px; vertical-align:2px; }
+
+  .box { position: relative; height: 320px; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+  .box.narrow { width: 420px; }
+  .vid { position: absolute; inset: 0; background: url("highlight-on-annotation.png") top center / 100% auto no-repeat #fff; }
+  .hlbox { position: absolute; left: 56%; top: 33%; width: 22%; height: 14%; border: 4px solid var(--activity);
+           background: rgba(255,194,51,.16); border-radius: 3px; }
+  .stamp { position: absolute; left: 12px; top: 12px; font-size: 13px; padding: 5px 10px; z-index: 5;
+           background: rgba(10,13,18,.92); border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 36px 12px 10px; z-index: 4;
+         background: linear-gradient(transparent, rgba(8,10,14,.95) 28%); }
+  .bar.gone { display: none; }
+
+  .track { position: relative; height: 12px; background: #39414d; border-radius: 6px; }
+  .track .an { position: absolute; inset: 0 auto 0 0; background: #4d5765; border-radius: 6px; }
+  .track .pl { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 6px; }
+  .track .th { position: absolute; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+               background: #fff; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0,0,0,.5); }
+  .lane { position: relative; height: 14px; margin-top: 5px; }
+  .lane b { position: absolute; top: 3px; bottom: 3px; min-width: 5px; background: var(--activity); border-radius: 2px; }
+  .lane b.now { background: var(--accent); box-shadow: 0 0 0 2px rgba(255,194,51,.4); }
+
+  .nl { margin-top: 7px; padding: 8px 10px; border-radius: 8px; background: rgba(24,29,38,.95);
+        border: 1px solid var(--line); font-size: 15px; display: flex; gap: 10px; align-items: center; }
+  .nl .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex:none; }
+  .nl .nx { margin-left: auto; color: var(--muted); font-size: 14px; }
+
+  .row { display: flex; gap: 7px; align-items: center; margin-top: 8px; }
+  .k { height: 40px; min-width: 40px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px;
+       background: rgba(38,44,54,.96); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; color: var(--text); }
+  .k.p { background: var(--accent); color: #1a1200; border-color: var(--accent); }
+  .k.on { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .k .kb { font-size: 11px; opacity: .55; }
+  .sp { flex: 1; }
+  .vol { width: 68px; height: 6px; background: #39414d; border-radius: 3px; position: relative; }
+  .vol i { position: absolute; inset: 0 auto 0 0; width: 70%; background: #fff; border-radius: 3px; }
+
+  /* sidebar */
+  .side { position: absolute; right: 0; top: 0; bottom: 0; width: 260px; z-index: 6;
+          background: rgba(10,13,18,.97); border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+  /* full-bleed: covers the video, but STOPS above the collapsed bar so playback is
+     still stoppable while you browse. */
+  .side.bleed { left: 0; width: auto; border-left: none; bottom: 92px; border-bottom: 1px solid var(--line); }
+  .side .sh { display: flex; align-items: center; gap: 8px; padding: 12px; border-bottom: 1px solid var(--line); }
+  .side .sh .t { font-size: 16px; font-weight: 650; }
+  .side .sh .x { margin-left: auto; height: 34px; min-width: 34px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px;
+                 background: #262c36; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+  .side .list { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .side.bleed .list { display: grid; grid-template-columns: 1fr 1fr; }
+  .mc { display: flex; gap: 9px; align-items: center; padding: 9px; border-radius: 8px;
+        background: #1b202a; border: 1px solid var(--line); text-align: left; }
+  .mc.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .mini { flex: none; width: 40px; height: 23px; border: 1px solid #5a6470; border-radius: 2px; position: relative; background: #0b0e12; }
+  .mini i { position: absolute; background: var(--activity); border-radius: 1px; }
+  .mc .t { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .mc .d { font-size: 12px; color: var(--muted); }
+</style></head><body>
+<div class="wrap">
+
+  <h1>The bar has three states. The sidebar forces the smallest one.</h1>
+  <p class="lede">Rule: the sidebar and the full bar are never open together. Opening Moments collapses the bar — but collapsed still means play/pause, volume, the scrubber, the moment markers, and the expand arrow. You can always pause what you are hearing.</p>
+
+  <div class="h2">1 · Expanded — the working state</div>
+  <p class="cap">Everything. Appears on mouse move, on any keypress, on focus, or on pause. Fades after 2s of idle while playing.</p>
+  <div class="box">
+    <div class="vid"></div><div class="hlbox"></div>
+    <div class="bar">
+      <div class="track"><div class="an" style="width:78%"></div><div class="pl" style="width:30%"></div><div class="th" style="left:30%"></div></div>
+      <div class="lane">
+        <b style="left:4%;width:5%"></b><b style="left:13%"></b><b class="now" style="left:27%;width:7%"></b>
+        <b style="left:41%;width:6%"></b><b style="left:59%"></b><b style="left:70%;width:4%"></b>
+      </div>
+      <div class="nl" role="status">
+        <span class="dot"></span><span>Moment <b>3 of 23</b> · <b>1:30</b>, 4.2s</span>
+        <span class="nx">Next at <b>2:03</b></span>
+      </div>
+      <div class="row">
+        <span class="k p">▶</span>
+        <span class="k">⏮ Prev <span class="kb">[</span></span>
+        <span class="k">Next ⏭ <span class="kb">]</span></span>
+        <span class="k">🔊 <span class="vol"><i></i></span></span>
+        <span class="k">1:30 / 5:32</span>
+        <span class="sp"></span>
+        <span class="k">☰ Moments <span class="kb">M</span></span>
+        <span class="k">✨ Appearance</span>
+        <span class="k">⌄</span>
+        <span class="k">⛶</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="h2">2 · Collapsed <span class="rule">still pausable</span></div>
+  <p class="cap">The user asked for the biggest picture. They keep the scrubber, the moment markers, play/pause, volume, and the way back. They lose the now-line and the moment buttons — the <code>[</code> / <code>]</code> keys still work.</p>
+  <div class="box">
+    <div class="vid"></div><div class="hlbox"></div>
+    <div class="bar">
+      <div class="track"><div class="an" style="width:78%"></div><div class="pl" style="width:30%"></div><div class="th" style="left:30%"></div></div>
+      <div class="lane">
+        <b style="left:4%;width:5%"></b><b style="left:13%"></b><b class="now" style="left:27%;width:7%"></b>
+        <b style="left:41%;width:6%"></b><b style="left:59%"></b><b style="left:70%;width:4%"></b>
+      </div>
+      <div class="row">
+        <span class="k p">▶</span>
+        <span class="k">🔊 <span class="vol"><i></i></span></span>
+        <span class="k">1:30 / 5:32</span>
+        <span class="sp"></span>
+        <span class="k">⌃ Expand</span>
+        <span class="k">⛶</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="h2">3 · Hidden — playing, nobody touching anything</div>
+  <p class="cap">Only the lecture and the highlight. One mouse move, one key, one Tab, or a pause brings the bar back.</p>
+  <div class="box">
+    <div class="vid"></div><div class="hlbox"></div>
+    <div class="stamp">playing · idle 2s</div>
+    <div class="bar gone"></div>
+  </div>
+
+  <div class="h2">4 · Moments open — the bar auto-collapses</div>
+  <p class="cap">Sidebar and full bar are never both open. The bar drops to collapsed, so the video is still scrubbable and pausable while you browse.</p>
+  <div class="box">
+    <div class="vid"></div><div class="hlbox"></div>
+    <div class="side">
+      <div class="sh"><span class="t">23 moments</span><span class="x">✕ Esc</span></div>
+      <div class="list">
+        <button class="mc"><div class="mini"><i style="left:30%;top:20%;width:22%;height:16%"></i></div><div><div class="t">0:12</div><div class="d">1.4s</div></div></button>
+        <button class="mc"><div class="mini"><i style="left:12%;top:55%;width:30%;height:22%"></i></div><div><div class="t">0:41</div><div class="d">3.0s</div></div></button>
+        <button class="mc now"><div class="mini"><i style="left:56%;top:33%;width:22%;height:14%"></i></div><div><div class="t">1:30</div><div class="d">4.2s</div></div></button>
+        <button class="mc"><div class="mini"><i style="left:20%;top:60%;width:18%;height:20%"></i></div><div><div class="t">2:03</div><div class="d">2.1s</div></div></button>
+        <button class="mc"><div class="mini"><i style="left:66%;top:50%;width:20%;height:24%"></i></div><div><div class="t">2:48</div><div class="d">1.8s</div></div></button>
+      </div>
+    </div>
+    <div class="bar" style="right:260px">
+      <div class="track"><div class="an" style="width:78%"></div><div class="pl" style="width:30%"></div><div class="th" style="left:30%"></div></div>
+      <div class="lane">
+        <b style="left:4%;width:5%"></b><b style="left:13%"></b><b class="now" style="left:27%;width:7%"></b>
+        <b style="left:41%;width:6%"></b><b style="left:59%"></b>
+      </div>
+      <div class="row">
+        <span class="k p">▶</span>
+        <span class="k">🔊 <span class="vol"><i></i></span></span>
+        <span class="k">1:30 / 5:32</span>
+        <span class="sp"></span>
+        <span class="k on">☰</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="h2">5 · Narrow window / 400% zoom — the sidebar goes full-bleed</div>
+  <p class="cap">No 260px sliver squeezing a useless stripe of video. You are browsing, not watching — so browsing takes the screen. The collapsed bar stays pinned so the audio playing behind you is still stoppable.</p>
+  <div class="box narrow">
+    <div class="vid"></div>
+    <div class="side bleed">
+      <div class="sh"><span class="t">23 moments</span><span class="x">✕ Esc</span></div>
+      <div class="list">
+        <button class="mc"><div class="mini"><i style="left:30%;top:20%;width:22%;height:16%"></i></div><div><div class="t">0:12</div><div class="d">1.4s</div></div></button>
+        <button class="mc"><div class="mini"><i style="left:12%;top:55%;width:30%;height:22%"></i></div><div><div class="t">0:41</div><div class="d">3.0s</div></div></button>
+        <button class="mc now"><div class="mini"><i style="left:56%;top:33%;width:22%;height:14%"></i></div><div><div class="t">1:30</div><div class="d">4.2s</div></div></button>
+        <button class="mc"><div class="mini"><i style="left:20%;top:60%;width:18%;height:20%"></i></div><div><div class="t">2:03</div><div class="d">2.1s</div></div></button>
+      </div>
+    </div>
+    <div class="bar">
+      <div class="track"><div class="an" style="width:78%"></div><div class="pl" style="width:30%"></div><div class="th" style="left:30%"></div></div>
+      <div class="row">
+        <span class="k p">▶</span>
+        <span class="k">🔊</span>
+        <span class="k">1:30</span>
+        <span class="sp"></span>
+        <span class="k on">☰</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body></html>
