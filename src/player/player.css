@@ -54,7 +54,13 @@
   opacity: 0;
 }
 
-.video-controls-container .controls > button {
+/* The mute button is the one bar control that is NOT a direct child of .controls — it is
+   nested in .volume-container next to the slider — so it needs naming here explicitly, or it
+   misses the 44px box and centres nowhere near its siblings. A descendant selector would be
+   shorter but the Appearance popover also lives inside .controls, and its buttons must not
+   become 44px squares. */
+.video-controls-container .controls > button,
+.video-controls-container .controls > .volume-container > button {
   color: #f2f4f7;
   height: 44px;   /* WCAG 2.5.5 target size. Was 2rem/32px. */
   width: 44px;
@@ -64,16 +70,19 @@
   justify-content: center;
 }
 
-.video-controls-container .controls > button:hover {
+.video-controls-container .controls > button:hover,
+.video-controls-container .controls > .volume-container > button:hover {
   background-color: #21262f;
 }
 
-.video-controls-container .controls > button:focus-visible {
+.video-controls-container .controls > button:focus-visible,
+.video-controls-container .controls > .volume-container > button:focus-visible {
   outline: 3px solid #6fb3ff;
   outline-offset: 2px;
 }
 
-.video-controls-container .controls > button svg {
+.video-controls-container .controls > button svg,
+.video-controls-container .controls > .volume-container > button svg {
   width: 22px;
   height: 22px;
 }
