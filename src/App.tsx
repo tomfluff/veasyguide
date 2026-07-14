@@ -135,20 +135,47 @@ const PARAM_FIELDS: ParamField[] = [
   },
 ];
 
-// If the read phase never completes, say so instead of spinning forever.
-function Watchdog({ active }: { active: boolean }) {
+// The wait before the video is even readable — container parse, codec check, duration. Usually
+// under a second, but it is the first thing that happens after someone hands over their file, so
+// a bare line of grey text saying "Starting worker…" is a poor first impression AND a layout bug:
+// it occupies no space, so the player pops in and shoves the page down when meta arrives. This
+// holds the player's exact 16:9 box from the start.
+function Preparing({ stage, fileName, onCancel }: {
+  stage: string | null;
+  fileName: string | null;
+  onCancel: () => void;
+}) {
   const [late, setLate] = useState(false);
   useEffect(() => {
-    if (!active) return;
     const id = setTimeout(() => setLate(true), 15000);
     return () => clearTimeout(id);
-  }, [active]);
-  if (!late) return null;
+  }, []);
+
   return (
-    <div className="watchdog">
-      This is taking longer than expected. The analysis worker may have failed to start —
-      check the browser console. If you have more than one dev server running, stop all of
-      them, delete <code>node_modules/.vite</code>, and start a single one.
+    <div className="preparing" role="status" aria-live="polite">
+      <span className="spinner" aria-hidden="true" />
+      <div className="preparing-stage">{stage ?? "Getting ready…"}</div>
+      {fileName && <div className="preparing-file">{fileName}</div>}
+
+      {/* If the read phase never finishes, say so — and give a way out. This used to tell a
+          VIEWER to check the browser console, stop their dev servers and delete
+          node_modules/.vite: our debugging notes, shipped to the person least able to act on
+          them. The dev hint still exists, behind ?debug=1, for us. */}
+      {late && (
+        <div className="preparing-late">
+          <p>
+            This is taking longer than usual. Very large files can be slow to open — but if
+            nothing happens, the file may be damaged or in a format this browser can't read.
+          </p>
+          <button type="button" onClick={onCancel}>Try another video</button>
+          {DEBUG && (
+            <p className="preparing-devhint">
+              Dev: the worker may have failed to start — check the console. Two dev servers
+              running can break it; stop all but one and delete <code>node_modules/.vite</code>.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -230,7 +257,7 @@ export default function App() {
     setCurrMoment(null);
     setErrorDismissed(false);
     setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
-    setStage("Starting worker…");
+    setStage("Getting ready…");
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
     // Without these, a worker that fails to load or throws outside our try/catch dies
@@ -287,6 +314,21 @@ export default function App() {
 
   function reanalyze(cap = captureRef.current) {
     if (fileRef.current) analyze(fileRef.current, params, cap);
+  }
+
+  // Back to the landing screen — the way out of a stuck read. The worker must be terminated,
+  // not just forgotten: it may still be grinding through a file we are done with, and the next
+  // analyze() would leave two of them competing for the decoder.
+  function reset() {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    fileRef.current = null;
+    setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
+    setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
+    setFileName(null);
+    setMeta(null);
+    setStage(null);
+    setError(null);
   }
 
   // Dev-only auto-load for headless smoke tests: ?test=<name> fetches public/_test/<name>.
@@ -439,10 +481,7 @@ export default function App() {
               seekFnRef={seekFnRef}
             />
           ) : error ? null : (
-            <div className="probing">
-              <div>{stage ?? "Reading video…"}</div>
-              <Watchdog active />
-            </div>
+            <Preparing stage={stage} fileName={fileName} onCancel={reset} />
           )}
 
           {/* The analyzer readout is instrumentation, not product. It shipped to every viewer:
@@ -559,17 +598,18 @@ export default function App() {
           )}
         </div>
 
-        {meta && (
-          <MomentsSidebar
-            activities={activities}
-            thumbs={thumbs}
-            current={currMoment}
-            done={done}
-            canPlay={canPlay}
-            lead={params.highlightLead}
-            onJump={(t) => seekFnRef.current(t)}
-          />
-        )}
+        {/* Mounted from the first frame, not from `meta` — it already has a "Looking…" state,
+            and the column is reserved either way. Waiting for meta left a white void beside the
+            preparing card, which is the same layout jump the card exists to prevent. */}
+        <MomentsSidebar
+          activities={activities}
+          thumbs={thumbs}
+          current={currMoment}
+          done={done}
+          canPlay={canPlay}
+          lead={params.highlightLead}
+          onJump={(t) => seekFnRef.current(t)}
+        />
         </div>
       )}
 

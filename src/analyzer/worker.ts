@@ -50,7 +50,10 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
 };
 
 async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMsg, { type: "start" }>) {
-  post({ type: "status", stage: "Reading container…" });
+  // These strings are read by a person who is waiting, not by us. "Reading container" and
+  // "probing the demuxer" are true and useless; what they want to know is that something is
+  // happening to THEIR video and roughly what.
+  post({ type: "status", stage: "Opening your video…" });
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
 
   const track = await input.getPrimaryVideoTrack();
@@ -60,7 +63,7 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
     );
   }
 
-  post({ type: "status", stage: `Checking codec (${track.codec ?? "unknown"})…` });
+  post({ type: "status", stage: `Checking the format (${track.codec ?? "unknown"})…` });
   if (!(await track.canDecode())) {
     throw new UserError(
       `Your browser can't decode this video's codec (${track.codec ?? "unknown"}). ` +
@@ -77,11 +80,11 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
   // Duration: prefer the container metadata. computeDuration() is documented as
   // "potentially expensive… must check all tracks" (it can scan the whole file), and by
   // default it waits for live streams to end — either of which looks like a hang.
-  post({ type: "status", stage: "Reading duration…" });
+  post({ type: "status", stage: "Reading its length…" });
   const fromMeta = await input.getDurationFromMetadata(undefined, { skipLiveWait: true });
   let duration = fromMeta ?? 0;
   if (!Number.isFinite(duration) || duration <= 0) {
-    post({ type: "status", stage: "Scanning for duration (no metadata)…" });
+    post({ type: "status", stage: "Working out its length…" });
     duration = await input.computeDuration(undefined, { skipLiveWait: true });
   }
   if (!Number.isFinite(duration) || duration <= 0) {
