@@ -341,10 +341,10 @@
   border-radius: 6px;
 }
 
-.video-overlay .overlay-gate,
 .video-overlay .overlay-catching-up {
   position: absolute;
   left: 50%;
+  top: 0.75rem;
   transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.7);
   color: #fff;
@@ -355,15 +355,45 @@
   pointer-events: none;
 }
 
+/* The pre-playback gate. A full scrim, not a pill: until the first PLAYBACK_LEAD seconds are
+   analyzed there is nothing to interact with, and dimming the frame says that plainly — the
+   old pill floated over a video that looked ready but wasn't. */
 .video-overlay .overlay-gate {
-  top: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 1rem;
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  /* Opaque enough that the words win. At 0.72 the slide's own text showed through and
+     competed with "Finding the moments…" — the exact legibility failure this app exists to
+     prevent, on our own copy. */
+  background: rgba(10, 13, 18, 0.88);
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
 }
-
-.video-overlay .overlay-catching-up {
-  top: 0.75rem;
+.overlay-gate .gate-h { font-size: 22px; font-weight: 650; }
+.overlay-gate .gate-sub { font-size: 15px; color: #d3d9e2; }
+.overlay-gate .gate-bar {
+  width: min(340px, 70%);
+  height: 8px;
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+  overflow: hidden;
 }
+.overlay-gate .gate-fill {
+  height: 100%;
+  background: #ffc233;
+  border-radius: 4px;
+  transition: width 200ms ease-out;
+}
+.overlay-gate .gate-stats { font-size: 14px; color: #d3d9e2; margin-top: 8px; }
+.overlay-gate .gate-stats b { color: #fff; }
 
 /* Scene-change notice. Amber rather than the neutral black of the analysis notices: those
    report on us, this one is a caution about the video — enhancements were tuned to the

@@ -114,19 +114,113 @@ h1 { font-size: 20px; margin: 0 0 20px; }
 .side-t { font-variant-numeric: tabular-nums; font-weight: 600; }
 .side-d { color: #a7b0bd; font-size: 13px; margin-left: 8px; }
 
+/* --- Landing --------------------------------------------------------------
+   Dark, like the player and the sidebar: the app's chrome is dark, and a white first screen
+   that flips to a dark player reads as two different products. */
+.landing {
+  background: #12161d;
+  border: 1px solid #333a45;
+  border-radius: 14px;
+  padding: 40px 36px;
+  color: #f2f4f7;
+}
+.landing-h { font-size: 34px; line-height: 1.15; font-weight: 700; margin: 0 0 12px; }
+.landing-sub {
+  font-size: 17px;
+  line-height: 1.5;
+  color: #a7b0bd;
+  margin: 0 0 24px;
+  max-width: 52ch;
+}
+
 .drop {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 64px 24px;
-  border: 3px dashed #888;
+  width: 100%;
+  padding: 40px 24px;
+  background: #1b2029;
+  border: 3px dashed #4a5462;
   border-radius: 12px;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
   text-align: center;
 }
-.drop span { font-size: 20px; }
-.drop small { color: #777; }
+.drop:hover { border-color: #6b7787; background: #232935; }
+.drop:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.drop.over { border-color: #d27cf7; background: #241c30; border-style: solid; }
+.drop-h { font-size: 22px; font-weight: 650; }
+.drop small { color: #a7b0bd; font-size: 14px; }
+.drop-btn {
+  margin-top: 10px;
+  padding: 12px 22px;   /* 44px+ target */
+  background: #d27cf7;
+  color: #17061f;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+/* The reason a stranger trusts this site with their lecture. It gets a box, not a footnote. */
+.privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: rgba(58, 191, 122, 0.09);
+  border: 1px solid rgba(58, 191, 122, 0.35);
+  border-radius: 10px;
+  color: #a7b0bd;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.privacy svg { flex: none; margin-top: 2px; color: #3abf7a; }
+.privacy b { color: #6fe0a6; }
+.privacy p { margin: 0; }
+
+.landing-error {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: rgba(255, 90, 77, 0.1);
+  border: 1px solid rgba(255, 90, 77, 0.5);
+  border-radius: 10px;
+  color: #ffc7c2;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.landing-error b { color: #ff8a80; }
+
+/* Partial failure: the video plays, analysis just stopped early. Mostly a success — so it is
+   an amber strip you can dismiss, not a red panel that reads like a crash. */
+.strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 11px 14px;
+  background: rgba(255, 194, 51, 0.1);
+  border: 1px solid rgba(255, 194, 51, 0.45);
+  border-radius: 10px;
+  color: #6b5410;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.strip button {
+  flex: none;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.strip button:hover { background: rgba(0, 0, 0, 0.08); }
 
 .error {
   margin: 16px 0;

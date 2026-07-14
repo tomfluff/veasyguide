@@ -18,6 +18,12 @@ import type { Activity, AnalysisMeta, InMsg, Range, WorkerMsg } from "./types";
 
 const post = (m: WorkerMsg) => (self as unknown as Worker).postMessage(m);
 
+// An error whose message is written FOR the viewer. Everything else that escapes `run` is
+// library noise ("Tried reading [0, 9), but slice is [0, 8)") — true, useless, and alarming.
+// The distinction exists so the catch below can tell one from the other; without it a corrupt
+// file greets someone with a Mediabunny internal assertion.
+class UserError extends Error {}
+
 let seekRequest: number | null = null; // set by the main thread; aborts the current segment
 let activeGpu: GLAnalyzer | null = null; // disposed when the next run starts
 
@@ -32,7 +38,14 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
     seekRequest = null;
     await run(msg);
   } catch (err) {
-    post({ type: "error", message: err instanceof Error ? err.message : String(err) });
+    const detail = err instanceof Error ? err.message : String(err);
+    post({
+      type: "error",
+      message: err instanceof UserError
+        ? detail
+        : `This file couldn't be read — it may be incomplete, corrupt, or in a container ` +
+          `this browser can't parse. Re-encoding it to an MP4 usually fixes it. (${detail})`,
+    });
   }
 };
 
@@ -42,14 +55,14 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
 
   const track = await input.getPrimaryVideoTrack();
   if (!track) {
-    throw new Error(
+    throw new UserError(
       "This file has no video track. If it's an audio file or a container we can't parse, try an MP4/WebM."
     );
   }
 
   post({ type: "status", stage: `Checking codec (${track.codec ?? "unknown"})…` });
   if (!(await track.canDecode())) {
-    throw new Error(
+    throw new UserError(
       `Your browser can't decode this video's codec (${track.codec ?? "unknown"}). ` +
         `H.264, VP9 and AV1 work in Chrome; HEVC/H.265 usually does not. ` +
         `Re-encoding to H.264 MP4 will fix it.`
@@ -72,7 +85,7 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
     duration = await input.computeDuration(undefined, { skipLiveWait: true });
   }
   if (!Number.isFinite(duration) || duration <= 0) {
-    throw new Error("Could not determine the video's duration — the file may be corrupt or still recording.");
+    throw new UserError("Could not determine the video's duration — the file may be corrupt or still recording.");
   }
 
   const meta: AnalysisMeta = {

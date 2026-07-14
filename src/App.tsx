@@ -3,13 +3,13 @@ import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, 
 import { coverage, isAnalyzed } from "./analyzer/ranges";
 import { validActivities } from "./analyzer/select";
 import { thumbRect } from "./analyzer/snippets";
+import { convertSecondsToTimecode } from "./utils/misc";
 import type { SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
-import VideoPlayer from "./player/VideoPlayer";
+import VideoPlayer, { PLAYBACK_LEAD } from "./player/VideoPlayer";
 import MomentsSidebar from "./MomentsSidebar";
+import Landing from "./Landing";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
-
-const PLAYBACK_LEAD = 10; // seconds analyzed before playback unlocks
 
 // Debug tooling is for us, and it is OFF unless asked for — in dev too, so that a dev
 // run measures the same thing a production run does. `?debug=1` turns it on.
@@ -189,6 +189,7 @@ export default function App() {
   // Sidebar state: which moment the player is highlighting, and each moment's thumbnail.
   const [currMoment, setCurrMoment] = useState<Activity | null>(null);
   const [thumbs, setThumbs] = useState<ReadonlyMap<number, string>>(new Map());
+  const [errorDismissed, setErrorDismissed] = useState(false);
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -223,6 +224,7 @@ export default function App() {
     setDone(false); setError(null); setOpenClusters(0);
     setFramesCount(0); setViewIdx(-1); setScenes([]); setRanges([]);
     setCurrMoment(null);
+    setErrorDismissed(false);
     setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
     setStage("Starting worker…");
 
@@ -359,26 +361,42 @@ export default function App() {
 
   const progressPct = meta ? coverage(ranges, meta.duration) * 100 : 0;
 
+  // Fatal vs partial. Fatal = it broke before there was ever anything to watch (bad codec,
+  // unreadable container, worker refused to start) — there is no player to put a message in,
+  // so the landing screen takes it back. Partial = analysis died part-way through a video that
+  // plays fine; that is mostly a SUCCESS and must not read like a crash, so the player stays
+  // and says what still works.
+  const fatal = error !== null && meta === null;
+  const partial = error !== null && meta !== null;
+  // How far the analysis actually got — the end of the last analyzed range, which is the
+  // honest thing to name in the strip.
+  const lastAnalyzed = ranges.length > 0 ? ranges[ranges.length - 1].end : 0;
+
   return (
     // The page grows a right-hand column once a video is up; before that the narrow
     // reading width is right for the drop zone.
     <div className={videoUrl ? "app with-side" : "app"}>
       <h1>veasyguide-app</h1>
 
-      {!videoUrl && (
-        <label className="drop">
-          <input type="file" accept="video/*" hidden
-            onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
-          <span>⬇ Drop a lecture video or click to choose</span>
-          <small>Analysis runs in your browser · MP4 / WebM / MKV</small>
-        </label>
-      )}
+      {/* A fatal error belongs ON the landing screen, beside the drop zone: whatever went
+          wrong, the next thing the viewer wants is to try another file. */}
+      {(!videoUrl || fatal) && <Landing onFile={loadFile} error={error} />}
 
-      {error && <div className="error">⚠ {error}</div>}
-
-      {videoUrl && (
+      {videoUrl && !fatal && (
         <div className="stage-row">
         <div className="stage">
+          {partial && !errorDismissed && (
+            <div className="strip" role="status">
+              <span>
+                <b>Analysis stopped at {convertSecondsToTimecode(lastAnalyzed)}.</b>{" "}
+                Everything before that still works — highlights and magnification simply stop
+                past that point.
+              </span>
+              <button type="button" onClick={() => setErrorDismissed(true)} aria-label="Dismiss">
+                ✕
+              </button>
+            </div>
+          )}
           {meta ? (
             <VideoPlayer
               key={videoUrl}
@@ -389,6 +407,7 @@ export default function App() {
               ranges={ranges}
               done={done}
               canPlay={canPlay}
+              xRealtime={xRealtime}
               selectOpts={selectOpts}
               onSeeked={onSeeked}
               onTimeChange={onTimeChange}

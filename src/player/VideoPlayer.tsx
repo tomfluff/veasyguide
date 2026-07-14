@@ -75,6 +75,9 @@ type Props = {
   ranges: Range[];
   done: boolean;
   canPlay: boolean;
+  // Analysis throughput, for the pre-playback scrim. Everything else the scrim shows
+  // (coverage, moments found) the player can already derive from ranges/activities.
+  xRealtime?: number;
   selectOpts: SelectOpts;
   onSeeked?: (t: number) => void;
   onTimeChange?: (t: number) => void;
@@ -96,6 +99,11 @@ const EMPTY_THUMBS: ReadonlyMap<number, string> = new Map();
 
 const FLASH_SPEED = 250;
 const SCENE_NOTICE_MS = 2500;
+
+// Seconds of analysis before playback unlocks. Lives here because the pre-playback gate
+// PROMISES this number on screen ("the first 10 seconds"), and App gates `canPlay` on it —
+// two copies would be two chances for the promise and the behaviour to drift apart.
+export const PLAYBACK_LEAD = 10;
 
 const VideoPlayer = (props: Props) => {
   // Refs
@@ -458,6 +466,14 @@ const VideoPlayer = (props: Props) => {
   const playerActivity = currActivity ? toPlayerActivity(currActivity, props.meta) : null;
   const zoomActivity = currActivity ?? stableActivity;
 
+  // The gate's bar fills toward the UNLOCK (the first PLAYBACK_LEAD seconds), not toward the
+  // end of the video — the promise on screen is "playback starts as soon as the first 10
+  // seconds are ready", and a bar creeping toward 100% of a 75-minute lecture would flatly
+  // contradict it. Analysis restarts wherever the viewer seeks, so "analyzed" is a set of
+  // ranges; total covered seconds is the honest measure of progress toward that unlock.
+  const analyzedSec = props.ranges.reduce((s, r) => s + (r.end - r.start), 0);
+  const gatePct = (analyzedSec / PLAYBACK_LEAD) * 100;
+
   return (
     <Box
       className={videoContainerClasses}
@@ -758,8 +774,23 @@ const VideoPlayer = (props: Props) => {
           <IconZoom />
         </Box>
         <Box className="overlay-end" hidden={!isEnded}></Box>
+        {/* The only moment the app makes anyone wait. So it says what it is doing, shows it
+            moving, and says when it ends — a bare "Analyzing…" gives a viewer no way to tell
+            a slow machine from a hung one. */}
         {!props.canPlay && (
-          <Box className="overlay-gate">Analyzing… playback starts shortly</Box>
+          <Box className="overlay-gate" role="status">
+            <div className="gate-h">Finding the moments…</div>
+            <div className="gate-sub">
+              Playback starts as soon as the first {PLAYBACK_LEAD} seconds are ready.
+            </div>
+            <div className="gate-bar">
+              <div className="gate-fill" style={{ width: `${Math.min(100, gatePct)}%` }} />
+            </div>
+            <div className="gate-stats">
+              {props.xRealtime ? <>running at <b>{props.xRealtime.toFixed(1)}× realtime</b> · </> : null}
+              <b>{props.activities.length}</b> moment{props.activities.length === 1 ? "" : "s"} found so far
+            </div>
+          </Box>
         )}
         {props.canPlay && atUnanalyzed && (
           <Box className="overlay-catching-up">Analyzing this part…</Box>
