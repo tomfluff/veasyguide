@@ -37,7 +37,12 @@ the settings suites, and the polished player. This is a measurement harness wear
 
 ## Develop
 
-Requires Node 22+ and a Chromium browser (WebCodecs).
+Requires Node 22+ and a browser with WebCodecs. Chromium (Chrome/Edge/Arc) is what this is
+developed and benchmarked against; Firefox has shipped WebCodecs since 2024 and works too
+(confirmed by hand — not yet covered by an automated check, so treat non-Chromium as
+"works, unbenchmarked"). `docs/design.md` still says "Chromium-only, enforced by a capability
+check" — that constraint predates Firefox's WebCodecs support and no such check was ever
+built. Left as written: it is an approved design record, not a description of today.
 
 ```bash
 npm install

@@ -81,10 +81,15 @@ export default function About({ open, onClose }: { open: boolean; onClose: () =>
 
       <h3>What it needs</h3>
       <p>
-        A Chromium browser — Chrome, Edge, or Arc. Decoding happens through WebCodecs, which
-        Firefox and Safari don't yet support well enough for this. Videos must be in a codec your
-        machine can decode: H.264, VP9 and AV1 work; HEVC/H.265 usually does not, and you'll be
-        told so by name rather than left waiting.
+        A Chromium browser — Chrome, Edge or Arc — is what it's built and tested against, so
+        that's the smoothest ride. Other modern browsers generally work; you may just find
+        analysis slower or the odd rough edge, since decoding leans on WebCodecs and support for
+        it is newer outside Chromium.
+      </p>
+      <p>
+        Your video also has to be in a codec your machine can decode: H.264, VP9 and AV1 work;
+        HEVC/H.265 often doesn't. If it can't be decoded you're told so by name, rather than left
+        waiting.
       </p>
       <p className="about-note">
         Analysis speed depends on your hardware. Playback starts as soon as the first 10 seconds
