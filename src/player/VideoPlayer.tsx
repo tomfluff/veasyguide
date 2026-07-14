@@ -176,17 +176,33 @@ const VideoPlayer = (props: Props) => {
     () => setSceneNotice(false),
     SCENE_NOTICE_MS
   );
+  // A key that OPERATES the player shows the bar it operated. The hotkeys are bound to the
+  // document, but the bar's reveal used to be bound to the container's onKeyDown — so a key
+  // pressed with focus outside the player (the ordinary case: you clicked the video surface,
+  // which is a plain div and takes no focus) muted, zoomed or seeked with no visible chrome to
+  // show for it. The reveal belongs on the actions, not on a document-wide keydown: a blanket
+  // listener would also pop the bar open for keys that have nothing to do with the player.
+  // The handlers below are `const` arrows declared further down the component, so `fn` must be
+  // called lazily — passing the identifier here instead would read it in its temporal dead zone
+  // and throw on the first render.
+  const reveal = (fn: () => void) => () => {
+    showControls();
+    fn();
+  };
   useHotkeys([
-    ["Space", () => handlePlayPause()],
-    ["F", () => handleFullscreen()],
-    ["M", () => handleMute()],
-    ["Z", () => handleZoom()],
-    ["ArrowLeft", () => handleTimeShift(-5)],
-    ["ArrowRight", () => handleTimeShift(5)],
-    ["ArrowUp", () => handleZoomShift(0.1)],
-    ["ArrowDown", () => handleZoomShift(-0.1)],
+    ["Space", reveal(() => handlePlayPause())],
+    ["F", reveal(() => handleFullscreen())],
+    ["M", reveal(() => handleMute())],
+    ["Z", reveal(() => handleZoom())],
+    ["ArrowLeft", reveal(() => handleTimeShift(-5))],
+    ["ArrowRight", reveal(() => handleTimeShift(5))],
+    ["ArrowUp", reveal(() => handleZoomShift(0.1))],
+    ["ArrowDown", reveal(() => handleZoomShift(-0.1))],
     // Mantine matches on event.key, which for these is literally "[" and "]" — not the
     // KeyboardEvent.code names ("BracketLeft"/"BracketRight"), which never match.
+    //
+    // No reveal, unlike every key above: stepping between moments is watching, not operating
+    // the player. See handleStepMoment.
     ["[", () => handleStepMoment(-1)],
     ["]", () => handleStepMoment(1)],
   ]);
