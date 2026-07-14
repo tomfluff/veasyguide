@@ -17,6 +17,12 @@ import "./App.css";
 // run measures the same thing a production run does. `?debug=1` turns it on.
 const QUERY = new URLSearchParams(location.search);
 const DEBUG = QUERY.get("debug") === "1";
+
+// Moments to accumulate before a snippet batch is worth a decode pass. Each batch costs one
+// seek, so a batch per moment would be ~600 seeks on an hour-long lecture; a batch of 600 is
+// the old behaviour, where nothing appears until the end. Batching is self-pacing above this
+// floor: a pass takes a second or two, and whatever finalizes meanwhile becomes the next one.
+const SNIPPET_BATCH_MIN = 10;
 // Research mode: collect per-node region logs + show the activity gallery.
 const RESEARCH = QUERY.get("research") === "1";
 // Preset the gallery's snippet toggle (visual crops of each activity).
@@ -185,6 +191,10 @@ export default function App() {
   const seekFnRef = useRef<(t: number) => void>(() => {});
   const debugCanvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
+  const snipRef = useRef<Worker | null>(null);
+  const snipDoneRef = useRef<Set<number>>(new Set()); // moments already handed to the snippet worker
+  const snipBusyRef = useRef(false);
+  const [snipTick, setSnipTick] = useState(0);
   const activitiesRef = useRef<Activity[]>([]);
   const framesRef = useRef<DebugFrame[]>([]); // all analyzer-view frames (debug; in-memory only)
   const framesBytesRef = useRef(0);
@@ -322,6 +332,10 @@ export default function App() {
   function reset() {
     workerRef.current?.terminate();
     workerRef.current = null;
+    snipRef.current?.terminate();
+    snipRef.current = null;
+    snipDoneRef.current = new Set();
+    snipBusyRef.current = false;
     fileRef.current = null;
     setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
     setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
@@ -379,32 +393,55 @@ export default function App() {
     [params.highlightLead, params.highlightLinger]
   );
 
-  // Sidebar thumbnails: one crop per moment (at its END — the finished annotation is what
-  // a row must be recognized by), generated in a single monotonic decode pass once analysis
-  // completes. Requested for every valid activity regardless of the minDuration display
-  // filter, so loosening that filter later never surfaces a row without a thumbnail.
+  // Sidebar thumbnails: one crop per moment (at its END — the finished annotation is what a
+  // row must be recognized by). Open the file once, then feed the worker batches as moments
+  // finalize, so rows fill in behind the analyzer instead of all at the end. On a 59-minute
+  // lecture the old "wait for done" meant 602 numbered placeholders for the 14 minutes the
+  // analysis ran — precisely when a table of contents is worth having.
   useEffect(() => {
-    if (!done || !meta || !fileRef.current) return;
-    const all = validActivities(activitiesRef.current, 0);
-    if (all.length === 0) return;
-    const reqs: SnippetReq[] = all.map((a) => ({
-      activityId: a.id,
-      t: Math.max(0, Math.min(a.end, meta.duration - 0.05)),
-      rect: thumbRect(a, meta),
-    }));
+    if (!meta || !fileRef.current) return;
     const worker = new Worker(new URL("./analyzer/snippetWorker.ts", import.meta.url), { type: "module" });
     worker.onmessage = (e: MessageEvent<SnippetOutMsg>) => {
       const m = e.data;
       if (m.type === "snippet") {
         const url = URL.createObjectURL(m.blob);
         setThumbs((prev) => new Map(prev).set(m.activityId, url));
-      } else if (m.type === "done" || m.type === "error") {
-        worker.terminate();
+      } else if (m.type === "batchDone") {
+        if (DEBUG && m.count > 0) {
+          console.log(`[snippets] +${m.count} crops, ${(m.bytes / 1024).toFixed(0)} KB, ${(m.wallMs / 1000).toFixed(1)}s`);
+        }
+        snipBusyRef.current = false;
+        setSnipTick((n) => n + 1); // a batch finished — go see if more moments landed meanwhile
+      } else if (m.type === "error") {
+        snipBusyRef.current = false;
       }
     };
-    worker.postMessage({ type: "start", file: fileRef.current, reqs });
-    return () => worker.terminate();
-  }, [done, meta]);
+    worker.postMessage({ type: "open", file: fileRef.current });
+    snipRef.current = worker;
+    snipDoneRef.current = new Set();
+    snipBusyRef.current = false;
+    return () => { worker.terminate(); snipRef.current = null; };
+  }, [meta]);
+
+  // Hand the worker every moment it hasn't seen. One batch at a time: batches are what keep
+  // this to one monotonic decode per contiguous stretch, and two in flight would interleave
+  // seeks. Below the floor we wait for more rather than pay a seek per moment — unless
+  // analysis is done, in which case this is the tail and there is nothing left to wait for.
+  useEffect(() => {
+    const worker = snipRef.current;
+    if (!worker || !meta || snipBusyRef.current) return;
+    const pending = validActivities(activitiesRef.current, 0).filter((a) => !snipDoneRef.current.has(a.id));
+    if (pending.length === 0 || (!done && pending.length < SNIPPET_BATCH_MIN)) return;
+
+    const reqs: SnippetReq[] = pending.map((a) => ({
+      activityId: a.id,
+      t: Math.max(0, Math.min(a.end, meta.duration - 0.05)),
+      rect: thumbRect(a, meta),
+    }));
+    for (const a of pending) snipDoneRef.current.add(a.id);
+    snipBusyRef.current = true;
+    worker.postMessage({ type: "batch", reqs });
+  }, [activityCount, done, meta, snipTick]);
 
   const progressPct = meta ? coverage(ranges, meta.duration) * 100 : 0;
 
