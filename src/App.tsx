@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Range, type Scene, type WorkerMsg } from "./analyzer/types";
 import { coverage, isAnalyzed } from "./analyzer/ranges";
 import { validActivities } from "./analyzer/select";
+import { thumbRect } from "./analyzer/snippets";
+import type { SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
 import VideoPlayer from "./player/VideoPlayer";
+import MomentsSidebar from "./MomentsSidebar";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
 
@@ -183,6 +186,9 @@ export default function App() {
   const [openClusters, setOpenClusters] = useState(0);
   const [framesCount, setFramesCount] = useState(0);
   const [viewIdx, setViewIdx] = useState(-1); // -1 = follow the frontier
+  // Sidebar state: which moment the player is highlighting, and each moment's thumbnail.
+  const [currMoment, setCurrMoment] = useState<Activity | null>(null);
+  const [thumbs, setThumbs] = useState<ReadonlyMap<number, string>>(new Map());
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -216,6 +222,8 @@ export default function App() {
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
     setDone(false); setError(null); setOpenClusters(0);
     setFramesCount(0); setViewIdx(-1); setScenes([]); setRanges([]);
+    setCurrMoment(null);
+    setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
     setStage("Starting worker…");
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
@@ -322,10 +330,39 @@ export default function App() {
     [params.highlightLead, params.highlightLinger]
   );
 
+  // Sidebar thumbnails: one crop per moment (at its END — the finished annotation is what
+  // a row must be recognized by), generated in a single monotonic decode pass once analysis
+  // completes. Requested for every valid activity regardless of the minDuration display
+  // filter, so loosening that filter later never surfaces a row without a thumbnail.
+  useEffect(() => {
+    if (!done || !meta || !fileRef.current) return;
+    const all = validActivities(activitiesRef.current, 0);
+    if (all.length === 0) return;
+    const reqs: SnippetReq[] = all.map((a) => ({
+      activityId: a.id,
+      t: Math.max(0, Math.min(a.end, meta.duration - 0.05)),
+      rect: thumbRect(a, meta),
+    }));
+    const worker = new Worker(new URL("./analyzer/snippetWorker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (e: MessageEvent<SnippetOutMsg>) => {
+      const m = e.data;
+      if (m.type === "snippet") {
+        const url = URL.createObjectURL(m.blob);
+        setThumbs((prev) => new Map(prev).set(m.activityId, url));
+      } else if (m.type === "done" || m.type === "error") {
+        worker.terminate();
+      }
+    };
+    worker.postMessage({ type: "start", file: fileRef.current, reqs });
+    return () => worker.terminate();
+  }, [done, meta]);
+
   const progressPct = meta ? coverage(ranges, meta.duration) * 100 : 0;
 
   return (
-    <div className="app">
+    // The page grows a right-hand column once a video is up; before that the narrow
+    // reading width is right for the drop zone.
+    <div className={videoUrl ? "app with-side" : "app"}>
       <h1>veasyguide-app</h1>
 
       {!videoUrl && (
@@ -340,6 +377,7 @@ export default function App() {
       {error && <div className="error">⚠ {error}</div>}
 
       {videoUrl && (
+        <div className="stage-row">
         <div className="stage">
           {meta ? (
             <VideoPlayer
@@ -354,6 +392,7 @@ export default function App() {
               selectOpts={selectOpts}
               onSeeked={onSeeked}
               onTimeChange={onTimeChange}
+              onActivityChange={setCurrMoment}
               seekFnRef={seekFnRef}
             />
           ) : error ? null : (
@@ -469,6 +508,19 @@ export default function App() {
             )}
           </div>
           )}
+        </div>
+
+        {meta && (
+          <MomentsSidebar
+            activities={activities}
+            thumbs={thumbs}
+            current={currMoment}
+            done={done}
+            canPlay={canPlay}
+            lead={params.highlightLead}
+            onJump={(t) => seekFnRef.current(t)}
+          />
+        )}
         </div>
       )}
 

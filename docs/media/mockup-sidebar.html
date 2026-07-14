@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>veasyguide — moments sidebar: text rows vs thumbnail rows</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { max-width: 1180px; margin: 0 auto; }
+  .variant { margin-bottom: 40px; }
+
+  .shell { display: flex; }
+  .shell .stage { flex: 1; min-width: 0; }
+  .shell .video { border-radius: 0; }
+
+  /* --- the sidebar --------------------------------------------------------- */
+  .side {
+    width: 264px; flex: none;
+    border-left: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    background: var(--surface);
+  }
+  .side-head {
+    padding: 12px 14px 10px; border-bottom: 1px solid var(--line);
+  }
+  .side-head .h { font-size: 16px; font-weight: 650; }
+  .side-head .pos { font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .side-head .pos b { color: var(--text); }
+  .side-list { padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+
+  /* text-only row */
+  .mrow {
+    display: flex; align-items: center; gap: 10px;
+    min-height: 48px; padding: 0 12px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px;
+    font-size: 15px; cursor: pointer; text-align: left; color: var(--text);
+  }
+  .mrow .n { color: var(--muted); font-weight: 650; width: 22px; }
+  .mrow .t { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .mrow .d { color: var(--muted); font-size: 13px; margin-left: auto; }
+  .mrow.now { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .mrow.now .n { color: var(--accent); }
+
+  /* thumbnail row */
+  .vrow {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px; min-height: 56px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px;
+    font-size: 15px; cursor: pointer; text-align: left; color: var(--text);
+  }
+  .vrow.now { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .vrow .thumb {
+    flex: none; width: 96px; height: 54px; border-radius: 5px;
+    background-image: url("highlight-on-annotation.png");
+    background-repeat: no-repeat; background-color: #fff;
+    border: 1px solid var(--line);
+  }
+  .vrow .meta { min-width: 0; }
+  .vrow .t { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .vrow .d { color: var(--muted); font-size: 13px; }
+  .vrow .nowtag { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<div class="label">veasyguide-app · moments sidebar</div>
+<div class="title">Same sidebar, two row designs</div>
+<div class="sub">Both track playback live (“Now” row, position count). The only difference is what a row tells you.</div>
+
+<!-- ===================== T — text rows ===================== -->
+<section class="variant">
+  <div class="label">T — text rows (index + timestamp)</div>
+  <div class="app">
+    <div class="shell">
+      <div class="stage">
+        <div class="video">
+          <div class="hl" style="left: 56.4%; top: 30.5%; width: 21.4%; height: 11.6%;"></div>
+        </div>
+        <div class="controls">
+          <div class="timeline"><div class="analyzed" style="width: 78%"></div><div class="played" style="width: 28%"></div><div class="thumb" style="left: 28%"></div></div>
+        </div>
+      </div>
+      <aside class="side">
+        <div class="side-head">
+          <div class="h">Moments</div>
+          <div class="pos">Now at <b>4</b> of <b>12</b></div>
+        </div>
+        <div class="side-list">
+          <button class="mrow"><span class="n">1</span><span class="t">00:22</span><span class="d">1.8s</span></button>
+          <button class="mrow"><span class="n">2</span><span class="t">01:12</span><span class="d">2.4s</span></button>
+          <button class="mrow"><span class="n">3</span><span class="t">02:05</span><span class="d">1.2s</span></button>
+          <button class="mrow now"><span class="n">4</span><span class="t">03:24</span><span class="d">2.1s</span></button>
+          <button class="mrow"><span class="n">5</span><span class="t">04:11</span><span class="d">3.0s</span></button>
+          <button class="mrow"><span class="n">6</span><span class="t">04:48</span><span class="d">1.5s</span></button>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div class="note">Every row is the same sentence with different numbers. To find “the moment
+  where she circled the formula”, you must click rows one by one and watch the player.</div>
+</section>
+
+<!-- ===================== V — thumbnail rows ===================== -->
+<section class="variant">
+  <div class="label">V — thumbnail rows (a crop of what was annotated)</div>
+  <div class="app">
+    <div class="shell">
+      <div class="stage">
+        <div class="video">
+          <div class="hl" style="left: 56.4%; top: 30.5%; width: 21.4%; height: 11.6%;"></div>
+        </div>
+        <div class="controls">
+          <div class="timeline"><div class="analyzed" style="width: 78%"></div><div class="played" style="width: 28%"></div><div class="thumb" style="left: 28%"></div></div>
+        </div>
+      </div>
+      <aside class="side">
+        <div class="side-head">
+          <div class="h">Moments</div>
+          <div class="pos">Now at <b>4</b> of <b>12</b></div>
+        </div>
+        <div class="side-list">
+          <!-- crops: background-size = 830 * (96/w) px; position = -x*(96/w) -y*(96/w) -->
+          <button class="vrow">
+            <span class="thumb" style="background-size: 692px auto; background-position: -496px -25px;"></span>
+            <span class="meta"><span class="t">00:22</span><br><span class="d">1.8s</span></span>
+          </button>
+          <button class="vrow">
+            <span class="thumb" style="background-size: 692px auto; background-position: -321px -110px;"></span>
+            <span class="meta"><span class="t">01:12</span><br><span class="d">2.4s</span></span>
+          </button>
+          <button class="vrow">
+            <span class="thumb" style="background-size: 443px auto; background-position: -80px -122px;"></span>
+            <span class="meta"><span class="t">02:05</span><br><span class="d">1.2s</span></span>
+          </button>
+          <button class="vrow now">
+            <span class="thumb" style="background-size: 443px auto; background-position: -250px -78px;"></span>
+            <span class="meta"><span class="nowtag">Now</span><br><span class="t">03:24</span> <span class="d">2.1s</span></span>
+          </button>
+          <button class="vrow">
+            <span class="thumb" style="background-size: 512px auto; background-position: -222px -158px;"></span>
+            <span class="meta"><span class="t">04:11</span><br><span class="d">3.0s</span></span>
+          </button>
+          <button class="vrow">
+            <span class="thumb" style="background-size: 692px auto; background-position: -480px -204px;"></span>
+            <span class="meta"><span class="t">04:48</span><br><span class="d">1.5s</span></span>
+          </button>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div class="note">Rows answer “which moment is which” by sight: the circled formula, the grid
+  world, the agent diagram. Crops are grabbed during analysis — the analyzer already decodes
+  every frame, so this costs no second pass.</div>
+</section>
+
+</body>
+</html>

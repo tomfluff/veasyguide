@@ -27,6 +27,28 @@ export function cropRect(a: Activity, meta: AnalysisMeta): CropRect {
   return { x, y, w, h };
 }
 
+// The sidebar thumbnail's crop window. Wider than the snippet crop on purpose: a snippet
+// documents the activity (tight crop, registered sequence), but a thumbnail has to be
+// RECOGNIZED — "the circled formula", "the grid diagram" — and a tight crop of a small
+// mark is an anonymous sliver. So: at least a quarter of the frame wide, 16:9 to fill the
+// row's image box exactly, centred on the activity, shifted (never shrunk) to stay in frame.
+export const THUMB_ASPECT = 16 / 9;
+export const THUMB_MIN_WFRAC = 0.25;
+
+export function thumbRect(a: Activity, meta: AnalysisMeta): CropRect {
+  const padded = cropRect(a, meta);
+  const vw = meta.videoWidth;
+  const vh = meta.videoHeight;
+  let w = Math.max(padded.w, THUMB_MIN_WFRAC * vw);
+  const h = Math.min(vh, Math.max(padded.h, w / THUMB_ASPECT));
+  w = Math.min(vw, Math.max(w, h * THUMB_ASPECT));
+  let x = padded.x + padded.w / 2 - w / 2;
+  let y = padded.y + padded.h / 2 - h / 2;
+  x = Math.max(0, Math.min(x, vw - w));
+  y = Math.max(0, Math.min(y, vh - h));
+  return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+}
+
 // Timestamps to capture for one activity: a "before" frame (the baseline — what the
 // region looked like with nothing there), then start → every SNIPPET_INTERVAL → end.
 // Long activities are spread evenly rather than truncated, so the full arc survives.
