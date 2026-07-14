@@ -3,6 +3,10 @@
 // name, muted nav with one accent link, a human byline at the bottom.
 import type { ReactNode } from "react";
 import { IconBrandGithub, IconExternalLink } from "@tabler/icons-react";
+// Bundled, not hotlinked from tomfluff.github.io. The landing screen promises "no upload, no
+// account, no server" — a remote <img> would have the page phone out on every load, which is a
+// small thing that makes a large promise false.
+import avatar from "./assets/avatar.webp";
 
 export function TopBar({ file, status }: { file?: string | null; status?: ReactNode }) {
   return (
@@ -28,6 +32,7 @@ export function TopBar({ file, status }: { file?: string | null; status?: ReactN
           <IconBrandGithub size={16} /> Code on GitHub
         </a>
       </nav>
+      <img className="avatar" src={avatar} alt="Yotam Sechayk" />
     </header>
   );
 }
@@ -35,7 +40,9 @@ export function TopBar({ file, status }: { file?: string | null; status?: ReactN
 export function Footer() {
   return (
     <footer className="foot">
-      Created with love and care by <b>Yotam Sechayk</b> — reach out with any questions.
+      Created with love and care by{" "}
+      <img className="foot-av" src={avatar} alt="" aria-hidden="true" />
+      <b>Yotam Sechayk</b> — reach out with any questions.
     </footer>
   );
 }

@@ -4,7 +4,12 @@
 
 .video-container {
   width: 100%;
-  max-width: 860px;
+  /* The player fills its column, bounded by what actually FITS: the 860px cap was left over
+     from when the page was one narrow reading column, and beside the sidebar in a wide window
+     it just left the lecture small with grey space around it — the opposite of what this app is
+     for. The bound is now the viewport, not a magic number: a 16:9 video this wide is exactly
+     as tall as the space left once the two bars and the page padding are taken. */
+  max-width: calc((100vh - 160px) * 16 / 9);
   display: flex;
   justify-content: center;
   margin-inline: auto;

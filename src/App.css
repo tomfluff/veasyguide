@@ -70,6 +70,21 @@
 .nav a.acc { color: var(--accent); }
 .nav a:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
 
+.avatar {
+  width: 28px; height: 28px; flex: none;
+  margin-left: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  object-fit: cover;
+}
+.foot-av {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: -5px;
+  margin-right: 5px;
+}
+
 .foot {
   margin-top: auto;
   padding: 9px 15px;
@@ -84,10 +99,11 @@
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  padding: 16px 16px 24px;
+  padding: 16px 28px 24px;
 }
-/* Wide enough for the player at its old size PLUS the moments sidebar. */
-.app.with-side { max-width: 1200px; }
+/* Wide, so the lecture can use the window. The player's own height bound (player.css) stops it
+   from growing taller than the viewport on the way. */
+.app.with-side { max-width: 1560px; }
 
 /* --- Moments sidebar ------------------------------------------------------
    Light, like the page it lives on. (It was dark, to match the player's control bar — but on a
