@@ -1,7 +1,7 @@
 // The moments, as a table of contents. The timeline lane is a map (proportional, marks
 // merge when they collide); this list is the index — every moment gets the same full-width
 // row with a thumbnail of the annotated region, so you choose by sight, not by timestamp.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import type { Activity } from "./analyzer/types";
 import { convertSecondsToTimecode } from "./utils/misc";
 import { seekTargetFor } from "./player/moments";
@@ -16,26 +16,42 @@ type Props = {
   canPlay: boolean;
   lead: number;
   onJump: (t: number) => void;
+  // The same list mounts twice: on the page (windowed) and as an overlay inside the player
+  // (fullscreen, where the page is invisible). These let the overlay mount position itself.
+  className?: string;
+  style?: CSSProperties;
 };
 
-export default function MomentsSidebar({ activities, thumbs, current, done, canPlay, lead, onJump }: Props) {
+export default function MomentsSidebar({ activities, thumbs, current, done, canPlay, lead, onJump, className, style }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const currIndex = current ? activities.indexOf(current) : -1;
 
-  // Follow playback: keep the current row in view. "nearest" so it never yanks the list
-  // when the row is already visible.
+  // Follow playback: keep the current row centred, so the rows around it — where you are
+  // coming from and what is next — stay visible too. ("nearest" parks the row on the list's
+  // edge instead, and you can never see ahead.) Scrolls the LIST, not scrollIntoView, which
+  // also scrolls every ancestor — on the page mount that would drag the page around during
+  // playback. A pointer over the list means the viewer is browsing it; following would yank
+  // the rows out from under them.
   useEffect(() => {
-    if (currIndex < 0) return;
-    listRef.current
-      ?.querySelector('[aria-current="true"]')
-      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const list = listRef.current;
+    if (currIndex < 0 || !list || list.matches(":hover")) return;
+    const row = list.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!row) return;
+    list.scrollTo({
+      top: row.offsetTop - list.offsetTop - (list.clientHeight - row.offsetHeight) / 2,
+      behavior: "smooth",
+    });
   }, [currIndex]);
 
   return (
     // Keys pressed while focus is in the sidebar belong to the sidebar. Without this,
     // Space on a row also reaches the player's document-level hotkeys and toggles play
     // on top of the row's own seek.
-    <aside className="moments-side" onKeyDown={(e) => e.stopPropagation()}>
+    <aside
+      className={className ? `moments-side ${className}` : "moments-side"}
+      style={style}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
       <div className="side-head">
         <div className="side-title">Moments</div>
         <div className="side-pos" role="status">

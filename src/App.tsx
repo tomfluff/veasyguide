@@ -393,6 +393,7 @@ export default function App() {
               onSeeked={onSeeked}
               onTimeChange={onTimeChange}
               onActivityChange={setCurrMoment}
+              thumbs={thumbs}
               seekFnRef={seekFnRef}
             />
           ) : error ? null : (

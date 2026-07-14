@@ -45,6 +45,7 @@ import {
   IconPlayerTrackNextFilled,
   IconChevronDown,
   IconChevronUp,
+  IconListDetails,
 } from "@tabler/icons-react";
 import classNames from "classnames";
 import { convertSecondsToTimecode } from "../utils/misc";
@@ -54,6 +55,7 @@ import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
 import { timelineMarkers, stepMoment, seekTargetFor } from "./moments";
+import MomentsSidebar from "../MomentsSidebar";
 import AppearanceSheet from "./AppearanceSheet";
 import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
@@ -81,10 +83,16 @@ type Props = {
   // selectActivity on the rVFC loop; App sees time at a 0.2s throttle). Re-deriving it in
   // App would let the highlighted card drift from the highlight on the video.
   onActivityChange?: (activity: Activity | null) => void;
+  // Moment thumbnails (App generates them; see App's snippet-worker effect). The player
+  // needs them for the fullscreen moments overlay — the page sidebar is outside the
+  // fullscreened container and simply is not there.
+  thumbs?: ReadonlyMap<number, string>;
   // Assigned a seek function so external UI (debug views) can move the playhead.
   seekFnRef?: React.MutableRefObject<(t: number) => void>;
   extraHud?: ReactNode;
 };
+
+const EMPTY_THUMBS: ReadonlyMap<number, string> = new Map();
 
 const FLASH_SPEED = 250;
 const SCENE_NOTICE_MS = 2500;
@@ -103,6 +111,9 @@ const VideoPlayer = (props: Props) => {
     height: boxHeight,
   } = useElementSize<HTMLVideoElement>();
   const videoMergedRef = useMergedRef(videoRef, videoSizeRef);
+  // The moments overlay anchors just above the control bar, whose height depends on
+  // collapsed state and which rows (lane, now-line) are present — so it is measured.
+  const { ref: barSizeRef, height: barHeight } = useElementSize<HTMLDivElement>();
 
   // State
   const [volume, setVolume] = useState(1);
@@ -118,6 +129,8 @@ const VideoPlayer = (props: Props) => {
   const [isFullscreen, handleIsFullscreen] = useDisclosure(false);
   const [hideControls, handleHideControls] = useDisclosure(false);
   const [collapsed, handleCollapsed] = useDisclosure(false);
+  // Fullscreen-only: the moments list summoned as an overlay inside the player.
+  const [momentsOpen, handleMomentsOpen] = useDisclosure(false);
   const [sceneNotice, setSceneNotice] = useState(false);
   const currSceneIdRef = useRef<number | null>(null);
   const prevTimeRef = useRef(0);
@@ -457,7 +470,7 @@ const VideoPlayer = (props: Props) => {
       onKeyDown={showControls}
       onFocusCapture={showControls}
     >
-      <Box className="video-controls-container" py="sm">
+      <Box className="video-controls-container" py="sm" ref={barSizeRef}>
         <Box
           className="timeline-container"
           ref={trackRef}
@@ -657,7 +670,25 @@ const VideoPlayer = (props: Props) => {
               <AppearanceSheet />
             </Popover.Dropdown>
           </Popover>
-          {/* collapse-end: the two controls that stay to the RIGHT of the scrubber when the bar
+          {/* Fullscreen only: windowed, the moments list is always on the page beside the
+              player, and a second copy would be noise. collapse-end (not collapse-hide),
+              because opening the overlay collapses the bar — hiding the button that closes
+              it inside the very collapse it causes would strand the viewer. */}
+          {isFullscreen && (
+            <UnstyledButton
+              className="collapse-end"
+              onClick={() => {
+                if (!momentsOpen) handleCollapsed.open();
+                handleMomentsOpen.toggle();
+              }}
+              onKeyDown={stopPlayerHotkeys}
+              aria-label="Moments list"
+              aria-expanded={momentsOpen}
+            >
+              <IconListDetails />
+            </UnstyledButton>
+          )}
+          {/* collapse-end: the controls that stay to the RIGHT of the scrubber when the bar
               collapses to a single line. See the Collapsed block in player.css. */}
           <UnstyledButton
             className="collapse-end"
@@ -746,6 +777,26 @@ const VideoPlayer = (props: Props) => {
           </Box>
         )}
       </Box>
+      {/* The fullscreen mount of the moments list. Same component as the page sidebar —
+          the current row and the on-video highlight come from this player's own
+          currActivity, so they cannot disagree. Anchored above the measured bar so it
+          never covers the controls, whichever state the bar is in. */}
+      {isFullscreen && momentsOpen && (
+        <MomentsSidebar
+          className="overlay"
+          activities={props.activities}
+          thumbs={props.thumbs ?? EMPTY_THUMBS}
+          current={currActivity}
+          done={props.done}
+          canPlay={props.canPlay}
+          lead={props.selectOpts.lead}
+          onJump={(t) => {
+            const v = videoRef.current;
+            if (v && props.canPlay) v.currentTime = t;
+          }}
+          style={{ bottom: barHeight + 24, maxHeight: `calc(100% - ${barHeight + 48}px)` }}
+        />
+      )}
       <SVGFilters />
     </Box>
   );

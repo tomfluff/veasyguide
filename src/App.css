@@ -36,6 +36,18 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   .moments-side { width: 100%; position: static; max-height: 40vh; }
 }
 
+/* The fullscreen mount: same list, floated inside the player above the control bar
+   (bottom/max-height are set inline from the bar's measured height). Semi-opaque and
+   borderless-shadowed so it reads as an overlay on the lecture, not a docked panel. */
+.moments-side.overlay {
+  position: absolute;
+  right: 16px;
+  width: 280px;
+  z-index: 40; /* under the control bar (50): the bar must stay reachable no matter what */
+  background: rgba(18, 22, 29, 0.96);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+}
+
 .moments-side .side-head {
   padding: 12px 14px 10px;
   border-bottom: 1px solid #333a45;
