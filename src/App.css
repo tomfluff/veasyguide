@@ -91,15 +91,18 @@
    light page that made two dark slabs with a gap between them, and the list is something you
    READ, which is the argument for putting it on the page's surface rather than the player's.)
    Sticky with an internal scroll, so a long lecture's list never makes the page itself taller. */
-.stage-row { display: flex; gap: 14px; align-items: flex-start; }
-.stage-row .stage { flex: 1; min-width: 0; }
+/* The sidebar ends flush with the player. It is pinned to the row's box (absolute, top+bottom)
+   rather than sized by its own content — the row's height comes from the player alone, so a
+   141-moment list can never make the column taller than the video it navigates. */
+.stage-row { position: relative; }
+.stage-row .stage { margin-right: 282px; /* sidebar width + 14px gap */ min-width: 0; }
 
 .moments-side {
-  flex: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: 268px;
-  position: sticky;
-  top: 12px;
-  max-height: calc(100vh - 24px);
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -112,8 +115,8 @@
 
 /* Sidebar under the player on narrow windows — beside it there'd be no room for the video. */
 @media (max-width: 900px) {
-  .stage-row { flex-wrap: wrap; }
-  .moments-side { width: 100%; position: static; max-height: 40vh; }
+  .stage-row .stage { margin-right: 0; }
+  .moments-side { width: 100%; position: static; max-height: 40vh; margin-top: 12px; }
 }
 
 /* The fullscreen mount: same list, floated inside the player above the control bar
@@ -123,6 +126,8 @@
    Same component, two surfaces; hence the overrides. */
 .moments-side.overlay {
   position: absolute;
+  top: auto; /* the page mount pins top:0; the overlay hangs from the BOTTOM (inline style)
+                and grows upward to its max-height — inheriting top:0 would stretch it */
   right: 16px;
   width: 280px;
   z-index: 40; /* under the control bar (50): the bar must stay reachable no matter what */
@@ -158,6 +163,8 @@
 .moments-side .side-pos b { color: var(--ink); }
 
 .moments-side .side-list {
+  flex: 1;
+  min-height: 0; /* lets the list shrink to the aside's pinned height instead of its content */
   padding: 8px;
   display: flex;
   flex-direction: column;
