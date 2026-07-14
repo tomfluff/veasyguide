@@ -236,7 +236,11 @@ const VideoPlayer = (props: Props) => {
     const t = video.currentTime;
     const target = stepMoment(props.activities, t, props.selectOpts.lead, dir);
     if (!target) return; // at the ends: a no-op, not a wrap-around
-    showControls();
+    // Deliberately does NOT reveal the bar. Stepping between moments is watching, not
+    // operating the player: someone jumping through a lecture with [ and ] wants the lecture,
+    // and having the chrome flash back over it on every press is the opposite of what they
+    // asked for. The Prev/Next BUTTONS reveal it themselves (below) — they live in the bar, so
+    // it must not vanish out from under the cursor that is clicking them.
     const seekTo = seekTargetFor(target, props.selectOpts.lead);
     video.currentTime = seekTo;
     // Keep the chrome in step immediately rather than waiting for the next presented frame,
@@ -483,7 +487,12 @@ const VideoPlayer = (props: Props) => {
       // moments and the controls for a keyboard or screen-reader user; focus and keypress
       // bring them back for everyone. (Pause is handled by the `clear` class, which is gated
       // on isPlaying.)
-      onKeyDown={showControls}
+      //
+      // Except the moment keys: [ and ] are navigation, not operation. They must not summon the
+      // bar — see handleStepMoment. Every other key still does, so the bar is never unreachable.
+      onKeyDown={(e) => {
+        if (e.key !== "[" && e.key !== "]") showControls();
+      }}
       onFocusCapture={showControls}
     >
       <Box className="video-controls-container" py="sm" ref={barSizeRef}>
@@ -614,7 +623,7 @@ const VideoPlayer = (props: Props) => {
             <>
               <UnstyledButton
                 className="collapse-hide"
-                onClick={() => handleStepMoment(-1)}
+                onClick={() => { showControls(); handleStepMoment(-1); }}
                 onKeyDown={stopPlayerHotkeys}
                 disabled={!props.canPlay}
                 aria-label="Previous moment"
@@ -624,7 +633,7 @@ const VideoPlayer = (props: Props) => {
               </UnstyledButton>
               <UnstyledButton
                 className="collapse-hide"
-                onClick={() => handleStepMoment(1)}
+                onClick={() => { showControls(); handleStepMoment(1); }}
                 onKeyDown={stopPlayerHotkeys}
                 disabled={!props.canPlay}
                 aria-label="Next moment"
