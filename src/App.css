@@ -58,14 +58,74 @@
 .chip.ready .chip-dot { background: #17924e; }
 
 .nav { display: flex; align-items: center; gap: 18px; font-size: 14px; color: var(--muted); }
-.nav a {
+.nav a,
+.nav button {
   display: flex; align-items: center; gap: 6px;
-  color: inherit; text-decoration: none;
+  background: none; border: none; cursor: pointer;
+  color: inherit; font: inherit; text-decoration: none;
   padding: 3px 2px; border-radius: 6px;
 }
-.nav a:hover { color: var(--ink); }
+.nav a:hover,
+.nav button:hover { color: var(--ink); }
 .nav a.acc { color: var(--accent); }
-.nav a:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.nav a:focus-visible,
+.nav button:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+
+/* --- About ---------------------------------------------------------------- */
+.about {
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(80vh, 760px);
+  padding: 30px 34px 34px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgba(15, 18, 25, 0.28);
+  overflow-y: auto;
+}
+.about::backdrop { background: rgba(15, 18, 25, 0.55); }
+
+.about-x {
+  position: absolute;
+  top: 14px; right: 14px;
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  background: none; border: none; border-radius: 8px;
+  color: var(--muted); cursor: pointer;
+}
+.about-x:hover { background: #f1f2f5; color: var(--ink); }
+.about-x:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+
+.about h2 { font-size: 24px; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
+.about h3 {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--muted);
+  margin: 22px 0 8px;
+}
+.about p { margin: 0 0 10px; font-size: 15px; line-height: 1.6; color: #33383f; }
+.about p:last-child { margin-bottom: 0; }
+.about .about-lede { font-size: 16px; color: var(--ink); }
+.about .about-note { font-size: 14px; color: var(--muted); }
+.about a { color: var(--accent); }
+
+/* Definition list, so a screen reader reads "Space — play/pause" as the pair it is, rather
+   than as two unrelated cells. */
+.about-keys { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
+.about-keys > div { display: flex; align-items: center; gap: 10px; }
+.about-keys dt { flex: none; }
+.about-keys dd { margin: 0; font-size: 14px; color: #33383f; }
+.about kbd {
+  display: inline-block; min-width: 30px; text-align: center;
+  padding: 3px 7px;
+  background: #f3f4f6; border: 1px solid var(--line-2); border-bottom-width: 2px;
+  border-radius: 6px;
+  font: inherit; font-size: 12.5px; font-weight: 600;
+  color: #33383f;
+}
+
+@media (max-width: 560px) {
+  .about-keys { grid-template-columns: 1fr; }
+}
 
 /* Both avatars link to the profile — the one in the bar, and the avatar+name pair in the
    footer, which is a single link so the picture and the name cannot be clicked apart. */

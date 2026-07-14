@@ -11,7 +11,15 @@ import icon from "./assets/icon.png";
 
 const PROFILE = "https://tomfluff.github.io/";
 
-export function TopBar({ file, status }: { file?: string | null; status?: ReactNode }) {
+export function TopBar({
+  file,
+  status,
+  onAbout,
+}: {
+  file?: string | null;
+  status?: ReactNode;
+  onAbout: () => void;
+}) {
   return (
     <header className="top">
       {/* The project mark is a finished tile — it brings its own colours and its own rounded
@@ -24,7 +32,9 @@ export function TopBar({ file, status }: { file?: string | null; status?: ReactN
       <span className="grow" />
       {status}
       <nav className="nav">
-        <a href="#about">About</a>
+        {/* A button, not an anchor: it opens a dialog, it does not navigate anywhere. An <a
+            href="#about"> would put a dead fragment in the URL and lie to a screen reader. */}
+        <button type="button" onClick={onAbout}>About</button>
         <a className="acc" href={PROFILE} target="_blank" rel="noreferrer">
           <IconExternalLink size={16} /> Project Page
         </a>

@@ -9,6 +9,7 @@ import VideoPlayer, { PLAYBACK_LEAD } from "./player/VideoPlayer";
 import MomentsSidebar from "./MomentsSidebar";
 import Landing from "./Landing";
 import { TopBar, Footer } from "./Shell";
+import About from "./About";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
 
@@ -192,6 +193,7 @@ export default function App() {
   const [thumbs, setThumbs] = useState<ReadonlyMap<number, string>>(new Map());
   const [errorDismissed, setErrorDismissed] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -389,7 +391,12 @@ export default function App() {
 
   return (
     <div className="shell">
-      <TopBar file={videoUrl && !fatal ? fileName : null} status={chip} />
+      <TopBar
+        file={videoUrl && !fatal ? fileName : null}
+        status={chip}
+        onAbout={() => setAboutOpen(true)}
+      />
+      <About open={aboutOpen} onClose={() => setAboutOpen(false)} />
       {/* The page grows a right-hand column once a video is up; before that the narrow
           reading width is right for the drop zone. */}
       <main className={videoUrl && !fatal ? "app with-side" : "app"}>
