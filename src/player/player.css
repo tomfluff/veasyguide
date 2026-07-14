@@ -441,7 +441,10 @@
   top: 5px;
   bottom: 5px;
   min-width: 6px;
-  background-color: #ff5a4d;
+  /* Slate, not red. Red is the colour of a problem, and a lecture with 141 moments rendered a
+     bar of 141 red alarms — while the moments are the single best thing the analyzer produces.
+     The lane is a map; only the CURRENT mark is coloured, because only it is an answer. */
+  background-color: #7e8b9e;
   border-radius: 2px;
   padding: 0;
   /* The 24px hit area is the WCAG 2.5.8 target; the mark cannot be 44px wide without

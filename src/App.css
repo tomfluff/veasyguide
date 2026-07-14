@@ -1,32 +1,112 @@
-.app {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 24px 16px 60px;
+/* --- Shell ----------------------------------------------------------------
+   The chrome from the chart-accessibility demo, so the two read as one body of work: plum
+   hairline, slim white title bar, italic qualifier beside the name, muted nav with one accent
+   link, a human byline at the bottom. */
+:root {
+  --page: #fbfbfc;
+  --line: #e4e6ea;
+  --line-2: #d7dae0;
+  --ink: #15171c;
+  --muted: #6b7280;
+  --accent: #2f6feb;
+  --plum: #3b0d47;
+}
+
+/* A column, so the footer sits at the bottom of a short page instead of half-way up it. */
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+  color: var(--ink);
   font-family: system-ui, sans-serif;
+  border-top: 4px solid var(--plum);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 20px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.top .mark {
+  width: 30px; height: 30px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: #2b2f36; color: #fff; border-radius: 7px;
+}
+.ttl { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.ttl em { font-style: italic; font-weight: 400; color: var(--muted); font-size: 15px; margin-left: 6px; }
+.filechip {
+  font-size: 13px; color: var(--muted);
+  padding: 4px 10px; background: #f3f4f6;
+  border: 1px solid var(--line); border-radius: 999px;
+  max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.top .grow { flex: 1; }
+
+/* The one piece of analysis status a viewer gets — about their lecture, not our pipeline. */
+.chip {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; color: var(--muted);
+  padding: 5px 11px; margin-right: 6px;
+  background: #f3f4f6; border: 1px solid var(--line); border-radius: 999px;
+  white-space: nowrap;
+}
+.chip-dot { width: 7px; height: 7px; border-radius: 50%; background: #e0870d; flex: none; }
+.chip.ready .chip-dot { background: #17924e; }
+
+.nav { display: flex; align-items: center; gap: 18px; font-size: 15px; color: var(--muted); }
+.nav a {
+  display: flex; align-items: center; gap: 6px;
+  color: inherit; text-decoration: none;
+  padding: 4px 2px; border-radius: 6px;
+}
+.nav a:hover { color: var(--ink); }
+.nav a.acc { color: var(--accent); }
+.nav a:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+
+.foot {
+  margin-top: auto;
+  padding: 15px;
+  background: var(--plum);
+  color: #e9d8f5;
+  text-align: center;
+  font-size: 14px;
+}
+.foot b { color: #fff; font-weight: 600; }
+
+.app {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 22px 16px 40px;
 }
 /* Wide enough for the player at its old size PLUS the moments sidebar. */
-.app.with-side { max-width: 1150px; }
-h1 { font-size: 20px; margin: 0 0 20px; }
+.app.with-side { max-width: 1200px; }
 
 /* --- Moments sidebar ------------------------------------------------------
-   Dark like the player's control bar: functionally it IS part of the player — same moments,
-   same numbering — so it must not read as page furniture. Sticky with an internal scroll,
-   so a long lecture's list never makes the page itself taller. */
+   Light, like the page it lives on. (It was dark, to match the player's control bar — but on a
+   light page that made two dark slabs with a gap between them, and the list is something you
+   READ, which is the argument for putting it on the page's surface rather than the player's.)
+   Sticky with an internal scroll, so a long lecture's list never makes the page itself taller. */
 .stage-row { display: flex; gap: 14px; align-items: flex-start; }
 .stage-row .stage { flex: 1; min-width: 0; }
 
 .moments-side {
   flex: none;
-  width: 262px;
+  width: 268px;
   position: sticky;
   top: 12px;
   max-height: calc(100vh - 24px);
   display: flex;
   flex-direction: column;
-  background: #12161d;
-  border: 1px solid #333a45;
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  color: #f2f4f7;
+  color: var(--ink);
+  box-shadow: 0 4px 16px rgba(15, 18, 25, 0.06);
   overflow: hidden;
 }
 
@@ -37,24 +117,45 @@ h1 { font-size: 20px; margin: 0 0 20px; }
 }
 
 /* The fullscreen mount: same list, floated inside the player above the control bar
-   (bottom/max-height are set inline from the bar's measured height). Semi-opaque and
-   borderless-shadowed so it reads as an overlay on the lecture, not a docked panel. */
+   (bottom/max-height are set inline from the bar's measured height).
+   It stays DARK while the page sidebar is light, because in fullscreen it is not on the page —
+   it floats on the lecture, beside a dark control bar, and a white panel there would glare.
+   Same component, two surfaces; hence the overrides. */
 .moments-side.overlay {
   position: absolute;
   right: 16px;
   width: 280px;
   z-index: 40; /* under the control bar (50): the bar must stay reachable no matter what */
   background: rgba(18, 22, 29, 0.96);
+  border-color: #333a45;
+  color: #f2f4f7;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
 }
+.moments-side.overlay .side-head { border-bottom-color: #333a45; }
+.moments-side.overlay .side-pos { color: #a7b0bd; }
+.moments-side.overlay .side-pos b { color: #f2f4f7; }
+.moments-side.overlay .side-row {
+  background: #1b2029;
+  border-color: #333a45;
+}
+.moments-side.overlay .side-row:hover { background: #232935; }
+.moments-side.overlay .side-row.now {
+  background: #2a2313;
+  border-color: #ffc233;
+  box-shadow: 0 0 0 2px rgba(255, 194, 51, 0.4);
+}
+.moments-side.overlay .side-now { color: #ffc233; }
+.moments-side.overlay .side-d { color: #a7b0bd; }
+.moments-side.overlay .side-thumb { border-color: #333a45; }
+.moments-side.overlay .side-thumb.ph { background: #2a303a; color: #a7b0bd; }
 
 .moments-side .side-head {
   padding: 12px 14px 10px;
-  border-bottom: 1px solid #333a45;
+  border-bottom: 1px solid var(--line);
 }
 .moments-side .side-title { font-size: 16px; font-weight: 650; }
-.moments-side .side-pos { font-size: 14px; color: #a7b0bd; margin-top: 2px; }
-.moments-side .side-pos b { color: #f2f4f7; }
+.moments-side .side-pos { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.moments-side .side-pos b { color: var(--ink); }
 
 .moments-side .side-list {
   padding: 8px;
@@ -70,8 +171,8 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   gap: 10px;
   padding: 6px;
   min-height: 56px;
-  background: #1b2029;
-  border: 1px solid #333a45;
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: 9px;
   color: inherit;
   font: inherit;
@@ -79,17 +180,23 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   text-align: left;
   cursor: pointer;
 }
-.side-row:hover { background: #232935; }
+.side-row:hover { background: #f7f8fa; }
 .side-row:disabled { opacity: 0.5; cursor: not-allowed; }
 .side-row:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
-.side-row.now { border-color: #ffc233; box-shadow: 0 0 0 2px #ffc233; }
+/* --now is the amber from the player, darkened until it actually passes contrast on white.
+   #ffc233 on #fff is 1.7:1 — invisible as a text colour, which is where the "Now" label uses it. */
+.side-row.now {
+  border-color: #e0870d;
+  box-shadow: 0 0 0 2px rgba(224, 135, 13, 0.3);
+  background: #fffaf1;
+}
 
 .side-thumb {
   flex: none;
   width: 96px;
   height: 54px;
   border-radius: 5px;
-  border: 1px solid #333a45;
+  border: 1px solid var(--line-2);
   object-fit: cover;
   background: #fff;
 }
@@ -97,38 +204,37 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #2a303a;
-  color: #a7b0bd;
+  background: #eef0f3;
+  color: var(--muted);
   font-weight: 650;
 }
 
 .side-meta { min-width: 0; line-height: 1.35; }
 .side-now {
   display: block;
-  color: #ffc233;
+  color: #b3690a;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .side-t { font-variant-numeric: tabular-nums; font-weight: 600; }
-.side-d { color: #a7b0bd; font-size: 13px; margin-left: 8px; }
+.side-d { color: var(--muted); font-size: 13px; margin-left: 8px; }
 
 /* --- Landing --------------------------------------------------------------
-   Dark, like the player and the sidebar: the app's chrome is dark, and a white first screen
-   that flips to a dark player reads as two different products. */
+   A white card on the page, like the chart demo's artifact card. */
 .landing {
-  background: #12161d;
-  border: 1px solid #333a45;
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 40px 36px;
-  color: #f2f4f7;
+  box-shadow: 0 6px 22px rgba(15, 18, 25, 0.07);
 }
 .landing-h { font-size: 34px; line-height: 1.15; font-weight: 700; margin: 0 0 12px; }
 .landing-sub {
   font-size: 17px;
   line-height: 1.5;
-  color: #a7b0bd;
+  color: var(--muted);
   margin: 0 0 24px;
   max-width: 52ch;
 }
@@ -140,24 +246,25 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   gap: 8px;
   width: 100%;
   padding: 40px 24px;
-  background: #1b2029;
-  border: 3px dashed #4a5462;
+  background: #f8f9fb;
+  border: 3px dashed #c6cbd4;
   border-radius: 12px;
   color: inherit;
   font: inherit;
   cursor: pointer;
   text-align: center;
 }
-.drop:hover { border-color: #6b7787; background: #232935; }
+.drop:hover { border-color: #9aa2af; background: #f2f4f7; }
 .drop:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
-.drop.over { border-color: #d27cf7; background: #241c30; border-style: solid; }
+.drop.over { border-color: #7e22ce; background: #faf3ff; border-style: solid; }
+.drop svg { color: var(--muted); }
 .drop-h { font-size: 22px; font-weight: 650; }
-.drop small { color: #a7b0bd; font-size: 14px; }
+.drop small { color: var(--muted); font-size: 14px; }
 .drop-btn {
   margin-top: 10px;
   padding: 12px 22px;   /* 44px+ target */
-  background: #d27cf7;
-  color: #17061f;
+  background: #6d28d9;  /* 7.4:1 on white — the light-surface counterpart of the brand purple */
+  color: #fff;
   border-radius: 10px;
   font-size: 16px;
   font-weight: 650;
@@ -170,28 +277,28 @@ h1 { font-size: 20px; margin: 0 0 20px; }
   gap: 10px;
   margin-top: 16px;
   padding: 12px 14px;
-  background: rgba(58, 191, 122, 0.09);
-  border: 1px solid rgba(58, 191, 122, 0.35);
+  background: #f0fbf4;
+  border: 1px solid #b7e4c9;
   border-radius: 10px;
-  color: #a7b0bd;
+  color: #456853;
   font-size: 15px;
   line-height: 1.45;
 }
-.privacy svg { flex: none; margin-top: 2px; color: #3abf7a; }
-.privacy b { color: #6fe0a6; }
+.privacy svg { flex: none; margin-top: 2px; color: #17924e; }
+.privacy b { color: #10693a; }
 .privacy p { margin: 0; }
 
 .landing-error {
   margin-bottom: 20px;
   padding: 14px 16px;
-  background: rgba(255, 90, 77, 0.1);
-  border: 1px solid rgba(255, 90, 77, 0.5);
+  background: #fdf2f2;
+  border: 1px solid #f0b3ae;
   border-radius: 10px;
-  color: #ffc7c2;
+  color: #8a3a34;
   font-size: 15px;
   line-height: 1.5;
 }
-.landing-error b { color: #ff8a80; }
+.landing-error b { color: #b02a20; }
 
 /* Partial failure: the video plays, analysis just stopped early. Mostly a success — so it is
    an amber strip you can dismiss, not a red panel that reads like a crash. */

@@ -8,6 +8,7 @@ import type { SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
 import VideoPlayer, { PLAYBACK_LEAD } from "./player/VideoPlayer";
 import MomentsSidebar from "./MomentsSidebar";
 import Landing from "./Landing";
+import { TopBar, Footer } from "./Shell";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
 
@@ -190,6 +191,7 @@ export default function App() {
   const [currMoment, setCurrMoment] = useState<Activity | null>(null);
   const [thumbs, setThumbs] = useState<ReadonlyMap<number, string>>(new Map());
   const [errorDismissed, setErrorDismissed] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -276,6 +278,7 @@ export default function App() {
 
   function loadFile(file: File) {
     setCurrentTime(0);
+    setFileName(file.name);
     setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
     analyze(file, params);
   }
@@ -372,11 +375,24 @@ export default function App() {
   // honest thing to name in the strip.
   const lastAnalyzed = ranges.length > 0 ? ranges[ranges.length - 1].end : 0;
 
+  // What the top bar says about the analysis. This is the ONLY analyzer status a viewer gets,
+  // and it is deliberately about their lecture ("141 moments") rather than about our pipeline
+  // ("21.8× realtime, 480×270, 8 scenes") — the number they can act on, not the one we tune on.
+  const chip = videoUrl && !fatal && (
+    <span className={done ? "chip ready" : "chip"} role="status">
+      <span className="chip-dot" />
+      {done
+        ? `${activities.length} moment${activities.length === 1 ? "" : "s"}`
+        : `Finding moments… ${progressPct.toFixed(0)}%`}
+    </span>
+  );
+
   return (
-    // The page grows a right-hand column once a video is up; before that the narrow
-    // reading width is right for the drop zone.
-    <div className={videoUrl ? "app with-side" : "app"}>
-      <h1>veasyguide-app</h1>
+    <div className="shell">
+      <TopBar file={videoUrl && !fatal ? fileName : null} status={chip} />
+      {/* The page grows a right-hand column once a video is up; before that the narrow
+          reading width is right for the drop zone. */}
+      <main className={videoUrl && !fatal ? "app with-side" : "app"}>
 
       {/* A fatal error belongs ON the landing screen, beside the drop zone: whatever went
           wrong, the next thing the viewer wants is to try another file. */}
@@ -422,6 +438,11 @@ export default function App() {
             </div>
           )}
 
+          {/* The analyzer readout is instrumentation, not product. It shipped to every viewer:
+              "21.8× realtime · 141 valid / 192 activities · playhead 1734.0s" tells a learner
+              nothing and makes the app look like a lab harness. Behind ?debug=1 with the rest
+              of the tooling now; the status a viewer actually needs is the chip in the top bar. */}
+          {DEBUG && (
           <div className="hud">
             <div className={`meter ${xRealtime >= 4 ? "ok" : xRealtime >= 2 ? "warn" : "bad"}`}>
               {done ? "done" : "analyzing"} · <b>{xRealtime.toFixed(1)}×</b> realtime
@@ -444,6 +465,7 @@ export default function App() {
               {" · analyzed "}{progressPct.toFixed(0)}%{" · playhead "}{currentTime.toFixed(1)}s
             </div>
           </div>
+          )}
 
           {DEBUG && (
           <div className="params">
@@ -625,6 +647,8 @@ export default function App() {
         </div>
       )}
 
+      </main>
+      <Footer />
     </div>
   );
 }

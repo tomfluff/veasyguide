@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>veasyguide — app shell directions</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0b0e13; --surface: #12161d; --raise: #1b2029; --line: #2b323d;
+    --text: #f2f4f7; --muted: #939db0; --brand: #d27cf7; --brand-ink: #17061f;
+    --now: #ffc233; --ok: #3abf7a;
+  }
+  body {
+    background: #06080b; color: var(--text);
+    font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+    padding: 26px; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .kicker { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; letter-spacing: -.01em; }
+  .lede { color: var(--muted); margin-bottom: 22px; max-width: 76ch; }
+  h2 { font-size: 17px; font-weight: 650; margin-bottom: 3px; }
+  .why { color: var(--muted); font-size: 14px; margin-bottom: 12px; max-width: 82ch; }
+  section { margin-bottom: 38px; }
+  .note { margin-top: 10px; color: var(--muted); font-size: 13.5px; border-left: 2px solid var(--line); padding-left: 10px; }
+  .note b { color: #cfd6e2; }
+
+  /* ---------- shared app chrome ---------- */
+  .app { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .top {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface);
+  }
+  .mark {
+    width: 24px; height: 24px; border-radius: 7px; flex: none;
+    background: linear-gradient(135deg, var(--brand), #7d5cff);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #fff;
+  }
+  .name { font-weight: 650; letter-spacing: -.01em; }
+  .file {
+    color: var(--muted); font-size: 13px; padding: 3px 9px;
+    background: var(--raise); border: 1px solid var(--line); border-radius: 999px;
+    max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .grow { flex: 1; }
+  .chip {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--muted);
+    padding: 5px 11px; background: var(--raise); border: 1px solid var(--line); border-radius: 999px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .tbtn {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--raise); color: var(--muted); font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .body { display: flex; gap: 12px; padding: 12px; }
+  .main { flex: 1; min-width: 0; }
+  .player { border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #000; }
+  .video {
+    position: relative; aspect-ratio: 830 / 388;
+    background: url("highlight-on-annotation.png") top center / 100% auto no-repeat #000;
+  }
+  .hl { position: absolute; left: 56.4%; top: 30.5%; width: 21.4%; height: 11.6%;
+        border: 3px solid #ff5a4d; background: rgba(255,194,51,.16); border-radius: 2px; }
+
+  /* control bar */
+  .bar { background: var(--surface); border-top: 1px solid var(--line); padding: 9px 12px 10px; }
+  .scrub { position: relative; height: 6px; background: #39414d; border-radius: 3px; }
+  .scrub .played { position: absolute; inset: 0 auto 0 0; width: 52%; background: var(--brand); border-radius: 3px; }
+  .scrub .knob { position: absolute; left: 52%; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px;
+                 background: #fff; border-radius: 50%; }
+  .lane { position: relative; height: 10px; margin-top: 7px; }
+  .lane i { position: absolute; top: 2px; height: 6px; border-radius: 2px; background: #5c6779; }
+  .lane i.on { background: var(--now); height: 10px; top: 0; }
+  .nowline {
+    display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    padding: 7px 10px; background: var(--raise); border: 1px solid var(--line); border-radius: 8px;
+    font-size: 13.5px;
+  }
+  .nowline .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--now); flex: none; }
+  .nowline .nx { margin-left: auto; color: var(--muted); }
+  .btns { display: flex; align-items: center; gap: 5px; margin-top: 8px; }
+  .b {
+    width: 34px; height: 34px; border-radius: 8px; border: none; background: none;
+    color: var(--text); display: flex; align-items: center; justify-content: center;
+    font-size: 13px; cursor: pointer;
+  }
+  .b:hover { background: var(--raise); }
+  .tc { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 6px; }
+  .vol { width: 58px; height: 4px; background: #39414d; border-radius: 2px; margin-left: 4px; position: relative; }
+  .vol::after { content:""; position:absolute; inset:0 30% 0 0; background: var(--brand); border-radius:2px; }
+
+  /* sidebar */
+  .side {
+    width: 268px; flex: none; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  }
+  .side-h { padding: 11px 12px 9px; border-bottom: 1px solid var(--line); }
+  .side-h .t { font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 7px; }
+  .side-h .t small { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 12.5px; }
+  .search {
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    padding: 6px 9px; background: var(--bg); border: 1px solid var(--line); border-radius: 7px;
+    color: var(--muted); font-size: 12.5px;
+  }
+  .list { padding: 7px; display: flex; flex-direction: column; gap: 5px; overflow: hidden; }
+  .sceneh {
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+    padding: 7px 4px 3px; display: flex; align-items: center; gap: 7px;
+  }
+  .sceneh::after { content:""; flex:1; height:1px; background: var(--line); }
+  .row {
+    display: flex; align-items: center; gap: 9px; padding: 5px;
+    background: var(--raise); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  }
+  .row.on { border-color: var(--now); box-shadow: 0 0 0 1.5px var(--now); }
+  .row .tn {
+    width: 84px; height: 47px; flex: none; border-radius: 4px; border: 1px solid var(--line);
+    background-image: url("highlight-on-annotation.png"); background-repeat: no-repeat; background-color:#fff;
+  }
+  .row .m { min-width: 0; line-height: 1.3; }
+  .row .m .a { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+  .row .m .b2 { color: var(--muted); font-size: 12px; }
+  .row .m .nw { color: var(--now); font-size: 10.5px; font-weight: 700; letter-spacing:.07em; text-transform: uppercase; }
+
+  /* ---- B: theater ---- */
+  .theater .body { padding: 0; }
+  .theater .player { border: none; border-radius: 0; }
+  .theater .stagewrap { position: relative; flex: 1; min-width: 0; }
+  .theater .side {
+    position: absolute; right: 12px; top: 12px; bottom: 96px; z-index: 5;
+    background: rgba(18,22,29,.95); box-shadow: 0 14px 40px rgba(0,0,0,.6);
+  }
+  .theater .top { background: transparent; border-bottom: none; position: absolute; top:0; left:0; right:0; z-index: 6;
+                  background: linear-gradient(180deg, rgba(6,8,11,.8), transparent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="kicker">veasyguide-app · making it look like a product</div>
+<h1>Three shells for the same player</h1>
+<p class="lede">
+  All three delete the engineering readout, replace <b>“veasyguide-app”</b> with a real title bar,
+  and recolour the moment lane (red reads as <i>error</i>; these moments are the good stuff).
+  They differ in how much room the lecture gets, and how hard the sidebar works.
+</p>
+
+<!-- ================= A ================= -->
+<section>
+  <h2>A — Product shell</h2>
+  <p class="why">A real top bar: mark, name, the file you loaded, and one honest status chip.
+     Player and sidebar are a two-column grid of equal height. Nothing else changes.</p>
+  <div class="app">
+    <div class="top">
+      <div class="mark">v</div>
+      <div class="name">veasyguide</div>
+      <div class="file">robotics-lecture-week3.mp4</div>
+      <div class="grow"></div>
+      <div class="chip"><span class="dot"></span> 141 moments · ready</div>
+      <button class="tbtn">?</button>
+    </div>
+    <div class="body">
+      <div class="main">
+        <div class="player">
+          <div class="video"><div class="hl"></div></div>
+          <div class="bar">
+            <div class="scrub"><div class="played"></div><div class="knob"></div></div>
+            <div class="lane">
+              <i style="left:2%;width:1.2%"></i><i style="left:7%;width:1%"></i><i style="left:11%;width:1.6%"></i>
+              <i style="left:19%;width:1%"></i><i style="left:23%;width:2%"></i><i style="left:31%;width:1.2%"></i>
+              <i style="left:37%;width:1%"></i><i style="left:44%;width:1.4%"></i>
+              <i class="on" style="left:52%;width:2%"></i>
+              <i style="left:58%;width:1%"></i><i style="left:63%;width:1.6%"></i><i style="left:71%;width:1.2%"></i>
+              <i style="left:78%;width:1%"></i><i style="left:85%;width:1.8%"></i><i style="left:93%;width:1%"></i>
+            </div>
+            <div class="nowline">
+              <span class="pip"></span> Moment <b>101</b> of <b>141</b> · <b>28:53</b>, 1.0s
+              <span class="nx">Next at <b>28:55</b></span>
+            </div>
+            <div class="btns">
+              <button class="b">▶</button><button class="b">⏮</button><button class="b">⏭</button>
+              <button class="b">🔊</button><div class="vol"></div>
+              <span class="tc">28:54 / 35:50</span>
+              <div class="grow"></div>
+              <button class="b">✦</button><button class="b">⛶</button><button class="b">⌄</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="side">
+        <div class="side-h"><div class="t">Moments <small>101 / 141</small></div></div>
+        <div class="list">
+          <div class="row"><span class="tn" style="background-size:340px;background-position:-190px -30px"></span>
+            <span class="m"><span class="a">27:55</span><span class="b2"> · 2.4s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:250px;background-position:-40px -70px"></span>
+            <span class="m"><span class="a">27:57</span><span class="b2"> · 0.8s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:400px;background-position:-230px -95px"></span>
+            <span class="m"><span class="a">27:58</span><span class="b2"> · 1.4s</span></span></div>
+          <div class="row on"><span class="tn" style="background-size:290px;background-position:-150px -50px"></span>
+            <span class="m"><span class="nw">Now</span><span class="a">28:53</span><span class="b2"> · 1.0s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:330px;background-position:-60px -120px"></span>
+            <span class="m"><span class="a">28:55</span><span class="b2"> · 3.2s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:260px;background-position:-180px -20px"></span>
+            <span class="m"><span class="a">29:01</span><span class="b2"> · 3.4s</span></span></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div class="note"><b>Costs:</b> a top bar (~40px). <b>Buys:</b> it stops looking like a dev harness.
+     Smallest change of the three — everything else is already built.</div>
+</section>
+
+<!-- ================= B ================= -->
+<section>
+  <h2>B — Theater</h2>
+  <p class="why">The lecture is the product; give it the whole frame. Page chrome floats over the
+     video and fades while playing. The sidebar becomes a panel you summon — same as fullscreen already does.</p>
+  <div class="app theater">
+    <div class="body">
+      <div class="stagewrap">
+        <div class="top">
+          <div class="mark">v</div><div class="name">veasyguide</div>
+          <div class="file">robotics-lecture-week3.mp4</div>
+          <div class="grow"></div>
+          <div class="chip"><span class="dot"></span> 141 moments</div>
+        </div>
+        <div class="player">
+          <div class="video" style="aspect-ratio: 830/440"><div class="hl"></div></div>
+          <div class="bar">
+            <div class="scrub"><div class="played"></div><div class="knob"></div></div>
+            <div class="lane">
+              <i style="left:2%;width:1.2%"></i><i style="left:11%;width:1.6%"></i><i style="left:23%;width:2%"></i>
+              <i style="left:37%;width:1%"></i><i class="on" style="left:52%;width:2%"></i>
+              <i style="left:63%;width:1.6%"></i><i style="left:78%;width:1%"></i><i style="left:93%;width:1%"></i>
+            </div>
+            <div class="btns">
+              <button class="b">▶</button><button class="b">⏮</button><button class="b">⏭</button>
+              <button class="b">🔊</button><div class="vol"></div>
+              <span class="tc">28:54 / 35:50 · Moment 101 of 141</span>
+              <div class="grow"></div>
+              <button class="b">☰</button><button class="b">✦</button><button class="b">⛶</button>
+            </div>
+          </div>
+        </div>
+        <aside class="side">
+          <div class="side-h"><div class="t">Moments <small>101 / 141</small></div></div>
+          <div class="list">
+            <div class="row"><span class="tn" style="background-size:340px;background-position:-190px -30px"></span>
+              <span class="m"><span class="a">27:55</span><span class="b2"> · 2.4s</span></span></div>
+            <div class="row"><span class="tn" style="background-size:250px;background-position:-40px -70px"></span>
+              <span class="m"><span class="a">27:57</span><span class="b2"> · 0.8s</span></span></div>
+            <div class="row on"><span class="tn" style="background-size:290px;background-position:-150px -50px"></span>
+              <span class="m"><span class="nw">Now</span><span class="a">28:53</span><span class="b2"> · 1.0s</span></span></div>
+            <div class="row"><span class="tn" style="background-size:330px;background-position:-60px -120px"></span>
+              <span class="m"><span class="a">28:55</span><span class="b2"> · 3.2s</span></span></div>
+            <div class="row"><span class="tn" style="background-size:260px;background-position:-180px -20px"></span>
+              <span class="m"><span class="a">29:01</span><span class="b2"> · 3.4s</span></span></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>Costs:</b> the moments list is no longer always visible — it becomes a thing you
+     open. <b>Buys:</b> the biggest possible lecture, and one layout for windowed and fullscreen instead of two.</div>
+</section>
+
+<!-- ================= C ================= -->
+<section>
+  <h2>C — Study workspace</h2>
+  <p class="why">141 moments is a lot to scroll. The sidebar earns its width: filter by text, and
+     group by scene, so the list becomes an outline of the lecture rather than one long strip.</p>
+  <div class="app">
+    <div class="top">
+      <div class="mark">v</div><div class="name">veasyguide</div>
+      <div class="file">robotics-lecture-week3.mp4</div>
+      <div class="grow"></div>
+      <div class="chip"><span class="dot"></span> 141 moments · 8 sections</div>
+      <button class="tbtn">?</button>
+    </div>
+    <div class="body">
+      <div class="main">
+        <div class="player">
+          <div class="video"><div class="hl"></div></div>
+          <div class="bar">
+            <div class="scrub"><div class="played"></div><div class="knob"></div></div>
+            <div class="lane">
+              <i style="left:2%;width:1.2%"></i><i style="left:7%;width:1%"></i><i style="left:11%;width:1.6%"></i>
+              <i style="left:19%;width:1%"></i><i style="left:23%;width:2%"></i><i style="left:31%;width:1.2%"></i>
+              <i style="left:37%;width:1%"></i><i style="left:44%;width:1.4%"></i>
+              <i class="on" style="left:52%;width:2%"></i>
+              <i style="left:58%;width:1%"></i><i style="left:63%;width:1.6%"></i><i style="left:71%;width:1.2%"></i>
+              <i style="left:78%;width:1%"></i><i style="left:85%;width:1.8%"></i><i style="left:93%;width:1%"></i>
+            </div>
+            <div class="nowline">
+              <span class="pip"></span> Moment <b>101</b> of <b>141</b> · <b>28:53</b>, 1.0s
+              <span class="nx">Next at <b>28:55</b></span>
+            </div>
+            <div class="btns">
+              <button class="b">▶</button><button class="b">⏮</button><button class="b">⏭</button>
+              <button class="b">🔊</button><div class="vol"></div>
+              <span class="tc">28:54 / 35:50</span>
+              <div class="grow"></div>
+              <button class="b">✦</button><button class="b">⛶</button><button class="b">⌄</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="side">
+        <div class="side-h">
+          <div class="t">Moments <small>101 / 141</small></div>
+          <div class="search">🔍 Jump to a time…</div>
+        </div>
+        <div class="list">
+          <div class="sceneh">Section 6 · 27:40</div>
+          <div class="row"><span class="tn" style="background-size:340px;background-position:-190px -30px"></span>
+            <span class="m"><span class="a">27:55</span><span class="b2"> · 2.4s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:250px;background-position:-40px -70px"></span>
+            <span class="m"><span class="a">27:57</span><span class="b2"> · 0.8s</span></span></div>
+          <div class="sceneh">Section 7 · 28:40</div>
+          <div class="row on"><span class="tn" style="background-size:290px;background-position:-150px -50px"></span>
+            <span class="m"><span class="nw">Now</span><span class="a">28:53</span><span class="b2"> · 1.0s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:330px;background-position:-60px -120px"></span>
+            <span class="m"><span class="a">28:55</span><span class="b2"> · 3.2s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:260px;background-position:-180px -20px"></span>
+            <span class="m"><span class="a">29:01</span><span class="b2"> · 3.4s</span></span></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <div class="note"><b>Costs:</b> real new features (filter, scene grouping). The analyzer already
+     emits scenes — <b>8 of them</b> on your lecture — and nothing in the UI uses them today.
+     <b>Buys:</b> 141 moments stop being a wall.</div>
+</section>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>veasyguide — shell A in the house style</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --page: #fbfbfc;
+    --card: #ffffff;
+    --line: #e4e6ea;
+    --line-2: #d7dae0;
+    --ink: #15171c;
+    --muted: #6b7280;
+    --accent: #2f6feb;          /* the blue on "Project Page" */
+    --plum: #3b0d47;            /* the footer / top hairline */
+    --brand: #a855f7;           /* veasyguide purple, tuned for a LIGHT surface */
+    --now: #e0870d;             /* "now" amber, darkened until it passes on white */
+    --mark: #6b7280;
+  }
+  body {
+    background: #eceef1; color: var(--ink);
+    font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+    padding: 24px; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  .kicker { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #6b7280; margin-bottom: 6px; }
+  h1.pg { font-size: 23px; font-weight: 700; margin-bottom: 4px; }
+  .lede { color: #6b7280; margin-bottom: 22px; max-width: 78ch; }
+  h2.pg { font-size: 16px; font-weight: 650; margin-bottom: 3px; }
+  .why { color: #6b7280; font-size: 14px; margin-bottom: 12px; max-width: 84ch; }
+  section { margin-bottom: 34px; }
+  .note { margin-top: 10px; color: #6b7280; font-size: 13.5px; border-left: 2px solid #c9ccd2; padding-left: 10px; }
+  .note b { color: #2b2f36; }
+
+  /* ================= the app ================= */
+  .app {
+    background: var(--page); border: 1px solid var(--line-2); border-radius: 12px;
+    overflow: hidden; box-shadow: 0 6px 22px rgba(15,18,25,.09);
+  }
+  .hairline { height: 4px; background: var(--plum); }
+
+  /* --- top bar --- */
+  .top {
+    display: flex; align-items: center; gap: 11px;
+    padding: 11px 18px; background: #fff; border-bottom: 1px solid var(--line);
+  }
+  .mark {
+    width: 30px; height: 30px; flex: none; border-radius: 7px;
+    background: #2b2f36; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mark svg { display: block; }
+  .ttl { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+  .ttl em { font-style: italic; font-weight: 400; color: var(--muted); font-size: 15px; margin-left: 6px; }
+  .grow { flex: 1; }
+  .nav { display: flex; align-items: center; gap: 20px; font-size: 15px; color: var(--muted); }
+  .nav a { color: inherit; text-decoration: none; display: flex; align-items: center; gap: 6px; }
+  .nav a.acc { color: var(--accent); }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%; margin-left: 6px;
+    background: linear-gradient(135deg, #f0abfc, #7dd3fc); border: 1px solid var(--line-2);
+  }
+  .filechip {
+    font-size: 13px; color: var(--muted); padding: 4px 10px;
+    background: #f3f4f6; border: 1px solid var(--line); border-radius: 999px;
+    max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* --- body --- */
+  .body { display: flex; gap: 14px; padding: 18px; align-items: stretch; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  .player {
+    border-radius: 12px; overflow: hidden; background: #000;
+    border: 1px solid var(--line-2); box-shadow: 0 4px 16px rgba(15,18,25,.10);
+    position: relative;
+  }
+  .video {
+    position: relative; aspect-ratio: 830 / 388;
+    background: url("highlight-on-annotation.png") top center / 100% auto no-repeat #000;
+  }
+  .hl { position: absolute; left: 56.4%; top: 30.5%; width: 21.4%; height: 11.6%;
+        border: 3px solid #ff5a4d; background: rgba(255,194,51,.16); border-radius: 2px; }
+
+  /* --- sidebar (light) --- */
+  .side {
+    width: 268px; flex: none; display: flex; flex-direction: column;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    box-shadow: 0 4px 16px rgba(15,18,25,.06);
+  }
+  .side-h { padding: 12px 13px 10px; border-bottom: 1px solid var(--line); }
+  .side-h .t { font-size: 15px; font-weight: 650; display: flex; align-items: center; }
+  .side-h .t small { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 13px; }
+  .list { padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+  .row {
+    display: flex; align-items: center; gap: 10px; padding: 6px;
+    background: #fff; border: 1px solid var(--line); border-radius: 9px; cursor: pointer;
+  }
+  .row:hover { background: #f7f8fa; }
+  .row.on { border-color: var(--now); box-shadow: 0 0 0 2px rgba(224,135,13,.28); background: #fffaf1; }
+  .row .tn {
+    width: 88px; height: 50px; flex: none; border-radius: 5px; border: 1px solid var(--line-2);
+    background-image: url("highlight-on-annotation.png"); background-repeat: no-repeat; background-color: #fff;
+  }
+  .row .m { min-width: 0; line-height: 1.3; }
+  .row .m .a { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 14px; }
+  .row .m .b2 { color: var(--muted); font-size: 12.5px; }
+  .row .m .nw { display:block; color: var(--now); font-size: 10.5px; font-weight: 800; letter-spacing:.07em; text-transform: uppercase; }
+
+  /* --- footer --- */
+  .foot {
+    background: var(--plum); color: #e9d8f5; text-align: center;
+    padding: 13px; font-size: 14px;
+  }
+  .foot b { color: #fff; font-weight: 600; }
+  .foot .av { width: 20px; height: 20px; border-radius: 50%; display: inline-block; vertical-align: -5px;
+              background: linear-gradient(135deg, #f0abfc, #7dd3fc); margin: 0 5px; }
+
+  /* ================= VARIANT 1 — dark controls on the video ============ */
+  .barDark { background: #12161d; padding: 9px 12px 10px; }
+  .barDark .scrub { position: relative; height: 6px; background: #39414d; border-radius: 3px; }
+  .barDark .played { position: absolute; inset: 0 auto 0 0; width: 52%; background: var(--brand); border-radius: 3px; }
+  .barDark .knob { position: absolute; left: 52%; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; background: #fff; border-radius: 50%; }
+  .barDark .lane { position: relative; height: 10px; margin-top: 7px; }
+  .barDark .lane i { position: absolute; top: 2px; height: 6px; border-radius: 2px; background: #5c6779; }
+  .barDark .lane i.on { background: #ffc233; height: 10px; top: 0; }
+  .barDark .nowline { display:flex; align-items:center; gap:8px; margin-top:8px; padding:7px 10px;
+    background:#1b2029; border:1px solid #2b323d; border-radius:8px; font-size:13.5px; color:#f2f4f7; }
+  .barDark .nowline .nx { margin-left:auto; color:#939db0; }
+  .barDark .pip { width:7px;height:7px;border-radius:50%;background:#ffc233;flex:none; }
+  .barDark .btns { display:flex; align-items:center; gap:5px; margin-top:8px; }
+  .barDark .b { width:34px;height:34px;border-radius:8px;border:none;background:none;color:#f2f4f7;
+    display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer; }
+  .barDark .b:hover { background:#232935; }
+  .barDark .tc { font-size:13px;color:#939db0;font-variant-numeric:tabular-nums;margin-left:6px; }
+  .barDark .vol { width:58px;height:4px;background:#39414d;border-radius:2px;margin-left:4px;position:relative; }
+  .barDark .vol::after { content:"";position:absolute;inset:0 30% 0 0;background:var(--brand);border-radius:2px; }
+
+  /* ================= VARIANT 2 — floating pill toolbar ================= */
+  .pillstage { position: relative; }
+  .pillstage .video { border-radius: 12px; }
+  /* the scrubber still has to live ON the video — it is spatial, it maps to the frame */
+  .onvid {
+    position: absolute; left: 12px; right: 12px; bottom: 12px;
+    background: rgba(10,13,18,.72); border-radius: 10px; padding: 8px 10px;
+    backdrop-filter: blur(6px);
+  }
+  .onvid .scrub { position: relative; height: 6px; background: rgba(255,255,255,.28); border-radius: 3px; }
+  .onvid .played { position: absolute; inset: 0 auto 0 0; width: 52%; background: #c084fc; border-radius: 3px; }
+  .onvid .knob { position: absolute; left: 52%; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; background:#fff; border-radius:50%; }
+  .onvid .lane { position: relative; height: 9px; margin-top: 6px; }
+  .onvid .lane i { position: absolute; top: 2px; height: 5px; border-radius: 2px; background: rgba(255,255,255,.45); }
+  .onvid .lane i.on { background: #ffc233; height: 9px; top: 0; }
+  .onvid .nowline { display:flex; align-items:center; gap:7px; margin-top:7px; font-size:13px; color:#fff; }
+  .onvid .nowline .nx { margin-left:auto; color:#cfd6e2; }
+  .onvid .pip { width:7px;height:7px;border-radius:50%;background:#ffc233;flex:none; }
+
+  .pill {
+    display: flex; align-items: center; gap: 4px;
+    margin: 16px auto 2px; width: fit-content; max-width: 100%;
+    background: #fff; border: 1px solid var(--line);
+    border-radius: 999px; padding: 7px 9px;
+    box-shadow: 0 8px 26px rgba(15,18,25,.13);
+  }
+  .pb {
+    display: flex; align-items: center; gap: 7px;
+    height: 40px; padding: 0 13px; border: none; background: none; border-radius: 999px;
+    color: var(--ink); font: inherit; font-size: 14.5px; font-weight: 500; cursor: pointer;
+  }
+  .pb.icon { padding: 0; width: 40px; justify-content: center; }
+  .pb:hover { background: #f1f2f5; }
+  .pb.on { background: #f1f2f5; font-weight: 600; }
+  .pb .g { color: var(--muted); }
+  .sep { width: 1px; height: 26px; background: var(--line); margin: 0 5px; }
+  .seg { display: flex; align-items: center; gap: 2px; background: #f7f8fa; border-radius: 999px; padding: 3px; }
+  .zoom { display: flex; align-items: center; gap: 2px; }
+  .zoom .pct { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; padding: 0 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="kicker">veasyguide-app · direction A, in your house style</div>
+<h1 class="pg">Same shell, two answers for the controls</h1>
+<p class="lede">
+  Both take the language from your chart demo: the plum hairline and footer, the slim white
+  title bar with an italic qualifier and a muted nav, the light page, the soft-shadowed card.
+  Both delete the analyzer readout and recolour the moment lane. They disagree on exactly one
+  thing — <b>where the controls live</b>.
+</p>
+
+<!-- =============== A1 =============== -->
+<section>
+  <h2 class="pg">A1 — Light shell, dark controls</h2>
+  <p class="why">The page is yours; the player keeps a conventional dark control bar, because it
+     sits against video. Every video player on the web does this, and for a low-vision viewer the
+     white-on-near-black bar is the highest-contrast surface in the app.</p>
+
+  <div class="app">
+    <div class="hairline"></div>
+    <div class="top">
+      <div class="mark">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 6h14M6 1v14"/>
+        </svg>
+      </div>
+      <div class="ttl">veasyguide <em>Lecture video, enhanced</em></div>
+      <div class="filechip">robotics-lecture-week3.mp4</div>
+      <div class="grow"></div>
+      <div class="nav">
+        <a>About</a>
+        <a class="acc">↗ Project Page</a>
+        <a>Code on GitHub</a>
+      </div>
+      <div class="avatar"></div>
+    </div>
+
+    <div class="body">
+      <div class="main">
+        <div class="player">
+          <div class="video"><div class="hl"></div></div>
+          <div class="barDark">
+            <div class="scrub"><div class="played"></div><div class="knob"></div></div>
+            <div class="lane">
+              <i style="left:2%;width:1.2%"></i><i style="left:7%;width:1%"></i><i style="left:11%;width:1.6%"></i>
+              <i style="left:19%;width:1%"></i><i style="left:23%;width:2%"></i><i style="left:31%;width:1.2%"></i>
+              <i style="left:37%;width:1%"></i><i style="left:44%;width:1.4%"></i>
+              <i class="on" style="left:52%;width:2%"></i>
+              <i style="left:58%;width:1%"></i><i style="left:63%;width:1.6%"></i><i style="left:71%;width:1.2%"></i>
+              <i style="left:78%;width:1%"></i><i style="left:85%;width:1.8%"></i><i style="left:93%;width:1%"></i>
+            </div>
+            <div class="nowline">
+              <span class="pip"></span> Moment <b>101</b> of <b>141</b> · <b>28:53</b>, 1.0s
+              <span class="nx">Next at <b>28:55</b></span>
+            </div>
+            <div class="btns">
+              <button class="b">▶</button><button class="b">⏮</button><button class="b">⏭</button>
+              <button class="b">🔊</button><div class="vol"></div>
+              <span class="tc">28:54 / 35:50</span>
+              <div class="grow"></div>
+              <button class="b">✦</button><button class="b">⛶</button><button class="b">⌄</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="side-h"><div class="t">Moments <small>101 of 141</small></div></div>
+        <div class="list">
+          <div class="row"><span class="tn" style="background-size:340px;background-position:-190px -30px"></span>
+            <span class="m"><span class="a">27:55</span><span class="b2"> · 2.4s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:250px;background-position:-40px -70px"></span>
+            <span class="m"><span class="a">27:57</span><span class="b2"> · 0.8s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:400px;background-position:-230px -95px"></span>
+            <span class="m"><span class="a">27:58</span><span class="b2"> · 1.4s</span></span></div>
+          <div class="row on"><span class="tn" style="background-size:290px;background-position:-150px -50px"></span>
+            <span class="m"><span class="nw">Now</span><span class="a">28:53</span><span class="b2"> · 1.0s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:330px;background-position:-60px -120px"></span>
+            <span class="m"><span class="a">28:55</span><span class="b2"> · 3.2s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:260px;background-position:-180px -20px"></span>
+            <span class="m"><span class="a">29:01</span><span class="b2"> · 3.4s</span></span></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="foot">
+      Created with love and care by <span class="av"></span><b>Yotam Sechayk</b> — reach out with any questions.
+    </div>
+  </div>
+  <div class="note"><b>Buys:</b> highest contrast where it matters, and it is what we already have —
+     the bar just gets re-skinned. <b>Costs:</b> the player is a dark slab in a light page; it reads
+     as a component, not as part of your design language.</div>
+</section>
+
+<!-- =============== A2 =============== -->
+<section>
+  <h2 class="pg">A2 — Light shell, floating pill</h2>
+  <p class="why">Your chart demo's toolbar, applied. The <i>spatial</i> controls (scrubber, moment lane,
+     now-line) must stay on the video — they map to the frame and to time. Everything else — play,
+     step, volume, Appearance, zoom, fullscreen — lifts out into the pill below.</p>
+
+  <div class="app">
+    <div class="hairline"></div>
+    <div class="top">
+      <div class="mark">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="1" y="1" width="14" height="14" rx="1.5"/><path d="M1 6h14M6 1v14"/>
+        </svg>
+      </div>
+      <div class="ttl">veasyguide <em>Lecture video, enhanced</em></div>
+      <div class="filechip">robotics-lecture-week3.mp4</div>
+      <div class="grow"></div>
+      <div class="nav">
+        <a>About</a>
+        <a class="acc">↗ Project Page</a>
+        <a>Code on GitHub</a>
+      </div>
+      <div class="avatar"></div>
+    </div>
+
+    <div class="body">
+      <div class="main">
+        <div class="player pillstage" style="background:transparent;border:none;box-shadow:none;">
+          <div class="video" style="border-radius:12px;border:1px solid var(--line-2);box-shadow:0 4px 16px rgba(15,18,25,.10);">
+            <div class="hl"></div>
+            <div class="onvid">
+              <div class="scrub"><div class="played"></div><div class="knob"></div></div>
+              <div class="lane">
+                <i style="left:2%;width:1.2%"></i><i style="left:7%;width:1%"></i><i style="left:11%;width:1.6%"></i>
+                <i style="left:19%;width:1%"></i><i style="left:23%;width:2%"></i><i style="left:31%;width:1.2%"></i>
+                <i style="left:37%;width:1%"></i><i style="left:44%;width:1.4%"></i>
+                <i class="on" style="left:52%;width:2%"></i>
+                <i style="left:58%;width:1%"></i><i style="left:63%;width:1.6%"></i><i style="left:71%;width:1.2%"></i>
+                <i style="left:78%;width:1%"></i><i style="left:85%;width:1.8%"></i><i style="left:93%;width:1%"></i>
+              </div>
+              <div class="nowline">
+                <span class="pip"></span> Moment <b>101</b> of <b>141</b> · <b>28:53</b>, 1.0s
+                <span class="nx">Next at <b>28:55</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pill">
+            <button class="pb icon">▶</button>
+            <button class="pb icon">⏮</button>
+            <button class="pb icon">⏭</button>
+            <span class="sep"></span>
+            <button class="pb icon">🔊</button>
+            <span class="pb" style="font-variant-numeric:tabular-nums;color:var(--muted);">28:54 / 35:50</span>
+            <span class="sep"></span>
+            <button class="pb"><span class="g">✦</span> Appearance</button>
+            <span class="sep"></span>
+            <div class="zoom">
+              <button class="pb icon">−</button>
+              <span class="pct">100%</span>
+              <button class="pb icon">+</button>
+            </div>
+            <span class="sep"></span>
+            <button class="pb icon">⛶</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="side-h"><div class="t">Moments <small>101 of 141</small></div></div>
+        <div class="list">
+          <div class="row"><span class="tn" style="background-size:340px;background-position:-190px -30px"></span>
+            <span class="m"><span class="a">27:55</span><span class="b2"> · 2.4s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:250px;background-position:-40px -70px"></span>
+            <span class="m"><span class="a">27:57</span><span class="b2"> · 0.8s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:400px;background-position:-230px -95px"></span>
+            <span class="m"><span class="a">27:58</span><span class="b2"> · 1.4s</span></span></div>
+          <div class="row on"><span class="tn" style="background-size:290px;background-position:-150px -50px"></span>
+            <span class="m"><span class="nw">Now</span><span class="a">28:53</span><span class="b2"> · 1.0s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:330px;background-position:-60px -120px"></span>
+            <span class="m"><span class="a">28:55</span><span class="b2"> · 3.2s</span></span></div>
+          <div class="row"><span class="tn" style="background-size:260px;background-position:-180px -20px"></span>
+            <span class="m"><span class="a">29:01</span><span class="b2"> · 3.4s</span></span></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="foot">
+      Created with love and care by <span class="av"></span><b>Yotam Sechayk</b> — reach out with any questions.
+    </div>
+  </div>
+  <div class="note"><b>Buys:</b> the player stops being a foreign object — it is unmistakably the same
+     product as the chart demo. <b>Costs:</b> two control surfaces instead of one (on-video + pill), and
+     the pill cannot follow into fullscreen, so fullscreen keeps the dark bar regardless. The buttons
+     also lose the near-black backing that makes them highest-contrast today.</div>
+</section>
+
+</div>
+</body>
+</html>
