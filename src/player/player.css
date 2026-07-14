@@ -263,10 +263,8 @@
    It is LARGER than the wrapper — sized to the scaled indicator box, with its source rect
    expanded to match — so it is centred here rather than inset:0.
 
-   It carries NO animation, on purpose. The canvas holds a copy of the video's own pixels, so
-   scaling it scales a picture of the lecture: pulsing it made the words under the highlight
-   physically grow and shrink. The pulse says "look here"; it does not magnify (the zoom does).
-   Only the border below throbs, around ink that stays put. */
+   It is never SCALED. The canvas holds a copy of the video's own pixels, so scaling it would
+   stretch a picture of the lecture and the words under the highlight would grow and shrink. */
 .highlight-enhance {
   position: absolute;
   left: 50%;
@@ -285,6 +283,31 @@
   100% {
     transform: scale(var(--indicator-scale));
   }
+}
+
+/* Making the ink breathe WITHOUT magnifying it.
+   When the pulse is on, the canvas is rendered at the throb's widest extent (PULSE_PEAK in
+   HighlightIndicator.tsx — keep the 1.25 above and there in step), still sampled 1:1 from the
+   video. This clip then reveals more or less of that canvas, in time with the border. So the
+   inked REGION spreads and contracts — more of the slide gets enhanced — while every pixel
+   inside it stays exactly where it is.
+
+   The 10% is derived, not chosen: at rest the visible region must be the un-throbbed box, which
+   is 1/1.25 = 80% of the canvas, so 10% is trimmed from each side. */
+@keyframes ink-spread {
+  0% {
+    clip-path: inset(10%);
+  }
+  50% {
+    clip-path: inset(0%);
+  }
+  100% {
+    clip-path: inset(10%);
+  }
+}
+
+.highlight-enhance.spreading {
+  animation: ink-spread var(--pulse-duration, 1s) ease-in-out forwards 3;
 }
 
 /* Deliberately NO prefers-reduced-motion override here: the pulse is off by default and is

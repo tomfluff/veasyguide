@@ -18,6 +18,11 @@ type Props = {
   videoRef: RefObject<HTMLVideoElement | null>;
 };
 
+// The top of a throb, as a multiple of the resting box. MUST match the 1.25 in @keyframes pulse
+// (player.css) — the canvas is sized to this extent and the ink-spread clip is derived from it,
+// so if they disagree the ink and the border stop lining up at the peak.
+const PULSE_PEAK = 1.25;
+
 const HighlightIndicator = (props: Props) => {
   const { leftShift, topShift, scaleRatio, activity } = props;
   const settings = useHighlightSettingsStore();
@@ -107,18 +112,24 @@ const HighlightIndicator = (props: Props) => {
   // by the same factor so the pixels stay 1:1 with the video underneath. (A source poking past
   // the frame edge is fine: GL clamps to edge, and 2D drawImage clips.)
   //
-  // The canvas is deliberately NOT animated with the pulse. It holds a copy of the video's own
-  // pixels, so scaling it scales a picture of the lecture — the words under the highlight would
-  // physically grow and shrink. The pulse is an attention cue about WHERE to look; it is not a
-  // claim that more content is highlighted, and it must not act like a magnifier (that is what
-  // the zoom is for). So the border throbs around ink that stays put, and at the top of a throb
-  // the border simply runs a little wider than the inked region.
+  // Making the ink breathe with the pulse: the canvas is NEVER scaled. It holds a copy of the
+  // video's own pixels, so scaling it would stretch a picture of the lecture and the words under
+  // the highlight would physically grow and shrink — a pulse is an attention cue, not a
+  // magnifier (that is what the zoom is for).
+  //
+  // Instead, when the pulse is on the canvas is rendered at the throb's WIDEST extent, still
+  // sourced 1:1, and a clip-path animation reveals more or less of it in step with the border.
+  // The inked REGION grows — more content gets enhanced — while every pixel inside it stays
+  // exactly where it was. Growing the region and magnifying it are different things, and only
+  // the first is what "pulse" should mean.
   const indicatorScale = settings.base_scale + 0.05;
+  const pulsing = settings.animation_style !== "none";
+  const inkScale = indicatorScale * (pulsing ? PULSE_PEAK : 1);
   const enhanceSource = {
-    x: currActivity.pos.x + (currActivity.dim.width * (1 - indicatorScale)) / 2,
-    y: currActivity.pos.y + (currActivity.dim.height * (1 - indicatorScale)) / 2,
-    width: currActivity.dim.width * indicatorScale,
-    height: currActivity.dim.height * indicatorScale,
+    x: currActivity.pos.x + (currActivity.dim.width * (1 - inkScale)) / 2,
+    y: currActivity.pos.y + (currActivity.dim.height * (1 - inkScale)) / 2,
+    width: currActivity.dim.width * inkScale,
+    height: currActivity.dim.height * inkScale,
   };
 
   return (
@@ -126,6 +137,7 @@ const HighlightIndicator = (props: Props) => {
       className="highlight-wrapper"
       style={{
         ["--highlight-opacity" as string]: highlightOpacity,
+        ["--pulse-duration" as string]: `${1 / settings.animation_speed}s`,
         position: "absolute",
         left: `${scaleRatio * currActivity.pos.x + leftShift}px`,
         top: `${scaleRatio * currActivity.pos.y + topShift}px`,
@@ -149,7 +161,7 @@ const HighlightIndicator = (props: Props) => {
       }}
     >
       <EnhanceCanvas
-        className="highlight-enhance"
+        className={pulsing ? "highlight-enhance spreading" : "highlight-enhance"}
         videoRef={props.videoRef}
         filters={filters}
         source={enhanceSource}
