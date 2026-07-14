@@ -101,6 +101,17 @@
   margin: 0 auto;
   padding: 16px 28px 24px;
 }
+
+/* No video yet: the landing is one short errand, so it sits in the middle of the window rather
+   than pinned to the top with a field of grey under it. (With a video loaded the page is
+   top-aligned — the player is tall enough to fill it, and content that moves when you load a
+   file would be worse than the gap.) */
+.app:not(.with-side) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 /* Wide, so the lecture can use the window. The player's own height bound (player.css) stops it
    from growing taller than the viewport on the way. */
 .app.with-side { max-width: 1560px; }
@@ -249,31 +260,35 @@
 
 /* --- Landing --------------------------------------------------------------
    A white card on the page, like the chart demo's artifact card. */
+/* The whole screen is one short errand: read a sentence, drop a file. It is sized to that —
+   narrower than the player's column, because a 900px-wide dashed rectangle is not a friendlier
+   target than a 620px one, just a more cavernous one. */
 .landing {
+  max-width: 620px;
+  margin: 0 auto;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 40px 36px;
+  padding: 26px 28px;
   box-shadow: 0 6px 22px rgba(15, 18, 25, 0.07);
 }
-.landing-h { font-size: 34px; line-height: 1.15; font-weight: 700; margin: 0 0 12px; }
+.landing-h { font-size: 27px; line-height: 1.2; font-weight: 700; margin: 0 0 6px; }
 .landing-sub {
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.5;
   color: var(--muted);
-  margin: 0 0 24px;
-  max-width: 52ch;
+  margin: 0 0 16px;
 }
 
 .drop {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
-  padding: 40px 24px;
+  padding: 22px 20px;
   background: #f8f9fb;
-  border: 3px dashed #c6cbd4;
+  border: 2px dashed #c6cbd4;
   border-radius: 12px;
   color: inherit;
   font: inherit;
@@ -283,12 +298,14 @@
 .drop:hover { border-color: #9aa2af; background: #f2f4f7; }
 .drop:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
 .drop.over { border-color: #7e22ce; background: #faf3ff; border-style: solid; }
-.drop svg { color: var(--muted); }
-.drop-h { font-size: 22px; font-weight: 650; }
-.drop small { color: var(--muted); font-size: 14px; }
+.drop svg { color: var(--muted); margin-bottom: 2px; }
+.drop-h { font-size: 18px; font-weight: 650; }
+.drop small { color: var(--muted); font-size: 13px; }
 .drop-btn {
   margin-top: 10px;
-  padding: 12px 22px;   /* 44px+ target */
+  /* 44px tall (16px text x 1.5 + 2x10px) — the WCAG 2.5.5 floor, which is the one thing in
+     here that does not get to shrink. */
+  padding: 10px 20px;
   background: #6d28d9;  /* 7.4:1 on white — the light-surface counterpart of the brand purple */
   color: #fff;
   border-radius: 10px;
@@ -300,14 +317,14 @@
 .privacy {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  margin-top: 16px;
-  padding: 12px 14px;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 10px 12px;
   background: #f0fbf4;
   border: 1px solid #b7e4c9;
   border-radius: 10px;
   color: #456853;
-  font-size: 15px;
+  font-size: 13.5px;
   line-height: 1.45;
 }
 .privacy svg { flex: none; margin-top: 2px; color: #17924e; }
@@ -315,13 +332,13 @@
 .privacy p { margin: 0; }
 
 .landing-error {
-  margin-bottom: 20px;
-  padding: 14px 16px;
+  margin-bottom: 14px;
+  padding: 11px 13px;
   background: #fdf2f2;
   border: 1px solid #f0b3ae;
   border-radius: 10px;
   color: #8a3a34;
-  font-size: 15px;
+  font-size: 13.5px;
   line-height: 1.5;
 }
 .landing-error b { color: #b02a20; }

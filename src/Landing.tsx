@@ -44,7 +44,7 @@ export default function Landing({ onFile, error }: { onFile: (f: File) => void; 
           take(e.dataTransfer.files[0]);
         }}
       >
-        <IconUpload size={30} />
+        <IconUpload size={24} />
         <span className="drop-h">Drop a lecture video here</span>
         <small>MP4, WebM or MKV — playback starts in seconds while analysis keeps running</small>
         <span className="drop-btn">Choose a file</span>
