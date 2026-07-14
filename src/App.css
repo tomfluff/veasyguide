@@ -97,11 +97,16 @@
 
 .foot {
   margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0 5px;
   padding: 9px 15px;
   background: var(--plum);
   color: #e9d8f5;
-  text-align: center;
   font-size: 13.5px;
+  line-height: 1.6;
 }
 .foot b { color: #fff; font-weight: 600; }
 

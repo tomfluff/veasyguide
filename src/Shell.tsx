@@ -41,13 +41,17 @@ export function TopBar({ file, status }: { file?: string | null; status?: ReactN
 
 export function Footer() {
   return (
+    // A flex row, not a line of text with an inline-flex link in it: an inline-flex box takes
+    // its baseline from its FIRST item — here the avatar, whose baseline is its bottom edge —
+    // so the name inside it sat off the baseline of the words around it. Centring every part
+    // against each other sidesteps baselines entirely.
     <footer className="foot">
-      Created with love and care by{" "}
+      <span>Created with love and care by</span>
       <a className="foot-link" href={PROFILE} target="_blank" rel="noreferrer">
         <img className="foot-av" src={avatar} alt="" aria-hidden="true" />
         <b>Yotam Sechayk</b>
-      </a>{" "}
-      — reach out with any questions.
+      </a>
+      <span>— reach out with any questions.</span>
     </footer>
   );
 }
