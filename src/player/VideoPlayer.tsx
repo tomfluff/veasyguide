@@ -100,6 +100,12 @@ const EMPTY_THUMBS: ReadonlyMap<number, string> = new Map();
 const FLASH_SPEED = 250;
 const SCENE_NOTICE_MS = 2500;
 
+// The keys that must NOT summon the control bar, because the control they operate is not in it:
+// zoom is drawn on the video with its own indicator, and [ / ] are navigation. Kept as one set
+// so the hotkey table and the container's onKeyDown cannot drift apart and disagree. Both `z`
+// and `Z` — the container sees the raw event.key, so Shift and CapsLock both reach it.
+const NO_REVEAL_KEYS = new Set(["z", "Z", "ArrowUp", "ArrowDown", "[", "]"]);
+
 // Seconds of analysis before playback unlocks. Lives here because the pre-playback gate
 // PROMISES this number on screen ("the first 10 seconds"), and App gates `canPlay` on it —
 // two copies would be two chances for the promise and the behaviour to drift apart.
@@ -176,12 +182,17 @@ const VideoPlayer = (props: Props) => {
     () => setSceneNotice(false),
     SCENE_NOTICE_MS
   );
-  // A key that OPERATES the player shows the bar it operated. The hotkeys are bound to the
-  // document, but the bar's reveal used to be bound to the container's onKeyDown — so a key
-  // pressed with focus outside the player (the ordinary case: you clicked the video surface,
-  // which is a plain div and takes no focus) muted, zoomed or seeked with no visible chrome to
-  // show for it. The reveal belongs on the actions, not on a document-wide keydown: a blanket
-  // listener would also pop the bar open for keys that have nothing to do with the player.
+  // A key reveals the bar only when THE CONTROL IT OPERATED LIVES IN THE BAR. That is the whole
+  // test. Play/pause, mute, the scrubber and fullscreen are all in there, so those keys show you
+  // what they just changed. Zoom and moment-stepping are not: the magnifier has its own on-video
+  // indicator and the bar carries no zoom control at all, while stepping is navigation. Popping
+  // the chrome up for those covers the lecture and tells you nothing about what happened.
+  //
+  // The reveal sits on the actions rather than on a document-wide keydown listener, which would
+  // summon the bar for keys that have nothing to do with the player. (It used to sit on the
+  // container's onKeyDown, which missed the ordinary case entirely: clicking the video surface
+  // to play leaves focus on <body>, because that surface is a plain div and takes no focus.)
+  //
   // The handlers below are `const` arrows declared further down the component, so `fn` must be
   // called lazily — passing the identifier here instead would read it in its temporal dead zone
   // and throw on the first render.
@@ -193,16 +204,15 @@ const VideoPlayer = (props: Props) => {
     ["Space", reveal(() => handlePlayPause())],
     ["F", reveal(() => handleFullscreen())],
     ["M", reveal(() => handleMute())],
-    ["Z", reveal(() => handleZoom())],
     ["ArrowLeft", reveal(() => handleTimeShift(-5))],
     ["ArrowRight", reveal(() => handleTimeShift(5))],
-    ["ArrowUp", reveal(() => handleZoomShift(0.1))],
-    ["ArrowDown", reveal(() => handleZoomShift(-0.1))],
+    // No reveal — the magnifier is drawn on the video and has its own indicator; the bar has
+    // no zoom control to show you. Kept in step with NO_REVEAL_KEYS below.
+    ["Z", () => handleZoom()],
+    ["ArrowUp", () => handleZoomShift(0.1)],
+    ["ArrowDown", () => handleZoomShift(-0.1)],
     // Mantine matches on event.key, which for these is literally "[" and "]" — not the
     // KeyboardEvent.code names ("BracketLeft"/"BracketRight"), which never match.
-    //
-    // No reveal, unlike every key above: stepping between moments is watching, not operating
-    // the player. See handleStepMoment.
     ["[", () => handleStepMoment(-1)],
     ["]", () => handleStepMoment(1)],
   ]);
@@ -504,10 +514,11 @@ const VideoPlayer = (props: Props) => {
       // bring them back for everyone. (Pause is handled by the `clear` class, which is gated
       // on isPlaying.)
       //
-      // Except the moment keys: [ and ] are navigation, not operation. They must not summon the
-      // bar — see handleStepMoment. Every other key still does, so the bar is never unreachable.
+      // Except the keys whose control is not IN the bar (zoom, moment-stepping) — see
+      // NO_REVEAL_KEYS and the hotkey table. Every other key still reveals it, so the bar is
+      // never unreachable from the keyboard.
       onKeyDown={(e) => {
-        if (e.key !== "[" && e.key !== "]") showControls();
+        if (!NO_REVEAL_KEYS.has(e.key)) showControls();
       }}
       onFocusCapture={showControls}
     >
