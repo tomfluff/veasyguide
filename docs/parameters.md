@@ -100,16 +100,32 @@ otherwise nudge *every* pixel toward "always moving".
 
 ## 3 · Scene detection — slide changes / cuts
 
-### `sceneThreshold` = 27
-A cut is declared when the HSV content score between two sampled frames (mean hue + saturation
-+ luma change, 0–255) reaches this value. The cut's frame pair yields no nodes, and open
-activities are closed at the boundary — **activities never span a cut**.
+### `sceneChangeFrac` = 0.08
+A cut is declared when this share of the frame changes between two sampled frames — the
+occupancy of the diff mask. The cut's frame pair yields no nodes, and open activities are
+closed at the boundary — **activities never span a cut**.
 
-**Why the default differs from Python.** The Python analyzer used PySceneDetect's
-`ContentDetector` at **threshold 14**, but scored *every adjacent frame* (~33 ms apart). We
-compare frames one `sampleInterval` apart, so more change accumulates and our scores run
-higher. Copying `14` would over-trigger. See [D7](decisions.md#d7--scene-detection-ported-not-imported).
-**Lower** = more cuts (a big animation may split a slide). **Higher** = slide changes leak into activities.
+**Why occupancy and not a content score.** The Python analyzer used PySceneDetect's
+`ContentDetector` (mean HSV delta over every pixel) and we ported it. It does not work on
+lecture slides. Consecutive slides in a deck share a background, a header and a layout — only
+the text differs — so a real slide change moves a fifth of the pixels a long way and leaves
+the rest pixel-identical, and the *mean* washes it out. Measured over a 59-minute lecture:
+every slide change scored **under 2.5 against a threshold of 27**, and not one was caught; the
+7 cuts it did find were all in the first 17 minutes, where the presenter dropped out of
+presentation mode to the desktop. Counting *changed pixels* separates the same footage with an
+order of magnitude of clearance at each end.
+
+| on that lecture | share of frame changed |
+|---|---|
+| typical frame (writing, webcam) | 0.4% (median) |
+| noise ceiling | 2.1% (p99) |
+| **slide changes** | **20–30%** |
+| cut to the desktop | 70%+ |
+
+**Calibration caveat.** 0.08 sits in the gap, but it was chosen against **one** lecture, and
+sanity-checked against a whiteboard recording (peak 0.68% changed → correctly no cuts). It is
+the number most likely to need revisiting on unfamiliar footage.
+**Lower** = more cuts (a big build animation may split a slide). **Higher** = slide changes leak into activities.
 
 ### `sceneMinLen` = 1.0 s
 Debounce: no second cut until this long after the previous one.

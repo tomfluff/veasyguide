@@ -2,7 +2,7 @@
 //
 // Pure geometry and stepping, kept out of the component so it can be tested.
 
-import type { Activity } from "../analyzer/types";
+import type { Activity, Scene } from "../analyzer/types";
 
 // A mark drawn in the lane under the scrubber. Usually one activity; sometimes several,
 // because at real lecture lengths they collide.
@@ -58,6 +58,37 @@ export function timelineMarkers(
   });
 
   return out;
+}
+
+// The moments of one scene, for the sidebar's grouped view.
+export type SceneGroup = { scene: Scene; activities: Activity[] };
+
+// Group the moments by the scene they fall in.
+//
+// Assignment is by scene START only, never by `end`: scenes stream in while the analysis runs,
+// and the newest one's `end` is still moving as the frontier advances. Bracketing on a moving
+// end would drop moments out of a group and put them back a second later. Every moment goes to
+// the last scene that had already started — so a moment before the first cut lands in scene 1,
+// which is where it belongs anyway.
+//
+// Scenes with no moments are dropped: an empty group is a header that expands to nothing.
+export function groupByScenes(
+  activities: readonly Activity[],
+  scenes: readonly Scene[]
+): SceneGroup[] {
+  if (scenes.length === 0) return [];
+
+  const groups = scenes.map((scene) => ({ scene, activities: [] as Activity[] }));
+  for (const a of activities) {
+    let g = 0;
+    // Scenes are ordered, and a lecture has tens of them, not thousands — a scan is enough.
+    for (let i = 1; i < scenes.length; i++) {
+      if (scenes[i].start <= a.start) g = i;
+      else break;
+    }
+    groups[g].activities.push(a);
+  }
+  return groups.filter((g) => g.activities.length > 0);
 }
 
 const EPS = 0.05;

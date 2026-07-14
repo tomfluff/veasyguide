@@ -42,7 +42,7 @@ type ParamField = {
 const PARAM_GROUPS: { title: string; note: string; keys: (keyof AnalysisParams)[] }[] = [
   { title: "1 · Sampling", note: "which pixels the analyzer looks at", keys: ["analysisWidth", "sampleInterval"] },
   { title: "2 · Change detection", note: "frame pair → changed regions (red mask / green boxes / blue = habitually moving)", keys: ["diffThresh", "dilateIters", "contourAreaLowFrac", "contourAreaHighFrac", "persistFrac"] },
-  { title: "3 · Scene detection", note: "slide changes / cuts — activities never span one", keys: ["sceneThreshold", "sceneMinLen"] },
+  { title: "3 · Scene detection", note: "slide changes / cuts — activities never span one", keys: ["sceneChangeFrac", "sceneMinLen"] },
   { title: "4 · Clustering", note: "regions over time → activities", keys: ["spanTh", "distRatio"] },
   { title: "5 · Filtering & display", note: "which activities the player shows, and when", keys: ["persistInvalidFrac", "minSizeFrac", "maxSizeFrac", "minDuration", "highlightLead", "highlightLinger"] },
 ];
@@ -84,9 +84,9 @@ const PARAM_FIELDS: ParamField[] = [
     why: "A talking-head webcam overlay never stops moving, so its pixels churn through the whole video; ink is written once and then sits still, so its pixels average near 0.05. That gap is the signal. The flag doesn't hide the region on its own — it feeds the per-activity vote below. Lower = flags more (eventually catching a region the instructor works in continuously); higher = the webcam stops being flagged.",
   },
   {
-    key: "sceneThreshold", label: "Scene threshold", step: 1,
-    what: "A scene cut is declared when the HSV content score between two sampled frames (mean hue+saturation+luma change, 0–255) reaches this value. The cut's own frame pair produces no detection nodes, and any open activities are closed at the boundary.",
-    why: "A slide change alters the whole frame — treating that as instructor activity would produce one giant bogus highlight, and an activity must never span two slides. Ports PySceneDetect's ContentDetector, which the Python analyzer used at threshold 14 — but it scored every adjacent frame (~33 ms apart) while we compare frames one sample interval apart, so more change accumulates and our score runs higher; hence the higher default. Lower = more cuts (a big animation may split a slide); higher = slide changes get missed and leak into activities.",
+    key: "sceneChangeFrac", label: "Scene change (frac of frame)", step: 0.01,
+    what: "A scene cut is declared when this share of the frame changes between two sampled frames. The cut's own frame pair produces no detection nodes, and any open activities are closed at the boundary.",
+    why: "A slide change replaces the whole frame — treating that as instructor activity would produce one giant bogus highlight, and an activity must never span two slides. This replaced a port of PySceneDetect's ContentDetector (mean HSV delta per pixel), which cannot see a slide change on a deck with a consistent style: the background and layout are pixel-identical between slides, so only the text moves and the mean washes it out. Measured on a 59-minute lecture, every slide change scored under 2.5 against a threshold of 27 and none was caught. Counting changed pixels separates the same footage cleanly — writing and webcam under 2%, slide changes 20–30%, hard cuts over 70%. Lower = more cuts (a big build animation may split a slide); higher = slide changes get missed and leak into activities.",
   },
   {
     key: "sceneMinLen", label: "Min scene length (s)", step: 0.5,
@@ -603,6 +603,7 @@ export default function App() {
             preparing card, which is the same layout jump the card exists to prevent. */}
         <MomentsSidebar
           activities={activities}
+          scenes={scenes}
           thumbs={thumbs}
           current={currMoment}
           done={done}

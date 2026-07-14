@@ -1,4 +1,4 @@
-// GPU port of the per-pixel half of pipeline.ts (toGray, contentScore, diffMask, dilate).
+// GPU port of the per-pixel half of pipeline.ts (toGray, diffMask, dilate).
 //
 // Why: profiling a real analysis run put 0% of the wall time in decode (Mediabunny
 // pipelines it off-thread), 39% in `sample.draw(ctx)` + `getImageData` and 61% in the
@@ -50,12 +50,13 @@ void main() {
 // still needs:
 //   R = raw diff mask (0 or 1)
 //   G = |gray delta|            -> Region.meanDiff
-//   B = per-pixel scene score   -> summed on the CPU to get contentScore (see below)
+//   B = unused
 //   A = gray of the current frame -> the debug composite
 //
-// contentScore is a mean of three per-channel means with equal weights, which is just the
-// mean of the per-pixel value ((dh + ds + dv) / 3) — so one channel reduces to the same
-// number, and no GPU reduction pass is needed.
+// B used to carry a per-pixel HSV scene score, summed on readback into PySceneDetect's
+// contentScore. That detector is gone (see pipeline.ts / decisions.md): a mean over every
+// pixel cannot see a slide change on a deck with a consistent style. Scene cuts are now read
+// off the mask's occupancy, which the readback below already walks.
 const FRAG_DIFF = `#version 300 es
 precision highp float;
 in vec2 vUV;
@@ -67,37 +68,13 @@ out vec4 oCol;
 // Matches pipeline.ts toGray: OpenCV BGR2GRAY weights, truncated to an integer.
 float gray255(vec3 c) { return floor(dot(c * 255.0, vec3(0.299, 0.587, 0.114))); }
 
-// Matches pipeline.ts rgbToHsv: OpenCV's 8-bit HSV convention (each channel 0..255).
-vec3 rgbToHsv255(vec3 c) {
-  vec3 p = c * 255.0;
-  float mx = max(p.r, max(p.g, p.b));
-  float mn = min(p.r, min(p.g, p.b));
-  float d = mx - mn;
-  float v = mx;
-  float s = mx == 0.0 ? 0.0 : d * 255.0 / mx;
-  float h = 0.0;
-  if (d != 0.0) {
-    if (mx == p.r)      h = 42.5 * mod((p.g - p.b) / d, 6.0);
-    else if (mx == p.g) h = 42.5 * ((p.b - p.r) / d + 2.0);
-    else                h = 42.5 * ((p.r - p.g) / d + 4.0);
-    if (h < 0.0) h += 255.0;
-  }
-  return vec3(h, s, v);
-}
-
 void main() {
   vec3 a = texture(uPrev, vUV).rgb;
   vec3 b = texture(uCur, vUV).rgb;
 
   float mag = abs(gray255(a) - gray255(b));
 
-  vec3 ha = rgbToHsv255(a);
-  vec3 hb = rgbToHsv255(b);
-  float dh = abs(ha.x - hb.x);
-  dh = min(dh, 255.0 - dh); // hue is circular
-  float score = (dh + abs(ha.y - hb.y) + abs(ha.z - hb.z)) / 3.0;
-
-  oCol = vec4(mag >= uThresh ? 1.0 : 0.0, mag / 255.0, score / 255.0, gray255(b) / 255.0);
+  oCol = vec4(mag >= uThresh ? 1.0 : 0.0, mag / 255.0, 0.0, gray255(b) / 255.0);
 }`;
 
 // 3x3 neighbourhood op on the mask in R; G/B/A pass through from the centre pixel.
@@ -132,7 +109,7 @@ export type GLFrame = {
   mask: Uint8Array; // 0/1, blurred + dilated
   mag: Uint8Array; // |gray delta| per pixel
   gray: Uint8Array; // current frame, for the debug composite
-  score: number; // contentScore of this frame against the previous one
+  frac: number; // share of the frame the mask covers — the scene-cut signal
 };
 
 export class GLAnalyzer {
@@ -244,14 +221,15 @@ export class GLAnalyzer {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.work[from], 0);
     gl.readPixels(0, 0, this.w, this.h, gl.RGBA, gl.UNSIGNED_BYTE, this.rgba);
 
-    let scoreSum = 0;
+    let on = 0;
     for (let i = 0, p = 0; i < this.mask.length; i++, p += 4) {
-      this.mask[i] = this.rgba[p] > 127 ? 1 : 0;
+      const m = this.rgba[p] > 127 ? 1 : 0;
+      this.mask[i] = m;
+      on += m;
       this.mag[i] = this.rgba[p + 1];
-      scoreSum += this.rgba[p + 2];
       this.gray[i] = this.rgba[p + 3];
     }
-    return { mask: this.mask, mag: this.mag, gray: this.gray, score: scoreSum / this.mask.length };
+    return { mask: this.mask, mag: this.mag, gray: this.gray, frac: on / this.mask.length };
   }
 
   dispose(): void {

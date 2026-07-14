@@ -852,6 +852,7 @@ const VideoPlayer = (props: Props) => {
         <MomentsSidebar
           className="overlay"
           activities={props.activities}
+          scenes={props.scenes}
           thumbs={props.thumbs ?? EMPTY_THUMBS}
           current={currActivity}
           done={props.done}

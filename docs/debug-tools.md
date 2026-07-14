@@ -73,7 +73,7 @@ in-session.
 ![Scene strip](media/scene-strip.png)
 
 Detected scenes as clickable segments. If a lecture with obvious slide changes shows one
-scene, `sceneThreshold` is too high; if a single slide fragments into many, it's too low.
+scene, `sceneChangeFrac` is too high; if a single slide fragments into many, it's too low.
 
 ---
 

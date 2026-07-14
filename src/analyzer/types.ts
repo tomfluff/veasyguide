@@ -44,7 +44,7 @@ export type AnalysisParams = {
   // motion, not instructor activity (webcam overlay, animated logo). See pipeline.Region.occ.
   persistInvalidFrac: number; // an activity with at least this share of its nodes flagged as
   // structural is marked invalid (and so never highlighted). 1 = off.
-  sceneThreshold: number; // HSV content score above which a scene cut is declared
+  sceneChangeFrac: number; // share of the frame that must change for a scene cut to be declared
   sceneMinLen: number; // minimum seconds between cuts (debounce)
   spanTh: number; // seconds; max time gap for linking nodes (study: 1.0)
   distRatio: number; // max spatial gap for linking, fraction of frame diagonal (0.05)
@@ -64,7 +64,7 @@ export const DEFAULT_PARAMS: AnalysisParams = {
   contourAreaHighFrac: 0.5,
   persistFrac: 0.35,
   persistInvalidFrac: 0.5,
-  sceneThreshold: 27,
+  sceneChangeFrac: 0.08,
   sceneMinLen: 1.0,
   spanTh: 1.0,
   distRatio: 0.05,

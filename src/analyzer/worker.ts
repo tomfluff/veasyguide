@@ -9,7 +9,7 @@
 // ranges, not one frontier.
 
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from "mediabunny";
-import { componentRegions, contentScore, diffMask, dilate, toGray, updateOccupancy } from "./pipeline";
+import { changedFrac, componentRegions, diffMask, dilate, toGray, updateOccupancy } from "./pipeline";
 import { GLAnalyzer } from "./glPipeline";
 import { computeFeatures } from "./features";
 import { StreamingClusterer, type RawActivity } from "./graph";
@@ -161,7 +161,6 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
     // in its first ~20 frames.
     const occ = new Float32Array(aw * ah);
     let prevGray: Uint8Array | null = null;
-    let prevRgba: Uint8ClampedArray | null = null;
     let sceneStart = from;
     let lastCut = -Infinity;
     let segEnd = from;
@@ -196,14 +195,14 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
       let mask: Uint8Array | null = null;
       let mag: Uint8Array | null = null;
       let gray: Uint8Array | null = null;
-      let score: number | null = null;
+      let frac: number | null = null;
 
       if (gpu) {
         const frame = sample.toVideoFrame();
         sample.close();
         const out = gpu.process(frame, params.diffThresh, params.dilateIters);
         frame.close();
-        if (out) ({ mask, mag, gray, score } = out);
+        if (out) ({ mask, mag, gray, frac } = out);
       } else {
         const tRead = performance.now();
         sample.draw(ctx, 0, 0, aw, ah);
@@ -211,19 +210,19 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
         const rgba = ctx.getImageData(0, 0, aw, ah).data;
         cost.readback += performance.now() - tRead;
         gray = toGray(rgba, aw, ah);
-        if (prevGray && prevRgba) {
-          score = contentScore(prevRgba, rgba);
+        if (prevGray) {
           const d = diffMask(prevGray, gray, aw, ah, params.diffThresh);
           mask = dilate(d.mask, aw, ah, params.dilateIters);
           mag = d.mag;
+          frac = changedFrac(mask);
         }
         prevGray = gray;
-        prevRgba = rgba;
       }
 
-      // Scene cut? Score the HSV content change against the previous sample.
+      // Scene cut? A cut is the frame going away and a new one arriving — so it is measured by
+      // HOW MUCH of the frame changed at once, not by how much the average pixel changed.
       let isCut = false;
-      if (score !== null && score >= params.sceneThreshold && t - lastCut >= params.sceneMinLen) {
+      if (frac !== null && frac >= params.sceneChangeFrac && t - lastCut >= params.sceneMinLen) {
         isCut = true;
         lastCut = t;
         post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: t } });

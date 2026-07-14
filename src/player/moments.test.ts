@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { timelineMarkers, stepMoment, seekTargetFor, MIN_MARKER_PX } from "./moments";
-import type { Activity } from "../analyzer/types";
+import { timelineMarkers, stepMoment, seekTargetFor, groupByScenes, MIN_MARKER_PX } from "./moments";
+import type { Activity, Scene } from "../analyzer/types";
 
 const act = (id: number, start: number, end: number) =>
   ({ id, start, end, isValid: true }) as unknown as Activity;
+
+const scene = (id: number, start: number, end: number): Scene => ({ id, start, end });
 
 describe("timelineMarkers", () => {
   it("places a marker at its share of the track", () => {
@@ -106,5 +108,35 @@ describe("seekTargetFor", () => {
 
   it("never seeks before the start of the video", () => {
     expect(seekTargetFor(act(1, 0.4, 4), 1)).toBe(0);
+  });
+});
+
+describe("groupByScenes", () => {
+  const scenes = [scene(0, 0, 100), scene(1, 100, 200), scene(2, 200, 300)];
+
+  it("puts each moment in the scene that was running when it started", () => {
+    const groups = groupByScenes([act(1, 10, 12), act(2, 150, 152), act(3, 160, 162)], scenes);
+    expect(groups.map((g) => [g.scene.id, g.activities.map((a) => a.id)])).toEqual([
+      [0, [1]],
+      [1, [2, 3]],
+    ]);
+  });
+
+  it("drops scenes with no moments rather than showing an empty group", () => {
+    // Scene 1 is a stretch of lecture where nothing was annotated.
+    const groups = groupByScenes([act(1, 10, 12), act(2, 250, 252)], scenes);
+    expect(groups.map((g) => g.scene.id)).toEqual([0, 2]);
+  });
+
+  it("keeps a moment that straddles the next cut in the scene it began in", () => {
+    // Assignment is by start, so a moment running 95→105 belongs to scene 0. This is what
+    // makes a group stable while the newest scene's `end` is still advancing.
+    const groups = groupByScenes([act(1, 95, 105)], scenes);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].scene.id).toBe(0);
+  });
+
+  it("has nothing to group before the first scene arrives", () => {
+    expect(groupByScenes([act(1, 10, 12)], [])).toEqual([]);
   });
 });

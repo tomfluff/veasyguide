@@ -1,18 +1,25 @@
 // Runnable self-check for the pure pipeline + clusterer logic (no browser needed).
 // Run: node --experimental-strip-types src/analyzer/selfcheck.ts
-import { componentRegions, contentScore, diffMask, dilate, toGray, updateOccupancy, type Region } from "./pipeline.ts";
+import { changedFrac, componentRegions, diffMask, dilate, toGray, updateOccupancy, type Region } from "./pipeline.ts";
 import { computeFeatures, shapeDiff, type DetailedNode } from "./features.ts";
 import { StreamingClusterer } from "./graph.ts";
-import { selectActivity } from "./select.ts";
+import { selectActivity, validActivities } from "./select.ts";
 import { addRange, coverage, isAnalyzed, nextGap } from "./ranges.ts";
 import { cropRect, snippetTimestamps, SNIPPET_MAX_FRAMES } from "./snippets.ts";
 import { zoomTransform } from "../player/zoom.ts";
 import type { Activity, Node } from "./types.ts";
 
+// Run every check, then fail. Exiting on the first failure means one stale assertion silently
+// takes every check after it out of the run — which is exactly what happened: a check that had
+// been testing behaviour since moved out of selectActivity sat here failing, and checks 5-10
+// below it (scene detection, ranges, Hu moments, features, snippets, zoom) had not executed
+// for who knows how long.
+let failed = 0;
 function assert(cond: boolean, msg: string) {
-  if (!cond) { console.error("FAIL:", msg); process.exit(1); }
+  if (!cond) { console.error("FAIL:", msg); failed++; return; }
   console.log("ok:", msg);
 }
+process.on("exit", () => process.exitCode = failed > 0 ? 1 : 0);
 
 const W = 100, H = 100;
 
@@ -159,24 +166,36 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
   assert(selectActivity([A, B], 19.9, opts)?.id === 0, "active activity beats pre-activity cue");
   // Linger: A still highlighted at t=20.4 when B removed.
   assert(selectActivity([A], 20.4, opts)?.id === 0, "highlight lingers after end");
-  // minDuration filter hides short activities.
+  // minDuration filter hides short activities. It is applied by validActivities, NOT by
+  // selectActivity — the filtering moved there so the player, the timeline and the sidebar all
+  // see one list. Passing minDuration to selectActivity does nothing at all.
   const S = act(2, 30, 30.2);
-  assert(selectActivity([S], 30.1, { ...opts, minDuration: 0.5 }) === null, "minDuration hides short activities");
-  // Invalid activities never selected.
-  assert(selectActivity([{ ...A, isValid: false }], 15, opts) === null, "invalid activities never selected");
+  assert(validActivities([S], 0.5).length === 0, "minDuration hides short activities");
+  assert(validActivities([S], 0.1).length === 1, "minDuration keeps activities that are long enough");
+  // Invalid activities never selected. Like minDuration, the isValid filter lives in
+  // validActivities, not in selectActivity.
+  assert(validActivities([{ ...A, isValid: false }], 0).length === 0, "invalid activities never selected");
 }
 
-// 5. Scene scoring: a small moving mark barely registers; a whole-frame change spikes.
+// 5. Scene signal: a small moving mark covers little of the frame; a whole-frame change fills it.
 {
-  const dark = frameWithBox(20, 20, 12, 12); // small white box on dark bg
-  const darkMoved = frameWithBox(40, 40, 12, 12); // same, box moved
+  const CUT = 0.08; // DEFAULT_PARAMS.sceneChangeFrac
+  // A 6x6 mark on a 100x100 frame, moved. Sized to stand in for a pen stroke: on real footage
+  // writing covers well under 2% of the frame, so this wants to land nowhere near the cut. (A
+  // 12x12 box here reaches 7.8% once dilated — under the threshold, but only just, which would
+  // make this check a coin toss rather than a check.)
+  const dark = frameWithBox(20, 20, 6, 6);
+  const darkMoved = frameWithBox(34, 34, 6, 6);
   const light = new Uint8ClampedArray(W * H * 4).fill(230); // entirely different frame
 
-  const activityScore = contentScore(dark, darkMoved);
-  const cutScore = contentScore(dark, light);
-  assert(activityScore < 27, `pen-stroke-scale change stays below cut threshold (${activityScore.toFixed(1)})`);
-  assert(cutScore > 27, `whole-frame change exceeds cut threshold (${cutScore.toFixed(1)})`);
-  assert(contentScore(dark, dark) === 0, "identical frames score 0");
+  const maskOf = (a: Uint8ClampedArray, b: Uint8ClampedArray) =>
+    dilate(diffMask(toGray(a, W, H), toGray(b, W, H), W, H, 25).mask, W, H, 3);
+
+  const activityFrac = changedFrac(maskOf(dark, darkMoved));
+  const cutFrac = changedFrac(maskOf(dark, light));
+  assert(activityFrac < CUT, `pen-stroke-scale change stays below the cut threshold (${(activityFrac * 100).toFixed(1)}%)`);
+  assert(cutFrac > CUT, `whole-frame change exceeds the cut threshold (${(cutFrac * 100).toFixed(1)}%)`);
+  assert(changedFrac(maskOf(dark, dark)) === 0, "identical frames change nothing");
 }
 
 // 6. Range bookkeeping: coverage is a set of segments, and gaps get backfilled in order.
@@ -325,4 +344,4 @@ const lShape = (x0: number, y0: number, s: number) => (mask: Uint8Array) => {
   assert(atEdge === 0 && pastEdge === 0, "pan saturates at the edge instead of overshooting");
 }
 
-console.log("\nALL PASS");
+console.log(failed === 0 ? "\nALL PASS" : `\n${failed} FAILED`);

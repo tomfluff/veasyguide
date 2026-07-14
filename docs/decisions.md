@@ -128,21 +128,52 @@ interval, or an "analyze first, then play" mode), so this is patchable, not arch
 
 ---
 
-## D7 — Scene detection, ported not imported
+## D7 — Scene detection: how much changed, not how much the average pixel changed
 
-**Decision.** Implement PySceneDetect's `ContentDetector` (~25 lines: mean HSV
-hue+saturation+luma delta between sampled frames, thresholded) rather than adding a
-scene-detection library.
+**Decision.** Declare a cut when more than `sceneChangeFrac` (8%) of the frame changes between
+two sampled frames — the occupancy of the diff mask we already compute.
 
-**Why.** The only browser-side option, `@doedja/scenecut-web`, does its own demux and
-decode — paying twice for the expensive step (see D4) — to replace an algorithm that is a
-weighted frame difference. We already have the frames.
+**Superseded:** this used to be a port of PySceneDetect's `ContentDetector` (mean HSV
+hue+saturation+luma delta per pixel, thresholded at 27). *It never fired on a real lecture.*
 
-**A divergence you must know about.** The Python analyzer ran `ContentDetector` on *every
-adjacent frame* (~33 ms apart) at **threshold 14**. We compare frames one `sampleInterval`
-apart (200 ms), so more change accumulates between them and the score runs systematically
-higher. Copying `14` would over-trigger. Our default is **27**, and it is tunable. This is
-why parameters have documented reasoning and not just values.
+**Why the port failed, and why it took so long to notice.** `ContentDetector` is built for
+film, where a cut replaces the whole frame and the mean delta spikes. A lecture deck is the
+opposite case. Consecutive slides share a background, a header and a layout; only the text
+differs. So a slide change moves perhaps a fifth of the pixels a very long way and leaves the
+other four fifths **pixel-identical** — and averaging over all of them washes the signal out.
+
+Measured on a 59-minute lecture: **every slide change scored under 2.5 against a threshold of
+27.** The 7 cuts it did find were all in the first 17 minutes and were not slide changes at
+all — they were the presenter dropping out of presentation mode to his desktop, which really
+does replace the whole frame. Forty-three minutes of slides produced not one cut.
+
+It went unnoticed because nothing downstream *depended* on scenes: the analyzer emitted them,
+the debug scene strip drew them, and no user-facing feature read them. A detector that
+silently returns nothing looks exactly like a video with no cuts. It only surfaced when the
+moments sidebar tried to group by scene and got one group.
+
+**Why occupancy works.** The same footage separates by an order of magnitude at each end:
+
+| | share of frame changed |
+|---|---|
+| typical frame (writing, webcam) | 0.4% (median) |
+| noise ceiling | 2.1% (p99) |
+| **slide changes** | **20–30%** |
+| cut to the desktop | 70%+ |
+
+8% sits in the gap. It is also free: the mask is computed for change detection anyway, so this
+is one pass over a byte array, no extra decode, and it let ~40 lines of HSV code (and the
+matching GLSL) be deleted from the pixel pipeline.
+
+**Calibration caveat.** The threshold was fitted to **one** lecture and sanity-checked against
+a whiteboard recording (peak 0.68% changed → correctly no cuts). Unfamiliar footage may move
+it. Verified by eye against the source frames: of the sampled cuts, all were real — including
+a burst of four in nine seconds that turned out to be the lecturer genuinely flipping back and
+forth between two slides.
+
+**Why not a library.** Unchanged from the original decision: the only browser-side option,
+`@doedja/scenecut-web`, does its own demux and decode — paying twice for the expensive step
+(see D4). We already have the frames.
 
 **The parity behavior that mattered.** In the Python version, frame pairs were generated
 *per scene*, so no frame difference ever crossed a cut. We reproduce this: a cut's own frame

@@ -27,11 +27,16 @@ downscaling happens: the pixel work costs a quarter of what it would at 720p.
 Sampling is **time-based**, not frame-index-based, so variable-frame-rate screen recordings
 degrade gracefully.
 
-### 2. Scene detection (`pipeline.ts: contentScore`)
+### 2. Scene detection (`pipeline.ts: changedFrac`)
 
-Each sampled frame is compared against the previous one with an HSV content score (mean
-hue + saturation + luma delta) — a port of PySceneDetect's `ContentDetector`. Above
-`sceneThreshold`, we declare a **cut**.
+Each sampled frame is compared against the previous one, and a **cut** is declared when more
+than `sceneChangeFrac` of the frame changed at once. The signal is the occupancy of the diff
+mask that stage 3 computes anyway, so scene detection costs one extra pass over a 480×300 byte
+array and no extra decode.
+
+This replaced a port of PySceneDetect's `ContentDetector` (mean HSV delta per pixel), which
+could not see a slide change at all on a deck with a consistent style — see
+[D7](decisions.md#d7--scene-detection-ported-not-imported).
 
 A cut does three things: it closes the current scene, it **produces no detection nodes**
 (a whole-frame change is a slide change, not instructor activity), and it **flushes all open

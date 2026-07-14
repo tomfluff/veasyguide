@@ -258,6 +258,17 @@
 .moments-side.overlay .side-d { color: #a7b0bd; }
 .moments-side.overlay .side-thumb { border-color: #333a45; }
 .moments-side.overlay .side-thumb.ph { background: #2a303a; color: #a7b0bd; }
+.moments-side.overlay .side-view { border-color: #333a45; }
+.moments-side.overlay .side-view button { background: #1b2029; color: #a7b0bd; }
+.moments-side.overlay .side-view button + button { border-left-color: #333a45; }
+.moments-side.overlay .side-view button:hover { background: #232935; }
+/* The plum reads as ink on paper; on the dark overlay it goes nearly black, so the selected
+   segment takes the player's own brand purple instead. */
+.moments-side.overlay .side-view button.on { background: #6d28d9; color: #fff; }
+.moments-side.overlay .side-scene summary { background: #232935; color: #f2f4f7; }
+.moments-side.overlay .side-scene summary:hover { background: #2b323d; }
+.moments-side.overlay .side-scene-t,
+.moments-side.overlay .side-scene-c { color: #a7b0bd; }
 
 .moments-side .side-head {
   padding: 12px 14px 10px;
@@ -266,6 +277,32 @@
 .moments-side .side-title { font-size: 16px; font-weight: 650; }
 .moments-side .side-pos { font-size: 14px; color: var(--muted); margin-top: 2px; }
 .moments-side .side-pos b { color: var(--ink); }
+
+/* List / By scene. A segmented pair, not a checkbox: both arrangements are named, so the one
+   you are NOT in is legible as a place to go rather than a state to infer. 44px because it is
+   a control in an app for people who cannot aim precisely (WCAG 2.5.5). */
+.side-view {
+  display: flex;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.side-view button {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  background: #fff;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.side-view button + button { border-left: 1px solid var(--line); }
+.side-view button:hover { background: #f7f8fa; }
+.side-view button.on { background: var(--plum); color: #fff; }
+.side-view button:focus-visible { outline: 3px solid #6fb3ff; outline-offset: -3px; }
 
 .moments-side .side-list {
   flex: 1;
@@ -276,6 +313,42 @@
   gap: 6px;
   overflow-y: auto;
 }
+
+/* A scene group. The rows inside are the same .side-row as the flat list — only the wrapper
+   and its header are new, so the two arrangements can never drift apart visually. */
+.side-scene { display: flex; flex-direction: column; gap: 6px; }
+.side-scene summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: #f2f3f5;
+  font-size: 14px;
+  cursor: pointer;
+  list-style: none; /* the default triangle sits outside the box and breaks the row */
+}
+.side-scene summary::-webkit-details-marker { display: none; }
+.side-scene summary:hover { background: #e9ebee; }
+.side-scene summary:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+/* Our own caret, so it lives inside the padding and rotates with the disclosure. */
+.side-scene summary::before {
+  content: "";
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 6px solid currentColor;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  transition: rotate 0.15s;
+}
+.side-scene[open] summary::before { rotate: 90deg; }
+.side-scene-n { font-weight: 700; }
+.side-scene-t { font-variant-numeric: tabular-nums; color: var(--muted); }
+.side-scene-c { margin-left: auto; color: var(--muted); font-size: 13px; }
+/* Indent the moments so the group reads as containing them. */
+.side-scene .side-row { margin-left: 12px; }
 
 .side-row {
   display: flex;
