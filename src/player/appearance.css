@@ -7,7 +7,7 @@
   padding: 0;
   background: #12161d;              /* the bar */
   border: 1px solid #333a45;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   color: #f2f4f7;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
 }
@@ -43,7 +43,7 @@
   padding: 0; cursor: pointer; overflow: hidden;
   background: #12161d;
   border: 2px solid var(--ap-line);
-  border-radius: 9px;
+  border-radius: var(--r-md);
 }
 .ap-tile.sel {
   border-color: var(--ap-brand);
@@ -81,7 +81,7 @@
 .ap-nav {
   display: flex; align-items: center; gap: 10px;
   width: 100%; height: 44px; padding: 0 12px;
-  background: var(--ap-raise); border: 1px solid var(--ap-line); border-radius: 9px;
+  background: var(--ap-raise); border: 1px solid var(--ap-line); border-radius: var(--r-md);
   color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer;
 }
 .ap-nav:hover { background: #232935; }
@@ -93,7 +93,7 @@
 .ap-back {
   display: flex; align-items: center; gap: 4px;
   height: 32px; padding: 0 10px 0 6px;
-  background: transparent; border: 1px solid var(--ap-line); border-radius: 8px;
+  background: transparent; border: 1px solid var(--ap-line); border-radius: var(--r-md);
   color: inherit; font: inherit; font-size: 13px; cursor: pointer;
 }
 .ap-back:hover { background: var(--ap-raise); }
@@ -105,7 +105,7 @@
 .ap-tabs { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; }
 .ap-tab {
   flex: none; height: 30px; padding: 0 9px;
-  background: transparent; border: 1px solid transparent; border-radius: 7px;
+  background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
   color: var(--ap-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
   white-space: nowrap;
 }
@@ -155,7 +155,7 @@
 .ap-seg { display: flex; gap: 4px; flex-wrap: wrap; }
 .ap-seg-btn {
   height: 30px; padding: 0 10px;
-  background: transparent; border: 1px solid var(--ap-line); border-radius: 7px;
+  background: transparent; border: 1px solid var(--ap-line); border-radius: var(--r-sm);
   color: var(--ap-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
 }
 .ap-seg-btn:hover { background: var(--ap-raise); color: #f2f4f7; }
@@ -177,7 +177,7 @@
 .ap-chips { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .ap-chip {
   display: block; width: 100%; padding: 7px 10px; text-align: left; cursor: pointer;
-  background: transparent; border: 1px solid var(--ap-line); border-radius: 8px;
+  background: transparent; border: 1px solid var(--ap-line); border-radius: var(--r-md);
   color: inherit; font: inherit;
 }
 .ap-chip:hover { background: var(--ap-raise); }

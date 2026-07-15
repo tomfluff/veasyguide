@@ -69,7 +69,7 @@
   color: #f2f4f7;
   height: 44px;   /* WCAG 2.5.5 target size. Was 2rem/32px. */
   width: 44px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -124,7 +124,7 @@
   height: 12px;
   width: 100%;
   position: relative;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 
 /* Purple, not red. The moment marks are red (--activity); if progress is red too, the two
@@ -135,7 +135,7 @@
   left: 0;
   bottom: 0;
   background-color: #d27cf7;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 
 /* Always visible. It used to be scale(0) until hover — you could not see where the playhead
@@ -350,7 +350,7 @@
   top: 0;
   bottom: 0;
   background-color: #4d5765;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 
 .video-overlay .overlay-catching-up {
@@ -488,7 +488,7 @@
   gap: 10px;
   margin-top: 6px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background-color: rgba(24, 29, 38, 0.92);
   border: 1px solid #3a4250;
   color: #f2f4f7;
@@ -615,7 +615,7 @@
   bottom: 0.75rem;
   z-index: 30;
   padding: 6px 11px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: rgba(20, 26, 20, 0.95);
   border: 1px solid #2b5c3c;
   color: #7ee3a4;
