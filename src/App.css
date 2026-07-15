@@ -30,7 +30,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 20px;
+  /* Zero vertical padding + a 44px floor: the bar IS one target tall, so the 44px nav/avatar
+     targets fill it instead of stacking extra chrome height onto the video (DESIGN.md wants
+     both — 44px targets AND slim chrome; a 44px-tall bar is how they coexist). */
+  padding: 0 20px;
+  min-height: 44px;
   background: #fff;
   border-bottom: 1px solid var(--line);
 }
@@ -60,7 +64,8 @@
 .nav { display: flex; align-items: center; gap: 18px; font-size: 15px; color: var(--muted); }
 .nav a,
 .nav button {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; min-width: 44px; /* WCAG 2.5.5 — the bar is 44px tall so this costs no extra height */
   background: none; border: none; cursor: pointer;
   color: inherit; font: inherit; text-decoration: none;
   padding: 3px 2px; border-radius: var(--r-sm);
@@ -89,7 +94,7 @@
   position: absolute;
   top: 14px; right: 14px;
   display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px;
+  width: 44px; height: 44px;
   background: none; border: none; border-radius: var(--r-md);
   color: var(--muted); cursor: pointer;
 }
@@ -130,8 +135,10 @@
 /* Both avatars link to the profile — the one in the bar, and the avatar+name pair in the
    footer, which is a single link so the picture and the name cannot be clicked apart. */
 .avatar-link {
-  display: flex; flex: none;
-  margin-left: 14px;
+  display: flex; align-items: center; justify-content: center;
+  flex: none;
+  min-width: 44px; min-height: 44px; /* 44px hit area around the 28px image */
+  margin-left: 8px;
   border-radius: 50%;
 }
 .avatar-link:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
@@ -509,8 +516,8 @@
 .strip button {
   flex: none;
   margin-left: auto;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   background: none;
   border: none;
   color: inherit;
@@ -582,9 +589,9 @@
 }
 .preparing-late p { font-size: 15px; line-height: 1.5; color: #e8dcc0; margin: 0 0 10px; }
 .preparing-late button {
-  height: 40px;
+  height: 44px;
   padding: 0 18px;
-  background: #d27cf7;
+  background: var(--brand-300);
   color: #17061f;
   border: none;
   border-radius: var(--r-md);
