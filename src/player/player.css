@@ -404,7 +404,7 @@
   border-radius: 4px;
   transition: width 200ms ease-out;
 }
-.overlay-gate .gate-stats { font-size: 14px; color: #d3d9e2; margin-top: 8px; }
+.overlay-gate .gate-stats { font-size: 15px; color: #d3d9e2; margin-top: 8px; }
 .overlay-gate .gate-stats b { color: #fff; }
 
 /* Scene-change notice. Amber rather than the neutral black of the analysis notices: those
@@ -619,6 +619,6 @@
   background: rgba(20, 26, 20, 0.95);
   border: 1px solid #2b5c3c;
   color: #7ee3a4;
-  font-size: 14px;
+  font-size: 15px;
   pointer-events: none;
 }

@@ -37,9 +37,9 @@
 /* No background plate: the mark is a finished tile with its own colours and corners. */
 .top .mark { width: 28px; height: 28px; flex: none; display: block; }
 .ttl { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
-.ttl em { font-style: italic; font-weight: 400; color: var(--muted); font-size: 14px; margin-left: 6px; }
+.ttl em { font-style: italic; font-weight: 400; color: var(--muted); font-size: 15px; margin-left: 6px; }
 .filechip {
-  font-size: 13px; color: var(--muted);
+  font-size: 15px; color: var(--muted);
   padding: 4px 10px; background: var(--surface-2);
   border: 1px solid var(--line); border-radius: var(--r-pill);
   max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -49,7 +49,7 @@
 /* The one piece of analysis status a viewer gets — about their lecture, not our pipeline. */
 .chip {
   display: flex; align-items: center; gap: 7px;
-  font-size: 13px; color: var(--muted);
+  font-size: 15px; color: var(--muted);
   padding: 4px 11px; margin-right: 6px;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-pill);
   white-space: nowrap;
@@ -57,7 +57,7 @@
 .chip-dot { width: 7px; height: 7px; border-radius: 50%; background: #e0870d; flex: none; }
 .chip.ready .chip-dot { background: #17924e; }
 
-.nav { display: flex; align-items: center; gap: 18px; font-size: 14px; color: var(--muted); }
+.nav { display: flex; align-items: center; gap: 18px; font-size: 15px; color: var(--muted); }
 .nav a,
 .nav button {
   display: flex; align-items: center; gap: 6px;
@@ -98,14 +98,14 @@
 
 .about h2 { font-size: 24px; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
 .about h3 {
-  font-size: 12px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  font-size: 15px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
   color: var(--muted);
   margin: 22px 0 8px;
 }
 .about p { margin: 0 0 10px; font-size: 15px; line-height: 1.6; color: var(--text); }
 .about p:last-child { margin-bottom: 0; }
 .about .about-lede { font-size: 16px; color: var(--ink); }
-.about .about-note { font-size: 14px; color: var(--muted); }
+.about .about-note { font-size: 15px; color: var(--muted); }
 .about a { color: var(--accent); }
 
 /* Definition list, so a screen reader reads "Space — play/pause" as the pair it is, rather
@@ -113,13 +113,13 @@
 .about-keys { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
 .about-keys > div { display: flex; align-items: center; gap: 10px; }
 .about-keys dt { flex: none; }
-.about-keys dd { margin: 0; font-size: 14px; color: var(--text); }
+.about-keys dd { margin: 0; font-size: 15px; color: var(--text); }
 .about kbd {
   display: inline-block; min-width: 30px; text-align: center;
   padding: 3px 7px;
   background: var(--surface-2); border: 1px solid var(--line-2); border-bottom-width: 2px;
   border-radius: var(--r-sm);
-  font: inherit; font-size: 12.5px; font-weight: 600;
+  font: inherit; font-size: 15px; font-weight: 600;
   color: var(--text);
 }
 
@@ -165,7 +165,7 @@
   padding: 9px 15px;
   background: var(--plum);
   color: #e9d8f5;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.6;
 }
 .foot b { color: #fff; font-weight: 600; }
@@ -275,7 +275,7 @@
   border-bottom: 1px solid var(--line);
 }
 .moments-side .side-title { font-size: 16px; font-weight: 650; }
-.moments-side .side-pos { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.moments-side .side-pos { font-size: 15px; color: var(--muted); margin-top: 2px; }
 .moments-side .side-pos b { color: var(--ink); }
 
 /* List / By scene. A segmented pair, not a checkbox: both arrangements are named, so the one
@@ -295,7 +295,7 @@
   background: #fff;
   color: var(--muted);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -325,7 +325,7 @@
   padding: 0 8px;
   border-radius: var(--r-md);
   background: #f2f3f5;
-  font-size: 14px;
+  font-size: 15px;
   cursor: pointer;
   list-style: none; /* the default triangle sits outside the box and breaks the row */
 }
@@ -346,7 +346,7 @@
 .side-scene[open] summary::before { rotate: 90deg; }
 .side-scene-n { font-weight: 700; }
 .side-scene-t { font-variant-numeric: tabular-nums; color: var(--muted); }
-.side-scene-c { margin-left: auto; color: var(--muted); font-size: 13px; }
+.side-scene-c { margin-left: auto; color: var(--muted); font-size: 15px; }
 /* Indent the moments so the group reads as containing them. */
 .side-scene .side-row { margin-left: 12px; }
 
@@ -398,13 +398,13 @@
 .side-now {
   display: block;
   color: #8a5200;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .side-t { font-variant-numeric: tabular-nums; font-weight: 600; }
-.side-d { color: var(--muted); font-size: 13px; margin-left: 8px; }
+.side-d { color: var(--muted); font-size: 15px; margin-left: 8px; }
 
 /* --- Landing --------------------------------------------------------------
    A white card on the page, like the chart demo's artifact card. */
@@ -448,7 +448,7 @@
 .drop.over { border-color: var(--brand-700); background: var(--brand-100); border-style: solid; }
 .drop svg { color: var(--muted); margin-bottom: 2px; }
 .drop-h { font-size: 18px; font-weight: 650; }
-.drop small { color: var(--muted); font-size: 13px; }
+.drop small { color: var(--muted); font-size: 15px; }
 .drop-btn {
   margin-top: 10px;
   /* 44px tall (16px text x 1.5 + 2x10px) — the WCAG 2.5.5 floor, which is the one thing in
@@ -472,7 +472,7 @@
   border: 1px solid #b7e4c9;
   border-radius: var(--r-md);
   color: #456853;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.45;
 }
 .privacy svg { flex: none; margin-top: 2px; color: #17924e; }
@@ -486,7 +486,7 @@
   border: 1px solid #f0b3ae;
   border-radius: var(--r-md);
   color: #8a3a34;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.5;
 }
 .landing-error b { color: #b02a20; }
@@ -503,7 +503,7 @@
   border: 1px solid rgba(255, 194, 51, 0.45);
   border-radius: var(--r-md);
   color: #6b5410;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.45;
 }
 .strip button {
@@ -564,7 +564,7 @@
 
 .preparing-stage { font-size: 17px; font-weight: 600; }
 .preparing-file {
-  font-size: 13px;
+  font-size: 15px;
   color: #a7b0bd;
   max-width: 80%;
   overflow: hidden;
@@ -580,7 +580,7 @@
   border: 1px solid rgba(255, 194, 51, 0.4);
   border-radius: var(--r-md);
 }
-.preparing-late p { font-size: 14px; line-height: 1.5; color: #e8dcc0; margin: 0 0 10px; }
+.preparing-late p { font-size: 15px; line-height: 1.5; color: #e8dcc0; margin: 0 0 10px; }
 .preparing-late button {
   height: 40px;
   padding: 0 18px;
