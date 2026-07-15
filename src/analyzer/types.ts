@@ -70,7 +70,7 @@ export const DEFAULT_PARAMS: AnalysisParams = {
   distRatio: 0.05,
   minSizeFrac: 0.01,
   maxSizeFrac: 0.7,
-  minDuration: 0,
+  minDuration: 0.1,
   highlightLead: 1.0,
   highlightLinger: 0.5,
 };

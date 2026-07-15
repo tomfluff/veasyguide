@@ -194,12 +194,18 @@ usefully highlight or zoom into. Above ~70% it's a scene-level change (scroll, t
 camera move) — highlighting it is meaningless and magnifying it impossible.
 Python: `roi_area_low` / `roi_area_high` in `RoIActivity._is_valid`.
 
-### `minDuration` = 0 s
-Display filter only (no re-analysis): activities shorter than this are hidden.
+### `minDuration` = 0.1 s
+Display filter only (no re-analysis): activities shorter than this are hidden — from the
+timeline lane, the moments sidebar AND the on-video highlight, since all three read the same
+filtered list.
 
 **Why.** Sub-second blips — a stray cursor flick — can distract more than help. This one comes
 from the *player*, not the analyzer: the study player filtered by duration (`atLeast`, up to
-1.5 s in some modes) when choosing what to highlight.
+1.5 s in some modes) when choosing what to highlight. The 0.1 default exists to drop the
+zero-length single-detection moments (one frame of change, "0.0s" in the sidebar), which are
+flashes rather than moments; anything long enough to watch survives. Thumbnails are generated
+for every valid activity regardless of this filter, so loosening it later never surfaces a
+row without one.
 
 ### `highlightLead` = 1.0 s
 **The pre-activity cue.** The highlight appears this many seconds *before* the activity
