@@ -322,8 +322,12 @@
 }
 
 /* A scene group. The rows inside are the same .side-row as the flat list — only the wrapper
-   and its header are new, so the two arrangements can never drift apart visually. */
-.side-scene { display: flex; flex-direction: column; gap: 0.5rem; }
+   and its header are new, so the two arrangements can never drift apart visually.
+
+   NOT flex+gap: Chrome slots a <details>' content into an internal ::details-content box, so a
+   flex gap on the details applies between the summary and that box — and the rows inside it get
+   NO gap at all (Firefox lays it out differently again). The 0.5rem rhythm lives as margins on
+   the rows themselves, which no engine's internal wrapper can swallow. */
 .side-scene summary {
   display: flex;
   align-items: center;
@@ -354,8 +358,13 @@
 .side-scene-n { font-weight: 700; }
 .side-scene-t { font-variant-numeric: tabular-nums; color: var(--muted); }
 .side-scene-c { margin-left: auto; color: var(--muted); font-size: 0.9375rem; }
-/* Indent the moments so the group reads as containing them. */
-.side-scene .side-row { margin-left: 12px; }
+/* Indent the moments so the group reads as containing them; 0.5rem above each row keeps the
+   same rhythm as the flat list. Buttons don't stretch inside a block box the way flex items
+   do, so the width is set explicitly. */
+.side-scene .side-row {
+  margin: 0.5rem 0 0 12px;
+  width: calc(100% - 12px);
+}
 
 .side-row {
   display: flex;
