@@ -2,7 +2,8 @@
 // the two read as one body of work — plum hairline, slim white bar, italic qualifier beside the
 // name, muted nav with one accent link, a human byline at the bottom.
 import type { ReactNode } from "react";
-import { IconBrandGithub, IconExternalLink } from "@tabler/icons-react";
+import { useMantineColorScheme, useComputedColorScheme } from "@mantine/core";
+import { IconBrandGithub, IconExternalLink, IconMoon, IconSun } from "@tabler/icons-react";
 // Both bundled, not hotlinked from tomfluff.github.io. The landing screen promises "no upload,
 // no account, no server" — a remote <img> would have the page phone out on every load, which is
 // a small thing that makes a large promise false.
@@ -20,6 +21,11 @@ export function TopBar({
   status?: ReactNode;
   onAbout: () => void;
 }) {
+  // setColorScheme flips Mantine's data attribute on <html>; index.css keys the token layer on
+  // the same attribute, so the whole page follows from one switch. Mantine persists the choice
+  // (localStorage) and "auto" tracks the OS until the viewer picks a side.
+  const { setColorScheme } = useMantineColorScheme();
+  const scheme = useComputedColorScheme("light");
   return (
     <header className="top">
       {/* The project mark is a finished tile — it brings its own colours and its own rounded
@@ -34,6 +40,14 @@ export function TopBar({
       <nav className="nav">
         {/* A button, not an anchor: it opens a dialog, it does not navigate anywhere. An <a
             href="#about"> would put a dead fragment in the URL and lie to a screen reader. */}
+        <button
+          type="button"
+          onClick={() => setColorScheme(scheme === "dark" ? "light" : "dark")}
+          aria-label={scheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+          title={scheme === "dark" ? "Light theme" : "Dark theme"}
+        >
+          {scheme === "dark" ? <IconSun size={18} /> : <IconMoon size={18} />}
+        </button>
         <button type="button" onClick={onAbout}>About</button>
         <a className="acc" href={PROFILE} target="_blank" rel="noreferrer">
           <IconExternalLink size={16} /> Project Page

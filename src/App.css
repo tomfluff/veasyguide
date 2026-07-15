@@ -6,10 +6,8 @@
    file keeps working while resolving to the contract's values. --line, --muted and --plum now
    come straight from index.css. */
 :root {
-  --page: var(--surface);
   --line-2: var(--line);
   --ink: var(--text);
-  --accent: var(--brand-700); /* was blue #2f6feb — DESIGN.md has no blue; the brand is purple */
 }
 
 /* A column, so the footer sits at the bottom of a short page instead of half-way up it. */
@@ -35,7 +33,7 @@
      both — 44px targets AND slim chrome; a 44px-tall bar is how they coexist). */
   padding: 0 20px;
   min-height: 44px;
-  background: #fff;
+  background: var(--card);
   border-bottom: 1px solid var(--line);
 }
 /* No background plate: the mark is a finished tile with its own colours and corners. */
@@ -74,7 +72,7 @@
 .nav button:hover { color: var(--ink); }
 .nav a.acc { color: var(--accent); }
 .nav a:focus-visible,
-.nav button:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
+.nav button:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 
 /* --- About ---------------------------------------------------------------- */
 .about {
@@ -83,7 +81,7 @@
   padding: 30px 34px 34px;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: #fff;
+  background: var(--card);
   color: var(--ink);
   box-shadow: 0 24px 60px rgba(15, 18, 25, 0.28);
   overflow-y: auto;
@@ -99,7 +97,7 @@
   color: var(--muted); cursor: pointer;
 }
 .about-x:hover { background: var(--surface-2); color: var(--ink); }
-.about-x:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
+.about-x:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 
 .about h2 { font-size: 1.5rem; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
 .about h3 {
@@ -141,7 +139,7 @@
   margin-left: 8px;
   border-radius: 50%;
 }
-.avatar-link:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
+.avatar-link:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 .avatar {
   width: 28px; height: 28px;
   border-radius: 50%;
@@ -155,7 +153,7 @@
   vertical-align: middle;
 }
 .foot-link:hover b { text-decoration: underline; }
-.foot-link:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; border-radius: 4px; }
+.foot-link:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 .foot-av {
   width: 1.25rem; height: 1.25rem;
   border-radius: 50%;
@@ -217,7 +215,7 @@
   width: 268px;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   color: var(--ink);
@@ -299,7 +297,7 @@
   flex: 1;
   min-height: 2rem;
   border: 0;
-  background: #fff;
+  background: var(--card);
   color: var(--muted);
   font: inherit;
   font-size: 0.9375rem;
@@ -307,9 +305,9 @@
   cursor: pointer;
 }
 .side-view button + button { border-left: 1px solid var(--line); }
-.side-view button:hover { background: #f7f8fa; }
+.side-view button:hover { background: var(--hover); }
 .side-view button.on { background: var(--plum); color: #fff; }
-.side-view button:focus-visible { outline: 3px solid var(--brand-500); outline-offset: -3px; }
+.side-view button:focus-visible { outline: 3px solid var(--ring); outline-offset: -3px; }
 
 .moments-side .side-list {
   flex: 1;
@@ -335,14 +333,14 @@
   min-height: 2rem;
   padding: 0 8px;
   border-radius: var(--r-md);
-  background: #f2f3f5;
+  background: var(--raise);
   font-size: 0.9375rem;
   cursor: pointer;
   list-style: none; /* the default triangle sits outside the box and breaks the row */
 }
 .side-scene summary::-webkit-details-marker { display: none; }
-.side-scene summary:hover { background: #e9ebee; }
-.side-scene summary:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
+.side-scene summary:hover { background: var(--surface-2); }
+.side-scene summary:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 /* Our own caret, so it lives inside the padding and rotates with the disclosure. */
 .side-scene summary::before {
   content: "";
@@ -375,7 +373,7 @@
      gets compressed to cram every moment into view — rows overlap and thumbnails vanish. The
      row keeps its natural height (thumbnail + padding) and the LIST scrolls. */
   flex: none;
-  background: #fff;
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   color: inherit;
@@ -384,9 +382,9 @@
   text-align: left;
   cursor: pointer;
 }
-.side-row:hover { background: #f7f8fa; }
+.side-row:hover { background: var(--hover); }
 .side-row:disabled { opacity: 0.5; cursor: not-allowed; }
-.side-row:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
+.side-row:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 /* --now is the amber from the player, darkened until it actually passes contrast on white.
    #ffc233 on #fff is 1.7:1 — invisible as a text colour, which is where the "Now" label uses it. */
 .side-row.now {
@@ -402,13 +400,13 @@
   border-radius: var(--r-sm);
   border: 1px solid var(--line-2);
   object-fit: cover;
-  background: #fff;
+  background: var(--card);
 }
 .side-thumb.ph {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef0f3;
+  background: var(--raise);
   color: var(--muted);
   font-weight: 650;
 }
@@ -433,7 +431,7 @@
 .landing {
   max-width: 620px;
   margin: 0 auto;
-  background: #fff;
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   padding: 26px 28px;
@@ -454,16 +452,16 @@
   gap: 4px;
   width: 100%;
   padding: 22px 20px;
-  background: #f8f9fb;
-  border: 2px dashed #c6cbd4;
+  background: var(--raise);
+  border: 2px dashed var(--line-2);
   border-radius: var(--r-lg);
   color: inherit;
   font: inherit;
   cursor: pointer;
   text-align: center;
 }
-.drop:hover { border-color: #9aa2af; background: var(--d-text); }
-.drop:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
+.drop:hover { border-color: var(--muted); background: var(--surface-2); }
+.drop:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 .drop.over { border-color: var(--brand-700); background: var(--brand-100); border-style: solid; }
 .drop svg { color: var(--muted); margin-bottom: 2px; }
 .drop-h { font-size: 1.125rem; font-weight: 650; }
@@ -613,7 +611,7 @@
   cursor: pointer;
 }
 .preparing-late button:hover { background: #dd97f9; }
-.preparing-late button:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
+.preparing-late button:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 .preparing-devhint {
   margin: 12px 0 0;
   font-size: 0.75rem;
@@ -621,6 +619,41 @@
   text-align: left;
 }
 .preparing-devhint code { background: rgba(255, 255, 255, 0.1); padding: 1px 4px; border-radius: 3px; }
+
+/* --- Dark scheme -----------------------------------------------------------
+   The surfaces flip through the tokens (index.css); what lives here is only the per-component
+   TINTS — semantic washes that were mixed for a white page and go muddy on a dark one. Each
+   dark text colour below was contrast-checked against its own tinted background. */
+[data-mantine-color-scheme="dark"] .chip-dot { background: var(--warn); }
+[data-mantine-color-scheme="dark"] .chip.ready .chip-dot { background: var(--ok); }
+[data-mantine-color-scheme="dark"] .landing { box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5); }
+/* The "now" amber, as the dark overlay sidebar already draws it. */
+[data-mantine-color-scheme="dark"] .side-row.now {
+  background: #2a2313;
+  border-color: #ffc233;
+  box-shadow: 0 0 0 2px rgba(255, 194, 51, 0.4);
+}
+[data-mantine-color-scheme="dark"] .side-now { color: #ffc233; }
+[data-mantine-color-scheme="dark"] .privacy {
+  background: rgba(126, 227, 164, 0.08);
+  border-color: rgba(126, 227, 164, 0.35);
+  color: #a9d8bb;
+}
+[data-mantine-color-scheme="dark"] .privacy svg,
+[data-mantine-color-scheme="dark"] .privacy b { color: var(--ok); }
+[data-mantine-color-scheme="dark"] .landing-error {
+  background: rgba(255, 107, 107, 0.08);
+  border-color: rgba(255, 107, 107, 0.35);
+  color: #f0b0b0;
+}
+[data-mantine-color-scheme="dark"] .landing-error b { color: var(--danger); }
+[data-mantine-color-scheme="dark"] .strip { color: #ffd77a; }
+[data-mantine-color-scheme="dark"] .strip button:hover { background: rgba(255, 255, 255, 0.08); }
+[data-mantine-color-scheme="dark"] .error { border-color: var(--danger); color: var(--danger); }
+[data-mantine-color-scheme="dark"] .drop.over {
+  background: rgba(210, 124, 247, 0.12);
+  border-color: var(--brand-300);
+}
 
 .gallery { margin-top: 24px; padding-top: 12px; border-top: 1px dashed #bbb; }
 .gallery h2 { font-size: 0.875rem; margin: 0 0 8px; color: #555; }

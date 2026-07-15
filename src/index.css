@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   /* Atkinson Hyperlegible — a functional legibility choice for low-vision readers, not a style
      one (DESIGN.md). Faces are self-hosted via @fontsource (imported in main.tsx); no CDN. */
   --font: "Atkinson Hyperlegible", sans-serif;
@@ -47,6 +47,36 @@
   --r-lg: 12px;
   --r-pill: 999px;
   --plum: #3b0d47;
+
+  /* Surfaces the page chrome is built from, per scheme. On light, cards are WHITE on a grey
+     page (the card is the brightest thing); on dark that inverts — the page is the darkest
+     thing and cards sit a step above it. --ring is the focus ring: brand-500 reads on light,
+     brand-300 is the only purple legible on dark. */
+  --page: var(--surface);
+  --card: #ffffff;
+  --hover: #f7f8fa;
+  --raise: #eef0f3;
+  --ring: var(--brand-500);
+  --accent: var(--brand-700);
+}
+
+/* Dark scheme. Keyed on Mantine's attribute so our CSS and Mantine's controls flip from ONE
+   source of truth. The values are DESIGN.md's dark neutrals — the same ones the always-dark
+   player uses as --d-* (which never flip; the player is dark in both schemes). */
+:root[data-mantine-color-scheme="dark"] {
+  color-scheme: dark;
+  --bg: #0d0f13;
+  --surface: #171b22;
+  --surface-2: #21262f;
+  --line: #333a45;
+  --text: #f2f4f7;
+  --muted: #a7b0bd;
+  --page: var(--bg);
+  --card: var(--surface);
+  --hover: var(--surface-2);
+  --raise: var(--surface-2);
+  --ring: var(--brand-300);
+  --accent: var(--brand-300);
 }
 * { box-sizing: border-box; }
 body { margin: 0; }
