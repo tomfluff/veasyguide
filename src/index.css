@@ -1,6 +1,9 @@
 :root {
   color-scheme: light dark;
-  font-family: system-ui, sans-serif;
+  /* Atkinson Hyperlegible — a functional legibility choice for low-vision readers, not a style
+     one (DESIGN.md). Faces are self-hosted via @fontsource (imported in main.tsx); no CDN. */
+  --font: "Atkinson Hyperlegible", sans-serif;
+  font-family: var(--font);
 }
 * { box-sizing: border-box; }
 body { margin: 0; }

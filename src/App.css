@@ -19,7 +19,7 @@
   flex-direction: column;
   background: var(--page);
   color: var(--ink);
-  font-family: system-ui, sans-serif;
+  font-family: var(--font);
   border-top: 4px solid var(--plum);
 }
 

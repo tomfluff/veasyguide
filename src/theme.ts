@@ -23,6 +23,9 @@ const brand: MantineColorsTuple = [
 export const theme = createTheme({
   primaryColor: "brand",
   colors: { brand },
+  // Atkinson Hyperlegible, or every Mantine control falls back to the framework's default stack.
+  // Faces self-hosted via @fontsource (main.tsx); matches --font in index.css.
+  fontFamily: '"Atkinson Hyperlegible", sans-serif',
   // The app is used by people who cannot see it well. Nothing in it renders below 16px.
   fontSizes: { xs: "0.875rem", sm: "0.9375rem", md: "1rem", lg: "1.125rem", xl: "1.25rem" },
 });
