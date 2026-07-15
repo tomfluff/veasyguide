@@ -278,7 +278,7 @@
 .moments-side.overlay .side-scene-c { color: var(--d-muted); }
 
 .moments-side .side-head {
-  padding: 12px 14px 10px;
+  padding: 10px 12px 8px;
   border-bottom: 1px solid var(--line);
 }
 .moments-side .side-title { font-size: 1rem; font-weight: 650; }
@@ -286,18 +286,18 @@
 .moments-side .side-pos b { color: var(--ink); }
 
 /* List / By scene. A segmented pair, not a checkbox: both arrangements are named, so the one
-   you are NOT in is legible as a place to go rather than a state to infer. 44px because it is
-   a control in an app for people who cannot aim precisely (WCAG 2.5.5). */
+   you are NOT in is legible as a place to go rather than a state to infer. Compact on purpose:
+   panel chrome is rem-sized and browser zoom (the magnification path) grows it with the page. */
 .side-view {
   display: flex;
-  margin-top: 8px;
+  margin-top: 6px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   overflow: hidden;
 }
 .side-view button {
   flex: 1;
-  min-height: 44px;
+  min-height: 2rem;
   border: 0;
   background: #fff;
   color: var(--muted);
@@ -328,7 +328,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 2rem;
   padding: 0 8px;
   border-radius: var(--r-md);
   background: #f2f3f5;
@@ -361,8 +361,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px;
-  min-height: 56px;
+  padding: 4px 6px;
+  min-height: 0; /* the thumbnail sets the height; no padding stack on top of it */
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
