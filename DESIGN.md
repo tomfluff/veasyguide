@@ -64,14 +64,23 @@ functional choice, not a style one, and it is the most on-brand decision availab
 
 Never `system-ui`. Never a default stack.
 
+**Browser zoom is the magnification path.** A low-vision user scales the whole page with
+their browser (Ctrl+/−, or a persistent zoom level), so every font size is in **rem** — zoom
+scales rem cleanly, while px sizes fight it. No `font-size` in px, anywhere. The default is
+1rem (the browser's 16px unless the user changed it — and if they changed it, that's them
+telling us what they need, so we inherit it rather than overriding).
+
+Because zoom does the magnifying, the UI itself can stay compact: secondary text and dense
+panels below 1rem are fine, as long as they are rem-based and scale with the page.
+
 ```
 --font: "Atkinson Hyperlegible", sans-serif;
 
-Body / controls   17px / 1.5      never below 16px, anywhere
-Small print       15px            the floor; nothing smaller ships
-Now-line          18px
-Section titles    20px / 650
-Page title        40px / 700 / -0.02em
+Body / controls   1rem / 1.5        the default; inherits the browser's base size
+Secondary / meta  0.875–0.9375rem   chips, nav, timestamps, footer
+Dense panels      down to 0.75rem   the Appearance sheet; scales with zoom like everything
+Section titles    1.25rem / 650
+Page headline     1.6875rem / 700
 Numerals          font-variant-numeric: tabular-nums  (timecodes must not jitter)
 ```
 
@@ -82,11 +91,17 @@ Numerals          font-variant-numeric: tabular-nums  (timecodes must not jitter
 Spacing: 4 / 8 / 12 / 16 / 24 / 32 / 40
 ```
 
-**Targets: 44×44px minimum** (WCAG 2.5.5). One named exception: the timeline's moment
-markers are time-positioned, so their width encodes duration and cannot be 44px without
-lying about the timeline. They are 24px tall, and **every marker is reachable by an
-equivalent full-size control** — the `[` / `]` keys, the Prev/Next buttons, and the moments
-sidebar. That is WCAG 2.5.8's *Equivalent* exception, used honestly.
+**Targets: 44×44px for the primary player controls** (play/pause, seek, volume, fullscreen,
+Prev/Next — the things used constantly, often while looking at the video rather than the
+button). Panel and chrome controls (sidebar switches, scene headers, dialog buttons, the
+Appearance sheet) may be compact: they are rem-sized, so browser zoom — the magnification
+path — grows them together with everything else, and a keyboard/screen-reader path exists
+for each.
+
+One named exception stays: the timeline's moment markers are time-positioned, so their width
+encodes duration and cannot be 44px without lying about the timeline. **Every marker is
+reachable by an equivalent full-size control** — the `[` / `]` keys, the Prev/Next buttons,
+and the moments sidebar. That is WCAG 2.5.8's *Equivalent* exception, used honestly.
 
 ## Layout
 
@@ -119,7 +134,8 @@ sidebar open. Nothing decorative.
 - `system-ui` / default font stacks as the primary face.
 - Three-column feature grids. (The landing had one. It was cut.)
 - Icons in colored circles, decorative blobs, wavy dividers, gradient backgrounds.
-- Any body text under 16px, or any text under 4.5:1 contrast.
+- `font-size` in px — everything is rem, or browser zoom breaks. Body text under 1rem,
+  or any text under 4.5:1 contrast.
 - Placeholder-as-label in a form field.
 - Hover as the only way to discover or reach anything.
 - Auto-hiding UI that does not also reveal on keyboard focus, on pause, and on keypress.

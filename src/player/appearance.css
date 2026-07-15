@@ -22,16 +22,16 @@
      that tile taller than its three siblings and broke the row's alignment. */
   width: 396px;
   padding: 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
-.ap-title { font-size: 15px; font-weight: 650; }
-.ap-hint { font-size: 12px; color: var(--ap-muted); line-height: 1.45; margin-bottom: 10px; }
-.ap-status { font-size: 12px; color: var(--ap-muted); margin: 8px 0 10px; min-height: 17px; }
+.ap-title { font-size: 0.9375rem; font-weight: 650; }
+.ap-hint { font-size: 0.75rem; color: var(--ap-muted); line-height: 1.45; margin-bottom: 10px; }
+.ap-status { font-size: 0.75rem; color: var(--ap-muted); margin: 8px 0 10px; min-height: 17px; }
 /* No negative-margin bleed: it made the sheet a few px taller than the dropdown, so the
    dropdown grew its own scrollbar on top of .ap-body's — two nested scrollbars. */
 .ap-foot {
-  font-size: 11px; color: var(--ap-muted);
+  font-size: 0.6875rem; color: var(--ap-muted);
   border-top: 1px solid var(--ap-line);
   margin-top: 10px; padding-top: 8px;
 }
@@ -72,7 +72,7 @@
 
 .ap-tile-name {
   display: block; padding: 4px 3px 5px;
-  font-size: 11px; font-weight: 650; text-align: center;
+  font-size: 0.6875rem; font-weight: 650; text-align: center;
   color: var(--ap-muted); background: #12161d;
 }
 .ap-tile.sel .ap-tile-name { color: var(--d-text); }
@@ -82,23 +82,23 @@
   display: flex; align-items: center; gap: 10px;
   width: 100%; height: 44px; padding: 0 12px;
   background: var(--ap-raise); border: 1px solid var(--ap-line); border-radius: var(--r-md);
-  color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+  color: inherit; font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer;
 }
 .ap-nav:hover { background: #232935; }
 .ap-nav:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 .ap-nav-label { flex: 1; font-weight: 600; }
-.ap-nav-value { color: var(--ap-muted); font-size: 13px; }
+.ap-nav-value { color: var(--ap-muted); font-size: 0.8125rem; }
 
 .ap-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .ap-back {
   display: flex; align-items: center; gap: 4px;
   height: 32px; padding: 0 10px 0 6px;
   background: transparent; border: 1px solid var(--ap-line); border-radius: var(--r-md);
-  color: inherit; font: inherit; font-size: 13px; cursor: pointer;
+  color: inherit; font: inherit; font-size: 0.8125rem; cursor: pointer;
 }
 .ap-back:hover { background: var(--ap-raise); }
 .ap-back:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
-.ap-head-title { font-size: 15px; font-weight: 650; }
+.ap-head-title { font-size: 0.9375rem; font-weight: 650; }
 
 /* The five groups stay reachable from any group — drilling in should not mean drilling
    back out and in again to compare the box against the pointer. */
@@ -106,7 +106,7 @@
 .ap-tab {
   flex: none; height: 30px; padding: 0 9px;
   background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
-  color: var(--ap-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  color: var(--ap-muted); font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer;
   white-space: nowrap;
 }
 .ap-tab:hover { background: var(--ap-raise); color: var(--d-text); }
@@ -119,11 +119,11 @@
 
 /* ---- rows -------------------------------------------------------------- */
 .ap-row { display: flex; align-items: center; gap: 8px; min-height: 38px; }
-.ap-label { flex: none; width: 62px; font-size: 13px; color: var(--ap-muted); }
+.ap-label { flex: none; width: 62px; font-size: 0.8125rem; color: var(--ap-muted); }
 .ap-control { flex: 1; min-width: 0; display: flex; align-items: center; }
 .ap-value {
   flex: none; width: 44px; text-align: right;
-  font-size: 13px; font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem; font-variant-numeric: tabular-nums;
 }
 
 /* ---- native range ------------------------------------------------------ */
@@ -156,7 +156,7 @@
 .ap-seg-btn {
   height: 30px; padding: 0 10px;
   background: transparent; border: 1px solid var(--ap-line); border-radius: var(--r-sm);
-  color: var(--ap-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  color: var(--ap-muted); font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer;
 }
 .ap-seg-btn:hover { background: var(--ap-raise); color: var(--d-text); }
 .ap-seg-btn.sel {
@@ -186,6 +186,6 @@
   background: var(--ap-brand); border-color: var(--ap-brand); color: var(--ap-brand-ink);
 }
 .ap-chip:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
-.ap-chip-name { display: block; font-size: 13px; font-weight: 650; }
-.ap-chip-hint { display: block; font-size: 11px; color: var(--ap-muted); }
+.ap-chip-name { display: block; font-size: 0.8125rem; font-weight: 650; }
+.ap-chip-hint { display: block; font-size: 0.6875rem; color: var(--ap-muted); }
 .ap-chip.on .ap-chip-hint { color: rgba(23, 6, 31, 0.75); }
