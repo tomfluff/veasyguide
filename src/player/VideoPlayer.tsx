@@ -522,7 +522,9 @@ const VideoPlayer = (props: Props) => {
       }}
       onFocusCapture={showControls}
     >
-      <Box className="video-controls-container" py="sm" ref={barSizeRef}>
+      {/* No py prop: it lands as an inline style and silently overrides the stylesheet's
+          padding, so the bar's vertical rhythm ends up owned by two places. CSS owns it. */}
+      <Box className="video-controls-container" ref={barSizeRef}>
         <Box
           className="timeline-container"
           ref={trackRef}
@@ -638,7 +640,7 @@ const VideoPlayer = (props: Props) => {
           </Box>
         )}
 
-        <Group className="controls" gap={6} align="center" mt={8}>
+        <Group className="controls" gap={6} align="center" mt={4}>
           <UnstyledButton
             onClick={handlePlayPause}
             onKeyDown={stopPlayerHotkeys}
