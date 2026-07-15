@@ -63,7 +63,7 @@ export function TopBar({
   );
 }
 
-export function Footer() {
+export function Footer({ feedbackHref }: { feedbackHref: string }) {
   return (
     // A flex row, not a line of text with an inline-flex link in it: an inline-flex box takes
     // its baseline from its FIRST item — here the avatar, whose baseline is its bottom edge —
@@ -75,7 +75,9 @@ export function Footer() {
         <img className="foot-av" src={avatar} alt="" aria-hidden="true" />
         <b>Yotam Sechayk</b>
       </a>
-      <span>— reach out with any questions.</span>
+      <span>
+        — <a className="foot-mail" href={feedbackHref}>reach out</a> with any questions.
+      </span>
     </footer>
   );
 }

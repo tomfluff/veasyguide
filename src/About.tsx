@@ -17,7 +17,17 @@ const KEYS: [string, string][] = [
   ["F", "Fullscreen"],
 ];
 
-export default function About({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function About({
+  open,
+  onClose,
+  feedbackHref,
+}: {
+  open: boolean;
+  onClose: () => void;
+  // Built lazily by the caller: the mailto body carries analysis diagnostics that change as
+  // the analyzer runs, so the href is composed at render, not baked in.
+  feedbackHref: string;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
 
   // showModal() is what makes it modal — a plain `open` attribute renders the dialog inline,
@@ -115,6 +125,15 @@ export default function About({ open, onClose }: { open: boolean; onClose: () =>
           on GitHub
         </a>
         .
+      </p>
+
+      <h3>Feedback</h3>
+      <p>
+        Found a bug, or a lecture it handles badly?{" "}
+        <a href={feedbackHref}>Send feedback by email</a>. The draft includes a few technical
+        details (browser, video length and resolution, what the analysis found — never the video
+        or its name); it opens in your own mail app, so you can read and edit everything before
+        deciding to send it.
       </p>
     </dialog>
   );

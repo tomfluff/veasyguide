@@ -9,6 +9,7 @@ import VideoPlayer, { PLAYBACK_LEAD } from "./player/VideoPlayer";
 import MomentsSidebar from "./MomentsSidebar";
 import Landing from "./Landing";
 import { TopBar, Footer } from "./Shell";
+import { feedbackMailto } from "./feedback";
 import About from "./About";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
@@ -468,6 +469,20 @@ export default function App() {
     </span>
   );
 
+  // The feedback email's diagnostics: what a bug report always needs and never includes.
+  // Composed fresh each render — it carries live analysis numbers.
+  const feedbackHref = feedbackMailto({
+    fileName,
+    duration: meta?.duration,
+    videoWidth: meta?.videoWidth,
+    videoHeight: meta?.videoHeight,
+    validMoments: activities.length,
+    totalActivities: activityCount,
+    scenes: scenes.length,
+    xRealtime,
+    done,
+  });
+
   return (
     <div className="shell">
       <TopBar
@@ -475,7 +490,7 @@ export default function App() {
         status={chip}
         onAbout={() => setAboutOpen(true)}
       />
-      <About open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <About open={aboutOpen} onClose={() => setAboutOpen(false)} feedbackHref={feedbackHref} />
       {/* The page grows a right-hand column once a video is up; before that the narrow
           reading width is right for the drop zone. */}
       <main className={videoUrl && !fatal ? "app with-side" : "app"}>
@@ -733,7 +748,7 @@ export default function App() {
       )}
 
       </main>
-      <Footer />
+      <Footer feedbackHref={feedbackHref} />
     </div>
   );
 }
