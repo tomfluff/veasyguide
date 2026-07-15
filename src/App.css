@@ -281,8 +281,8 @@
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--line);
 }
-.moments-side .side-title { font-size: 1rem; font-weight: 650; }
-.moments-side .side-pos { font-size: 0.9375rem; color: var(--muted); margin-top: 2px; }
+.moments-side .side-title { font-size: 1.25rem; font-weight: 650; }
+.moments-side .side-pos { font-size: 0.9375rem; color: var(--muted); margin-top: 0; }
 .moments-side .side-pos b { color: var(--ink); }
 
 /* List / By scene. A segmented pair, not a checkbox: both arrangements are named, so the one
@@ -317,13 +317,13 @@
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.5rem;
   overflow-y: auto;
 }
 
 /* A scene group. The rows inside are the same .side-row as the flat list — only the wrapper
    and its header are new, so the two arrangements can never drift apart visually. */
-.side-scene { display: flex; flex-direction: column; gap: 6px; }
+.side-scene { display: flex; flex-direction: column; gap: 0.5rem; }
 .side-scene summary {
   display: flex;
   align-items: center;
@@ -361,8 +361,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 6px;
-  min-height: 0; /* the thumbnail sets the height; no padding stack on top of it */
+  padding: 6px;
+  /* flex none, NOT min-height 0: the list is a pinned-height flex column, and a shrinkable row
+     gets compressed to cram every moment into view — rows overlap and thumbnails vanish. The
+     row keeps its natural height (thumbnail + padding) and the LIST scrolls. */
+  flex: none;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
