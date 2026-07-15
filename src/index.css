@@ -4,6 +4,49 @@
      one (DESIGN.md). Faces are self-hosted via @fontsource (imported in main.tsx); no CDN. */
   --font: "Atkinson Hyperlegible", sans-serif;
   font-family: var(--font);
+
+  /* The DESIGN.md token layer, defined once here so every stylesheet resolves against the
+     same contract. Values are the ones in DESIGN.md; the contrast figures there are checked. */
+
+  /* Brand purple. --brand-300 fails contrast on white (~2.1:1) and is a DARK-theme accent only;
+     light-theme meaning-carriers use --brand-700 (~6.4:1 on white). */
+  --brand-100: #f3e3fd;
+  --brand-300: #d27cf7;
+  --brand-500: #a94ae0;   /* borders, focus rings on light */
+  --brand-700: #7b2cbf;   /* light-theme accent */
+  --brand-900: #4c1d95;
+
+  /* Light-theme neutrals (every --muted pairing below meets 4.5:1 on its bg). */
+  --bg: #ffffff;
+  --surface: #f5f6f8;
+  --surface-2: #eaecf0;
+  --line: #d3d8e0;
+  --text: #14181f;
+  --muted: #55606e;       /* 5.9:1 on --bg */
+
+  /* Dark-region neutrals. The player bar and its overlays are always dark; these are the
+     DESIGN.md dark-theme values, defined once so player.css / appearance.css / the overlay
+     sidebar stop hand-duplicating the same seven hexes. */
+  --d-bg: #0d0f13;
+  --d-surface: #171b22;
+  --d-surface-2: #21262f;
+  --d-line: #333a45;
+  --d-text: #f2f4f7;
+  --d-muted: #a7b0bd;     /* 7.0:1 on --d-bg */
+
+  /* Semantic — chrome only. The highlight/magnifier colors are USER settings, not tokens. */
+  --activity: #ff5a4d;
+  --ok: #7ee3a4;
+  --warn: #ffb020;
+  --danger: #ff6b6b;
+
+  /* Radius + the plum chrome signature (deliberately off-palette: it is the title-bar hairline
+     and footer from the reference design, brand chrome rather than content). */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+  --plum: #3b0d47;
 }
 * { box-sizing: border-box; }
 body { margin: 0; }

@@ -49,7 +49,7 @@
   border-color: var(--ap-brand);
   box-shadow: 0 0 0 3px rgba(210, 124, 247, 0.3);
 }
-.ap-tile:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-tile:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 
 /* the miniature slide each tile draws itself onto */
 .ap-mini { position: relative; display: block; height: 54px; background: #fff; }
@@ -85,7 +85,7 @@
   color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer;
 }
 .ap-nav:hover { background: #232935; }
-.ap-nav:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-nav:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 .ap-nav-label { flex: 1; font-weight: 600; }
 .ap-nav-value { color: var(--ap-muted); font-size: 13px; }
 
@@ -97,7 +97,7 @@
   color: inherit; font: inherit; font-size: 13px; cursor: pointer;
 }
 .ap-back:hover { background: var(--ap-raise); }
-.ap-back:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-back:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 .ap-head-title { font-size: 15px; font-weight: 650; }
 
 /* The five groups stay reachable from any group — drilling in should not mean drilling
@@ -111,7 +111,7 @@
 }
 .ap-tab:hover { background: var(--ap-raise); color: #f2f4f7; }
 .ap-tab.sel { background: var(--ap-brand); color: var(--ap-brand-ink); }
-.ap-tab:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-tab:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 
 /* A fixed body height is the whole point of drilling: the sheet occludes the SAME band of
    video no matter which group is open. Long groups scroll inside it; they never push down. */
@@ -135,7 +135,7 @@
   flex: 1; min-width: 0; height: 24px; background: transparent; cursor: pointer;
 }
 .ap-range:disabled { opacity: 0.4; cursor: default; }
-.ap-range:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; border-radius: 4px; }
+.ap-range:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; border-radius: 4px; }
 
 .ap-range::-webkit-slider-runnable-track {
   height: 6px; border-radius: 3px; background: #2a303a;
@@ -162,7 +162,7 @@
 .ap-seg-btn.sel {
   background: var(--ap-brand); border-color: var(--ap-brand); color: var(--ap-brand-ink);
 }
-.ap-seg-btn:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-seg-btn:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 
 /* ---- swatches ----------------------------------------------------------- */
 .ap-swatches { display: flex; gap: 6px; }
@@ -171,7 +171,7 @@
   border: 2px solid var(--ap-line); border-radius: 50%;
 }
 .ap-swatch.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--ap-brand); }
-.ap-swatch:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-swatch:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 
 /* ---- ink chips ---------------------------------------------------------- */
 .ap-chips { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
@@ -185,7 +185,7 @@
 .ap-chip.on {
   background: var(--ap-brand); border-color: var(--ap-brand); color: var(--ap-brand-ink);
 }
-.ap-chip:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.ap-chip:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 .ap-chip-name { display: block; font-size: 13px; font-weight: 650; }
 .ap-chip-hint { display: block; font-size: 11px; color: var(--ap-muted); }
 .ap-chip.on .ap-chip-hint { color: rgba(23, 6, 31, 0.75); }

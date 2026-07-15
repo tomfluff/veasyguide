@@ -82,7 +82,7 @@
 
 .video-controls-container .controls > button:focus-visible,
 .video-controls-container .controls > .volume-container > button:focus-visible {
-  outline: 3px solid #6fb3ff;
+  outline: 3px solid var(--brand-300);
   outline-offset: 2px;
 }
 
@@ -472,7 +472,7 @@
 }
 
 .moment-mark:focus-visible {
-  outline: 3px solid #6fb3ff;
+  outline: 3px solid var(--brand-300);
   outline-offset: 2px;
 }
 

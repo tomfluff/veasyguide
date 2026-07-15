@@ -2,14 +2,14 @@
    The chrome from the chart-accessibility demo, so the two read as one body of work: plum
    hairline, slim white title bar, italic qualifier beside the name, muted nav with one accent
    link, a human byline at the bottom. */
+/* Legacy names, aliased onto the canonical DESIGN.md tokens in index.css so the rest of this
+   file keeps working while resolving to the contract's values. --line, --muted and --plum now
+   come straight from index.css. */
 :root {
-  --page: #fbfbfc;
-  --line: #e4e6ea;
-  --line-2: #d7dae0;
-  --ink: #15171c;
-  --muted: #6b7280;
-  --accent: #2f6feb;
-  --plum: #3b0d47;
+  --page: var(--surface);
+  --line-2: var(--line);
+  --ink: var(--text);
+  --accent: var(--brand-700); /* was blue #2f6feb — DESIGN.md has no blue; the brand is purple */
 }
 
 /* A column, so the footer sits at the bottom of a short page instead of half-way up it. */
@@ -40,7 +40,7 @@
 .ttl em { font-style: italic; font-weight: 400; color: var(--muted); font-size: 14px; margin-left: 6px; }
 .filechip {
   font-size: 13px; color: var(--muted);
-  padding: 4px 10px; background: #f3f4f6;
+  padding: 4px 10px; background: var(--surface-2);
   border: 1px solid var(--line); border-radius: 999px;
   max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -51,7 +51,7 @@
   display: flex; align-items: center; gap: 7px;
   font-size: 13px; color: var(--muted);
   padding: 4px 11px; margin-right: 6px;
-  background: #f3f4f6; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
   white-space: nowrap;
 }
 .chip-dot { width: 7px; height: 7px; border-radius: 50%; background: #e0870d; flex: none; }
@@ -69,7 +69,7 @@
 .nav button:hover { color: var(--ink); }
 .nav a.acc { color: var(--accent); }
 .nav a:focus-visible,
-.nav button:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.nav button:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
 
 /* --- About ---------------------------------------------------------------- */
 .about {
@@ -93,8 +93,8 @@
   background: none; border: none; border-radius: 8px;
   color: var(--muted); cursor: pointer;
 }
-.about-x:hover { background: #f1f2f5; color: var(--ink); }
-.about-x:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.about-x:hover { background: var(--surface-2); color: var(--ink); }
+.about-x:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
 
 .about h2 { font-size: 24px; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.01em; }
 .about h3 {
@@ -102,7 +102,7 @@
   color: var(--muted);
   margin: 22px 0 8px;
 }
-.about p { margin: 0 0 10px; font-size: 15px; line-height: 1.6; color: #33383f; }
+.about p { margin: 0 0 10px; font-size: 15px; line-height: 1.6; color: var(--text); }
 .about p:last-child { margin-bottom: 0; }
 .about .about-lede { font-size: 16px; color: var(--ink); }
 .about .about-note { font-size: 14px; color: var(--muted); }
@@ -113,14 +113,14 @@
 .about-keys { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
 .about-keys > div { display: flex; align-items: center; gap: 10px; }
 .about-keys dt { flex: none; }
-.about-keys dd { margin: 0; font-size: 14px; color: #33383f; }
+.about-keys dd { margin: 0; font-size: 14px; color: var(--text); }
 .about kbd {
   display: inline-block; min-width: 30px; text-align: center;
   padding: 3px 7px;
-  background: #f3f4f6; border: 1px solid var(--line-2); border-bottom-width: 2px;
+  background: var(--surface-2); border: 1px solid var(--line-2); border-bottom-width: 2px;
   border-radius: 6px;
   font: inherit; font-size: 12.5px; font-weight: 600;
-  color: #33383f;
+  color: var(--text);
 }
 
 @media (max-width: 560px) {
@@ -134,7 +134,7 @@
   margin-left: 14px;
   border-radius: 50%;
 }
-.avatar-link:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.avatar-link:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
 .avatar {
   width: 28px; height: 28px;
   border-radius: 50%;
@@ -148,7 +148,7 @@
   vertical-align: middle;
 }
 .foot-link:hover b { text-decoration: underline; }
-.foot-link:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; border-radius: 4px; }
+.foot-link:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; border-radius: 4px; }
 .foot-av {
   width: 20px; height: 20px;
   border-radius: 50%;
@@ -264,7 +264,7 @@
 .moments-side.overlay .side-view button:hover { background: #232935; }
 /* The plum reads as ink on paper; on the dark overlay it goes nearly black, so the selected
    segment takes the player's own brand purple instead. */
-.moments-side.overlay .side-view button.on { background: #6d28d9; color: #fff; }
+.moments-side.overlay .side-view button.on { background: var(--brand-700); color: #fff; }
 .moments-side.overlay .side-scene summary { background: #232935; color: #f2f4f7; }
 .moments-side.overlay .side-scene summary:hover { background: #2b323d; }
 .moments-side.overlay .side-scene-t,
@@ -302,7 +302,7 @@
 .side-view button + button { border-left: 1px solid var(--line); }
 .side-view button:hover { background: #f7f8fa; }
 .side-view button.on { background: var(--plum); color: #fff; }
-.side-view button:focus-visible { outline: 3px solid #6fb3ff; outline-offset: -3px; }
+.side-view button:focus-visible { outline: 3px solid var(--brand-500); outline-offset: -3px; }
 
 .moments-side .side-list {
   flex: 1;
@@ -331,7 +331,7 @@
 }
 .side-scene summary::-webkit-details-marker { display: none; }
 .side-scene summary:hover { background: #e9ebee; }
-.side-scene summary:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.side-scene summary:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
 /* Our own caret, so it lives inside the padding and rotates with the disclosure. */
 .side-scene summary::before {
   content: "";
@@ -367,7 +367,7 @@
 }
 .side-row:hover { background: #f7f8fa; }
 .side-row:disabled { opacity: 0.5; cursor: not-allowed; }
-.side-row:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.side-row:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
 /* --now is the amber from the player, darkened until it actually passes contrast on white.
    #ffc233 on #fff is 1.7:1 — invisible as a text colour, which is where the "Now" label uses it. */
 .side-row.now {
@@ -397,7 +397,7 @@
 .side-meta { min-width: 0; line-height: 1.35; }
 .side-now {
   display: block;
-  color: #b3690a;
+  color: #8a5200;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -444,8 +444,8 @@
   text-align: center;
 }
 .drop:hover { border-color: #9aa2af; background: #f2f4f7; }
-.drop:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
-.drop.over { border-color: #7e22ce; background: #faf3ff; border-style: solid; }
+.drop:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
+.drop.over { border-color: var(--brand-700); background: var(--brand-100); border-style: solid; }
 .drop svg { color: var(--muted); margin-bottom: 2px; }
 .drop-h { font-size: 18px; font-weight: 650; }
 .drop small { color: var(--muted); font-size: 13px; }
@@ -454,7 +454,7 @@
   /* 44px tall (16px text x 1.5 + 2x10px) — the WCAG 2.5.5 floor, which is the one thing in
      here that does not get to shrink. */
   padding: 10px 20px;
-  background: #6d28d9;  /* 7.4:1 on white — the light-surface counterpart of the brand purple */
+  background: var(--brand-700);  /* 7.4:1 on white — the light-surface counterpart of the brand purple */
   color: #fff;
   border-radius: 10px;
   font-size: 16px;
@@ -594,7 +594,7 @@
   cursor: pointer;
 }
 .preparing-late button:hover { background: #dd97f9; }
-.preparing-late button:focus-visible { outline: 3px solid #6fb3ff; outline-offset: 2px; }
+.preparing-late button:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
 .preparing-devhint {
   margin: 12px 0 0;
   font-size: 12px;
