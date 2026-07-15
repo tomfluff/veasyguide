@@ -6,15 +6,15 @@
 .ap-pop.mantine-Popover-dropdown {
   padding: 0;
   background: #12161d;              /* the bar */
-  border: 1px solid #333a45;
+  border: 1px solid var(--d-line);
   border-radius: var(--r-lg);
-  color: #f2f4f7;
+  color: var(--d-text);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
 }
 
 .ap-sheet {
-  --ap-line: #333a45;
-  --ap-muted: #a7b0bd;
+  --ap-line: var(--d-line);
+  --ap-muted: var(--d-muted);
   --ap-raise: #1b2029;
   --ap-brand: #d27cf7;             /* brand-300: the only purple legible on this surface */
   --ap-brand-ink: #17061f;
@@ -75,7 +75,7 @@
   font-size: 11px; font-weight: 650; text-align: center;
   color: var(--ap-muted); background: #12161d;
 }
-.ap-tile.sel .ap-tile-name { color: #f2f4f7; }
+.ap-tile.sel .ap-tile-name { color: var(--d-text); }
 
 /* ---- drill navigation -------------------------------------------------- */
 .ap-nav {
@@ -109,7 +109,7 @@
   color: var(--ap-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
   white-space: nowrap;
 }
-.ap-tab:hover { background: var(--ap-raise); color: #f2f4f7; }
+.ap-tab:hover { background: var(--ap-raise); color: var(--d-text); }
 .ap-tab.sel { background: var(--ap-brand); color: var(--ap-brand-ink); }
 .ap-tab:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 
@@ -158,7 +158,7 @@
   background: transparent; border: 1px solid var(--ap-line); border-radius: var(--r-sm);
   color: var(--ap-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
 }
-.ap-seg-btn:hover { background: var(--ap-raise); color: #f2f4f7; }
+.ap-seg-btn:hover { background: var(--ap-raise); color: var(--d-text); }
 .ap-seg-btn.sel {
   background: var(--ap-brand); border-color: var(--ap-brand); color: var(--ap-brand-ink);
 }

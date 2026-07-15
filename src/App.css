@@ -244,16 +244,16 @@
   width: 280px;
   z-index: 40; /* under the control bar (50): the bar must stay reachable no matter what */
   background: rgba(18, 22, 29, 0.96);
-  border-color: #333a45;
-  color: #f2f4f7;
+  border-color: var(--d-line);
+  color: var(--d-text);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
 }
-.moments-side.overlay .side-head { border-bottom-color: #333a45; }
-.moments-side.overlay .side-pos { color: #a7b0bd; }
-.moments-side.overlay .side-pos b { color: #f2f4f7; }
+.moments-side.overlay .side-head { border-bottom-color: var(--d-line); }
+.moments-side.overlay .side-pos { color: var(--d-muted); }
+.moments-side.overlay .side-pos b { color: var(--d-text); }
 .moments-side.overlay .side-row {
   background: #1b2029;
-  border-color: #333a45;
+  border-color: var(--d-line);
 }
 .moments-side.overlay .side-row:hover { background: #232935; }
 .moments-side.overlay .side-row.now {
@@ -262,20 +262,20 @@
   box-shadow: 0 0 0 2px rgba(255, 194, 51, 0.4);
 }
 .moments-side.overlay .side-now { color: #ffc233; }
-.moments-side.overlay .side-d { color: #a7b0bd; }
-.moments-side.overlay .side-thumb { border-color: #333a45; }
-.moments-side.overlay .side-thumb.ph { background: #2a303a; color: #a7b0bd; }
-.moments-side.overlay .side-view { border-color: #333a45; }
-.moments-side.overlay .side-view button { background: #1b2029; color: #a7b0bd; }
-.moments-side.overlay .side-view button + button { border-left-color: #333a45; }
+.moments-side.overlay .side-d { color: var(--d-muted); }
+.moments-side.overlay .side-thumb { border-color: var(--d-line); }
+.moments-side.overlay .side-thumb.ph { background: #2a303a; color: var(--d-muted); }
+.moments-side.overlay .side-view { border-color: var(--d-line); }
+.moments-side.overlay .side-view button { background: #1b2029; color: var(--d-muted); }
+.moments-side.overlay .side-view button + button { border-left-color: var(--d-line); }
 .moments-side.overlay .side-view button:hover { background: #232935; }
 /* The plum reads as ink on paper; on the dark overlay it goes nearly black, so the selected
    segment takes the player's own brand purple instead. */
 .moments-side.overlay .side-view button.on { background: var(--brand-700); color: #fff; }
-.moments-side.overlay .side-scene summary { background: #232935; color: #f2f4f7; }
+.moments-side.overlay .side-scene summary { background: #232935; color: var(--d-text); }
 .moments-side.overlay .side-scene summary:hover { background: #2b323d; }
 .moments-side.overlay .side-scene-t,
-.moments-side.overlay .side-scene-c { color: #a7b0bd; }
+.moments-side.overlay .side-scene-c { color: var(--d-muted); }
 
 .moments-side .side-head {
   padding: 12px 14px 10px;
@@ -450,7 +450,7 @@
   cursor: pointer;
   text-align: center;
 }
-.drop:hover { border-color: #9aa2af; background: #f2f4f7; }
+.drop:hover { border-color: #9aa2af; background: var(--d-text); }
 .drop:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; }
 .drop.over { border-color: var(--brand-700); background: var(--brand-100); border-style: solid; }
 .drop svg { color: var(--muted); margin-bottom: 2px; }
@@ -550,7 +550,7 @@
   padding: 24px;
   background: #12161d;
   border-radius: var(--r-lg);
-  color: #f2f4f7;
+  color: var(--d-text);
   text-align: center;
 }
 
@@ -572,7 +572,7 @@
 .preparing-stage { font-size: 17px; font-weight: 600; }
 .preparing-file {
   font-size: 15px;
-  color: #a7b0bd;
+  color: var(--d-muted);
   max-width: 80%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -605,7 +605,7 @@
 .preparing-devhint {
   margin: 12px 0 0;
   font-size: 12px;
-  color: #a7b0bd;
+  color: var(--d-muted);
   text-align: left;
 }
 .preparing-devhint code { background: rgba(255, 255, 255, 0.1); padding: 1px 4px; border-radius: 3px; }

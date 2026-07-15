@@ -45,8 +45,8 @@
   z-index: 50;
   padding: 10px 12px 12px;
   background-color: #12161d;
-  border-top: 1px solid #333a45;
-  color: #f2f4f7;
+  border-top: 1px solid var(--d-line);
+  color: var(--d-text);
   opacity: 1;
   transition: opacity 150ms ease-out; /* DESIGN.md: control bar show/hide is ease-out */
 }
@@ -66,7 +66,7 @@
    become 44px squares. */
 .video-controls-container .controls > button,
 .video-controls-container .controls > .volume-container > button {
-  color: #f2f4f7;
+  color: var(--d-text);
   height: 44px;   /* WCAG 2.5.5 target size. Was 2rem/32px. */
   width: 44px;
   border-radius: var(--r-md);
@@ -500,11 +500,11 @@
   border-radius: var(--r-md);
   background-color: rgba(24, 29, 38, 0.92);
   border: 1px solid #3a4250;
-  color: #f2f4f7;
+  color: var(--d-text);
   font-size: 16px;
 }
 
-.now-line.empty { color: #a7b0bd; }
+.now-line.empty { color: var(--d-muted); }
 
 .now-dot {
   width: 9px;
@@ -518,7 +518,7 @@
 
 .now-next {
   margin-left: auto;
-  color: #a7b0bd;
+  color: var(--d-muted);
   font-size: 15px;
 }
 
@@ -576,7 +576,7 @@
 }
 
 .duration-container {
-  color: #f2f4f7;
+  color: var(--d-text);
   font-variant-numeric: tabular-nums; /* the timecode must not jitter as digits change */
   flex-grow: 1;
   padding-left: 10px;
