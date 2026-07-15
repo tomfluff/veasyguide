@@ -48,7 +48,7 @@
   border-top: 1px solid #333a45;
   color: #f2f4f7;
   opacity: 1;
-  transition: opacity 150ms ease-in-out;
+  transition: opacity 150ms ease-out; /* DESIGN.md: control bar show/hide is ease-out */
 }
 
 .video-container.paused .video-controls-container {
@@ -422,7 +422,7 @@
   color: #fef3c7;
   padding: 0.35rem 0.9rem;
   border-radius: 1rem;
-  font-size: 0.85rem;
+  font-size: 15px;
   z-index: 25;
   pointer-events: none;
   animation: overlay-scene-in 200ms ease-out;
@@ -435,6 +435,15 @@
 @keyframes overlay-scene-in {
   from { opacity: 0; transform: translate(-50%, -0.35rem); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* DESIGN.md: motion honours prefers-reduced-motion by falling back to a static state, not by
+   silently dropping the cue. The scene notice still appears — it just arrives without the slide,
+   and the control bar snaps rather than fading. (The opt-in highlight pulse is deliberately NOT
+   here: a viewer who turned it on chose it, and that choice outranks the OS default.) */
+@media (prefers-reduced-motion: reduce) {
+  .video-overlay .overlay-scene { animation: none; }
+  .video-controls-container { transition: none; }
 }
 
 /* --- Moment lane ---------------------------------------------------------

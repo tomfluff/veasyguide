@@ -67,9 +67,11 @@ export default function MomentsSidebar({ activities, scenes, thumbs, current, do
     if (currIndex < 0 || !list || list.matches(":hover")) return;
     const row = list.querySelector<HTMLElement>('[aria-current="true"]');
     if (!row) return;
+    // Honour prefers-reduced-motion: jump rather than smooth-scroll for vestibular safety.
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     list.scrollTo({
       top: row.offsetTop - list.offsetTop - (list.clientHeight - row.offsetHeight) / 2,
-      behavior: "smooth",
+      behavior: reduce ? "auto" : "smooth",
     });
   }, [currIndex, collapsed]);
 
