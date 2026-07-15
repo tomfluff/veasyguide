@@ -157,7 +157,7 @@
 .foot-link:hover b { text-decoration: underline; }
 .foot-link:focus-visible { outline: 3px solid var(--brand-500); outline-offset: 2px; border-radius: 4px; }
 .foot-av {
-  width: 20px; height: 20px;
+  width: 1.25rem; height: 1.25rem;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -168,14 +168,14 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0 5px;
-  padding: 9px 15px;
+  gap: 0 0.5rem;
+  padding: 6px 16px;
   background: var(--plum);
-  color: #e9d8f5;
-  font-size: 0.9375rem;
-  line-height: 1.6;
+  color: #d8bce6;
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
-.foot b { color: #fff; font-weight: 600; }
+.foot b { color: #fff; font-weight: 500; }
 
 .app {
   width: 100%;
