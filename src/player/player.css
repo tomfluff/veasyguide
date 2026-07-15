@@ -34,17 +34,19 @@
   aspect-ratio: 16/9;
 }
 
-/* An OPAQUE surface, not a gradient. The gradient faded to nothing at the top, so against a
-   white lecture slide the controls sat on almost no background and the icons were unreadable
-   — the exact failure this app exists to prevent. Tokens from DESIGN.md. */
+/* A dark surface with a floor, not a gradient. The original gradient faded to NOTHING at the
+   top, so against a white slide the controls sat on no background at all — the exact failure
+   this app exists to prevent. Translucency is fine as long as the floor holds: at 0.85 alpha
+   the worst case (pure white slide behind) composites to rgb(45,57,63), which keeps the
+   #f2f4f7 icons at 10.7:1 — recheck that number if the alpha drops. */
 .video-controls-container {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 50;
-  padding: 6px 12px 8px;
-  background-color: #12161d;
+  padding: 4px 12px 4px;
+  background-color: rgba(18, 22, 29, 0.85);
   border-top: 1px solid var(--d-line);
   color: var(--d-text);
   opacity: 1;
@@ -495,11 +497,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 4px;
-  padding: 4px 10px;
+  margin-top: 8px;
+  padding: 1px 6px;
   border-radius: var(--r-md);
-  background-color: rgba(24, 29, 38, 0.92);
-  border: 1px solid #3a4250;
+  background-color: rgba(24, 29, 38, 0.65);
+  border: 1px solid rgba(102, 113, 133, 0.75);
   color: var(--d-text);
   font-size: 1rem;
 }

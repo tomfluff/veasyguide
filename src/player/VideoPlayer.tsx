@@ -640,7 +640,7 @@ const VideoPlayer = (props: Props) => {
           </Box>
         )}
 
-        <Group className="controls" gap={6} align="center" mt={4}>
+        <Group className="controls" gap={3} align="center" mt={4}>
           <UnstyledButton
             onClick={handlePlayPause}
             onKeyDown={stopPlayerHotkeys}
