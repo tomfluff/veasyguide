@@ -727,7 +727,13 @@ const VideoPlayer = (props: Props) => {
             </>
           )}
           <Box className="volume-container">
-            <UnstyledButton onClick={handleMute} aria-label="Mute">
+            {/* Label + pressed state both flip: an icon swap alone is invisible to AT, and
+                "Mute" on a muted player reads as the current state instead of the action. */}
+            <UnstyledButton
+              onClick={handleMute}
+              aria-label={isMuted ? "Unmute" : "Mute"}
+              aria-pressed={isMuted}
+            >
               {isMuted ? (
                 <IconVolumeMute />
               ) : volume > 0.5 ? (
@@ -736,14 +742,19 @@ const VideoPlayer = (props: Props) => {
                 <IconVolumeLow />
               )}
             </UnstyledButton>
+            {/* 0-100 domain, not the video element's 0-1: the thumb's aria-valuenow is
+                announced raw, and "35" with a "Volume" name is comprehensible where "0.35"
+                is not. thumbLabel is Mantine's prop for naming the thumb — a plain
+                aria-label prop lands on the root element, which AT never reads. */}
             <Slider
               className="volume-slider"
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeChange}
+              value={isMuted ? 0 : Math.round(volume * 100)}
+              onChange={(v) => handleVolumeChange(v / 100)}
               min={0}
-              max={1}
-              step={0.01}
-              label={() => `${Math.round(volume * 100)}%`}
+              max={100}
+              step={1}
+              label={(v) => `${v}%`}
+              thumbLabel="Volume"
             />
           </Box>
           <Group className="duration-container" gap="xs">
@@ -801,7 +812,7 @@ const VideoPlayer = (props: Props) => {
           <UnstyledButton
             className="collapse-end"
             onClick={handleFullscreen}
-            aria-label="Fullscreen"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
             {isFullscreen ? <IconMaximizeOff /> : <IconMaximize />}
           </UnstyledButton>
