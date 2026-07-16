@@ -59,6 +59,11 @@
 
 .video-container.clear .video-controls-container {
   opacity: 0;
+  /* Invisible must mean untouchable: without this the faded bar still hit-tests, so the
+     video's click-to-pause surface has a strip of invisible buttons across the bottom.
+     Keyboard focus is unaffected (pointer-events doesn't remove focusability), and focusing
+     any control reveals the bar again via the container's onFocusCapture. */
+  pointer-events: none;
 }
 
 /* The mute button is the one bar control that is NOT a direct child of .controls — it is

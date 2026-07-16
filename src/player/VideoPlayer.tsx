@@ -177,7 +177,15 @@ const VideoPlayer = (props: Props) => {
   const { start: startForwardShiftTimeout, clear: clearForwardShiftTimeout } =
     useTimeout(() => setForwardShiftRequest(false), FLASH_SPEED);
   const { start: startHideControlsTimeout, clear: clearHideControlsTimeout } =
-    useTimeout(() => handleHideControls.open(), 2000);
+    // Never hide the bar out from under keyboard focus: a keyboard user parked on a control
+    // is USING the bar even though no events are firing. Just skip — re-arming from inside
+    // the callback is a no-op (Mantine's useTimeout still holds its ref while the callback
+    // runs); the container's onBlurCapture restarts the timer when focus leaves.
+    useTimeout(() => {
+      const bar = barSizeRef.current;
+      if (bar && bar.contains(document.activeElement)) return;
+      handleHideControls.open();
+    }, 2000);
   const { start: startSceneNoticeTimeout, clear: clearSceneNoticeTimeout } = useTimeout(
     () => setSceneNotice(false),
     SCENE_NOTICE_MS
@@ -524,6 +532,10 @@ const VideoPlayer = (props: Props) => {
         if (!NO_REVEAL_KEYS.has(e.key)) showControls();
       }}
       onFocusCapture={showControls}
+      // Blur is the only signal that keyboard focus LEFT the bar (leaving fires no key or
+      // pointer event), and the hide timer above refuses to fire while focus is inside —
+      // so this restart is what lets the bar hide again afterwards.
+      onBlurCapture={showControls}
     >
       {/* No py prop: it lands as an inline style and silently overrides the stylesheet's
           padding, so the bar's vertical rhythm ends up owned by two places. CSS owns it. */}
