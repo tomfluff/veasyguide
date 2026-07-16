@@ -161,6 +161,23 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
     }
     if (webcam) webcam = expandZoneToEdges(webcam, edges, aw, ah);
 
+    // Then pad. Measured on entropy.mkv: even after the edge expansion the zone sat ~6px
+    // short of the inset's lower-left corner (a soft border/shadow never clears the 85%
+    // edge-persistence bar), and shoulder-movement boxes straddling that rim passed the
+    // overlap veto and got highlighted. 6px of a 480-wide frame is 1.25% — slide ink that
+    // close to the inset is rare, a highlight ON the presenter's chest is not.
+    // ponytail: fixed pad; if it ever eats real ink, make expandZoneToEdges accept softer edges instead.
+    if (webcam) {
+      const PAD = 6;
+      const x = Math.max(0, webcam.x - PAD);
+      const y = Math.max(0, webcam.y - PAD);
+      webcam = {
+        x, y,
+        w: Math.min(aw - x, webcam.w + (webcam.x - x) + PAD),
+        h: Math.min(ah - y, webcam.h + (webcam.y - y) + PAD),
+      };
+    }
+
     // Debug heatmap: churn as heat (black -> red -> yellow), the zone outlined in green.
     let blob: Blob | undefined;
     if (debugCanvas && debugCtx && pairs > 0) {
