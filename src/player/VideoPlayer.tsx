@@ -527,7 +527,20 @@ const VideoPlayer = (props: Props) => {
     >
       {/* No py prop: it lands as an inline style and silently overrides the stylesheet's
           padding, so the bar's vertical rhythm ends up owned by two places. CSS owns it. */}
-      <Box className="video-controls-container" ref={barSizeRef}>
+      {/* Keys pressed while focus is on a control in the bar belong to THAT control — the
+          same rule the moments sidebar already applies. Without this, Space on the focused
+          Mute button toggles playback instead of mute, and ArrowLeft on the volume slider
+          nudges the volume AND seeks −5s (the document-level hotkeys see every bubbled
+          keydown). The reveal is re-applied here because the stop also hides the event from
+          the container's own reveal handler. */}
+      <Box
+        className="video-controls-container"
+        ref={barSizeRef}
+        onKeyDown={(e) => {
+          showControls();
+          e.stopPropagation();
+        }}
+      >
         <Box
           className="timeline-container"
           ref={trackRef}
