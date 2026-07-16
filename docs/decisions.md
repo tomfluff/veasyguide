@@ -450,3 +450,35 @@ choice) to `localStorage`.
 is correct there. For a real user, an accessibility configuration is *theirs*: a low-vision
 learner who has tuned border width, fill opacity and zoom strength to their vision should
 not have to redo it every visit. Different product, different default.
+
+---
+
+## D16 — Scenes are a global cut partition, not per-segment spans
+
+**Decision.** The worker keeps one global list of content cuts and posts the full scene
+partition (`{type:"scenes"}`, replace-not-append) whenever it changes. Activity ids are
+assigned by the run, not by the per-segment clusterer, and App inserts streamed activities
+in start order.
+
+**Why.** Analysis is segmented — a seek abandons the current segment and restarts at the
+playhead (D5). The old code posted each segment's span as a "scene" and let each segment's
+clusterer restart ids at 0. On a straight run the two models coincide, so nothing looked
+wrong. Under seek-spam they diverge violently: a cut-less 5.5-minute video produced 19
+overlapping "scenes", false "Possible scene change" notices during playback, and 46
+colliding activity ids — which React, keying sidebar rows by id, amplified into 84 rendered
+rows for 39 real moments (28k duplicate-key errors) with permanently missing thumbnails.
+A segment boundary is a coverage artifact; only a content cut is a scene boundary.
+
+**How.** `addCut(t)` dedupes within `sceneMinLen` (two segments can rediscover the same cut
+with fresh local debounce state), sorts, and re-posts the partition `[0, …cuts, duration]`.
+The partition is also posted at `done`, so a cut-less video still ends with its single
+whole-lecture scene. The player tracks the current scene by `start` rather than `id` —
+partition ids shift by one when a backfilled segment finds an earlier cut, and an id
+changing under a stationary playhead is not a scene change.
+
+**Rejected.** Reconciling per-segment scene spans on the App side (merge overlaps, dedupe):
+treats the symptom; the worker still emits records that are not scenes. Keeping per-clusterer
+ids with a segment offset: still collides after any out-of-order flush.
+
+**Limitation.** A cut lying exactly on a segment boundary is invisible (neither segment
+diffs across it) — pre-existing, unchanged by this.

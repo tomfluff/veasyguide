@@ -146,7 +146,7 @@ const VideoPlayer = (props: Props) => {
   // Fullscreen-only: the moments list summoned as an overlay inside the player.
   const [momentsOpen, handleMomentsOpen] = useDisclosure(false);
   const [sceneNotice, setSceneNotice] = useState(false);
-  const currSceneIdRef = useRef<number | null>(null);
+  const currSceneStartRef = useRef<number | null>(null);
   const prevTimeRef = useRef(0);
   const lastReportedActivityRef = useRef<number | null>(null);
   const chromeTimeRef = useRef(-1);
@@ -313,10 +313,13 @@ const VideoPlayer = (props: Props) => {
     const jumped = Math.abs(t - prevTimeRef.current) > 1;
     prevTimeRef.current = t;
 
+    // Track the scene by its START, not its id: scenes are a partition that re-derives when
+    // analysis finds a new cut, and ids shift by one when a cut lands earlier in the video —
+    // the id changing under a stationary playhead is not a scene change.
     const scene = props.scenes.find((s) => t >= s.start && t <= s.end) ?? null;
-    if (scene && scene.id !== currSceneIdRef.current) {
-      const isFirst = currSceneIdRef.current === null;
-      currSceneIdRef.current = scene.id;
+    if (scene && scene.start !== currSceneStartRef.current) {
+      const isFirst = currSceneStartRef.current === null;
+      currSceneStartRef.current = scene.start;
       if (!isFirst && !jumped) {
         setSceneNotice(true);
         clearSceneNoticeTimeout();
@@ -474,7 +477,7 @@ const VideoPlayer = (props: Props) => {
 
   useEffect(() => {
     handleIsEnded.close();
-    currSceneIdRef.current = null;
+    currSceneStartRef.current = null;
     prevTimeRef.current = 0;
     setSceneNotice(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps

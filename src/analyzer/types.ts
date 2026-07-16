@@ -93,7 +93,10 @@ export type WorkerMsg =
   | { type: "status"; stage: string }
   | { type: "meta"; meta: AnalysisMeta }
   | { type: "activity"; activity: Activity }
-  | { type: "scene"; scene: Scene }
+  // The full scene partition so far — replaces, not appends. Scenes are derived from the
+  // global cut list and re-partition when a backfilled segment finds an earlier cut, so
+  // streaming them one at a time cannot express the model.
+  | { type: "scenes"; scenes: Scene[] }
   // The webcam pre-pass verdict: where the talking-head inset is (null = none found).
   // `blob` is a debug-only heatmap of the churn map with the zone outlined.
   | { type: "webcam"; zone: Box | null; wallMs: number; sampled: number; blob?: Blob }

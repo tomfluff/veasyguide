@@ -217,7 +217,7 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
     const detailed = a.log.map((n) => ({ t: n.t, region: n.detail! }));
     const features = computeFeatures(detailed, params.persistFrac);
     return {
-      id: a.id,
+      id: nextActivityId++,
       start: a.start,
       end: a.end,
       box: a.box,
@@ -233,7 +233,31 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
 
   let ranges: Range[] = [];
   const coverageOf = (rs: Range[]) => rs.reduce((s, r) => s + (r.end - r.start), 0);
-  let sceneId = 0;
+  // Activity ids are assigned here, across the whole run, NOT by the per-segment clusterer.
+  // Segments each start a fresh clusterer whose internal ids restart at 0 — using those
+  // directly meant a seek-heavy run emitted colliding ids, and everything keyed on id
+  // downstream (React rows, thumbnail maps) broke.
+  let nextActivityId = 0;
+  // Scenes are a PARTITION of the video derived from the content cuts found so far — a
+  // global model, not a per-segment one. Segments are coverage artifacts (a seek starts
+  // one), and posting their spans as scenes fabricated a "scene" per seek: overlapping
+  // records, false "scene change" notices, broken sidebar grouping.
+  const cuts: number[] = [];
+  const postScenes = () => {
+    const bounds = [0, ...cuts, duration];
+    const scenes = [];
+    for (let i = 0; i + 1 < bounds.length; i++) scenes.push({ id: i, start: bounds[i], end: bounds[i + 1] });
+    post({ type: "scenes", scenes });
+  };
+  // Cross-segment debounce: two segments can rediscover the same cut a sample apart
+  // (their local debounce state resets), and a transition straddling a segment boundary
+  // must not count twice.
+  const addCut = (t: number) => {
+    if (cuts.some((c) => Math.abs(c - t) < params.sceneMinLen)) return;
+    cuts.push(t);
+    cuts.sort((a, b) => a - b);
+    postScenes();
+  };
   let analyzedSec = 0; // video-seconds actually analyzed (for an honest x-realtime)
   const wallStart = performance.now();
   // Where the wall time actually goes. Logged at done under ?debug=1 — it's what tells you
@@ -242,8 +266,9 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
   const cost = { decode: 0, readback: 0, math: 0 };
 
   // Analyze forward from `from` until: a seek is requested, we run into already-analyzed
-  // video, or the video ends. Each segment is independent — fresh clusterer, and its start
-  // is treated as a scene start (as a cut would be).
+  // video, or the video ends. Each segment is independent — fresh clusterer, fresh diff
+  // state — but a segment boundary is a coverage artifact, not a scene: only real content
+  // cuts enter the global cut list.
   async function analyzeSegment(from: number) {
     const clusterer = new StreamingClusterer(params.spanTh, distTh);
     gpu?.reset(); // a segment never diffs across its own start
@@ -252,7 +277,6 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
     // in its first ~20 frames.
     const occ = new Float32Array(aw * ah);
     let prevGray: Uint8Array | null = null;
-    let sceneStart = from;
     let lastCut = -Infinity;
     let segEnd = from;
     let lastProgress = from;
@@ -262,7 +286,6 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
 
     const flushSegment = () => {
       for (const act of clusterer.flush()) post({ type: "activity", activity: finalize(act) });
-      if (segEnd > sceneStart) post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: segEnd } });
       ranges = addRange(ranges, { start: from, end: segEnd });
     };
 
@@ -316,8 +339,7 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
       if (frac !== null && frac >= params.sceneChangeFrac && t - lastCut >= params.sceneMinLen) {
         isCut = true;
         lastCut = t;
-        post({ type: "scene", scene: { id: sceneId++, start: sceneStart, end: t } });
-        sceneStart = t;
+        addCut(t);
         // Activities must not span a cut: the Python analyzer generated frame pairs
         // per scene, so no diff ever crossed a boundary. Close everything open.
         for (const act of clusterer.flush()) post({ type: "activity", activity: finalize(act) });
@@ -407,6 +429,9 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
         `readback ${pct(cost.readback)}, pixel math ${pct(cost.math)}`
     );
   }
+  // Final partition: with zero cuts this is the first scene post — one span, the whole
+  // lecture — which is also what the sidebar expects (a single scene is not a grouping).
+  postScenes();
   post({ type: "done", wallMs, xRealtime: analyzedSec / (wallMs / 1000), ranges });
   input.dispose?.();
 }

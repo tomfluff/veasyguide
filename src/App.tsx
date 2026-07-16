@@ -295,10 +295,16 @@ export default function App() {
       if (m.type === "status") setStage(m.stage);
       else if (m.type === "meta") { setStage(null); setMeta(m.meta); }
       else if (m.type === "activity") {
-        activitiesRef.current.push(m.activity);
+        // Insert in start order. Segments emit chronologically, but a backfill segment
+        // (started by a seek) emits earlier moments after later ones — and everything
+        // downstream (markers, stepping, the sidebar) assumes the list is sorted.
+        const list = activitiesRef.current;
+        let i = list.length;
+        while (i > 0 && list[i - 1].start > m.activity.start) i--;
+        list.splice(i, 0, m.activity);
         setActivityCount((c) => c + 1);
         if (m.activity.isValid) setValidCount((c) => c + 1);
-      } else if (m.type === "scene") { setScenes((s) => [...s, m.scene]); }
+      } else if (m.type === "scenes") { setScenes(m.scenes); }
       else if (m.type === "webcam") {
         const blob = m.blob;
         setWebcam((old) => {
