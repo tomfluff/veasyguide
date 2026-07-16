@@ -314,6 +314,9 @@ export default function App() {
       }
       else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); setOpenClusters(m.openClusters); setRanges(m.ranges); }
       else if (m.type === "done") {
+        // The final flush closed everything; without this the legend keeps the last
+        // mid-analysis count ("1 open clusters" forever after done).
+        setOpenClusters(0);
         setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); setRanges(m.ranges);
         setRuns((rs) => [...rs, {
           wallMs: m.wallMs, xRealtime: m.xRealtime, capture: cap, width: p.analysisWidth,
@@ -518,6 +521,7 @@ export default function App() {
         file={videoUrl && !fatal ? fileName : null}
         status={chip}
         onAbout={() => setAboutOpen(true)}
+        onChangeVideo={reset}
       />
       <About open={aboutOpen} onClose={() => setAboutOpen(false)} feedbackHref={feedbackHref} />
       {/* The page grows a right-hand column once a video is up; before that the narrow
@@ -783,7 +787,7 @@ export default function App() {
           <div className="debug-legend">
             <span><i className="sw red" /> diff mask (post-dilate)</span>
             <span><i className="sw green" /> node boxes (this sample)</span>
-            <span>{openClusters} open clusters</span>
+            <span>{openClusters} open cluster{openClusters === 1 ? "" : "s"}</span>
             <span>{framesCount}{framesCount >= MAX_DEBUG_FRAMES ? " (capped)" : ""} frames · {(framesBytesRef.current / 1048576).toFixed(1)} MB in memory (cleared on refresh)</span>
             {viewIdx >= 0 && (
               <button type="button" onClick={() => { followRef.current = true; setViewIdx(-1); void renderDebugFrame(framesRef.current.length - 1); }}>

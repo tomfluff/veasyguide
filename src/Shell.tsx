@@ -16,10 +16,14 @@ export function TopBar({
   file,
   status,
   onAbout,
+  onChangeVideo,
 }: {
   file?: string | null;
   status?: ReactNode;
   onAbout: () => void;
+  // Back to the landing screen to pick a different file. Optional: the landing screen
+  // itself has no video to change.
+  onChangeVideo?: () => void;
 }) {
   // setColorScheme flips Mantine's data attribute on <html>; index.css keys the token layer on
   // the same attribute, so the whole page follows from one switch. Mantine persists the choice
@@ -35,6 +39,13 @@ export function TopBar({
         veasyguide <em>Lecture video, enhanced</em>
       </h1>
       {file && <span className="filechip" title={file}>{file}</span>}
+      {/* The only way to open a different video used to be F5: the drop zone unmounts for
+          good once a video loads. Lives beside the filename it replaces. */}
+      {file && onChangeVideo && (
+        <button type="button" className="filechip-change" onClick={onChangeVideo}>
+          Change video
+        </button>
+      )}
       <span className="grow" />
       {status}
       <nav className="nav">

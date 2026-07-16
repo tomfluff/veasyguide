@@ -46,6 +46,16 @@
   border: 1px solid var(--line); border-radius: var(--r-pill);
   max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Styled like the nav buttons (accent text, quiet, 44px target), not like the chip it
+   sits beside — it is an action, and a second pill would read as a second filename. */
+.filechip-change {
+  font: inherit; font-size: 0.9375rem; color: var(--accent);
+  padding: 3px 8px; background: none; border: none; cursor: pointer;
+  border-radius: var(--r-sm);
+  min-height: 44px;
+}
+.filechip-change:hover { background: var(--hover); }
+.filechip-change:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 .top .grow { flex: 1; }
 
 /* The one piece of analysis status a viewer gets — about their lecture, not our pipeline. */
@@ -751,9 +761,11 @@
 .param-actions button { padding: 5px 12px; cursor: pointer; }
 .param-actions small { color: #777; }
 .capture-toggle { display: flex; align-items: center; gap: 5px; font-size: 0.8125rem; cursor: pointer; }
+/* Tokens, not literals: the old #ddd/#f4f4f4 made the header row white-on-white in the
+   dark theme (the page text is --text, which the hardcoded light fill never followed). */
 .runs { border-collapse: collapse; margin-top: 10px; font-size: 0.75rem; }
-.runs th, .runs td { border: 1px solid #ddd; padding: 3px 10px; text-align: left; }
-.runs th { background: #f4f4f4; font-weight: 600; }
+.runs th, .runs td { border: 1px solid var(--line); padding: 3px 10px; text-align: left; }
+.runs th { background: var(--surface-2); font-weight: 600; }
 
 .debug { margin-top: 24px; padding-top: 12px; border-top: 1px dashed #bbb; }
 .debug h2 { font-size: 0.875rem; margin: 0 0 8px; color: #555; }
