@@ -1,6 +1,6 @@
 // Runnable self-check for the pure pipeline + clusterer logic (no browser needed).
 // Run: node --experimental-strip-types src/analyzer/selfcheck.ts
-import { changedFrac, componentRegions, diffMask, dilate, toGray, updateOccupancy, type Region } from "./pipeline.ts";
+import { changedFrac, componentRegions, diffMask, dilate, expandZoneToEdges, toGray, updateOccupancy, webcamZone, type Region } from "./pipeline.ts";
 import { computeFeatures, shapeDiff, type DetailedNode } from "./features.ts";
 import { StreamingClusterer } from "./graph.ts";
 import { selectActivity, validActivities } from "./select.ts";
@@ -196,6 +196,72 @@ function frameWithBox(bx: number, by: number, bw: number, bh: number): Uint8Clam
   assert(activityFrac < CUT, `pen-stroke-scale change stays below the cut threshold (${(activityFrac * 100).toFixed(1)}%)`);
   assert(cutFrac > CUT, `whole-frame change exceeds the cut threshold (${(cutFrac * 100).toFixed(1)}%)`);
   assert(changedFrac(maskOf(dark, dark)) === 0, "identical frames change nothing");
+}
+
+// 5b. Webcam pre-pass: a patch that churns in every sparse pair is the zone; ink that
+// changed in a few pairs is not; a churn area spanning the frame (a camera video where the
+// instructor IS the picture) yields NO zone rather than a veto over the whole board.
+{
+  const pairs = 23;
+  const churn = new Uint16Array(W * H);
+  const paint = (x0: number, y0: number, w0: number, h0: number, v: number) => {
+    for (let y = y0; y < y0 + h0; y++) for (let x = x0; x < x0 + w0; x++) churn[y * W + x] = v;
+  };
+
+  // A 18x14 "head" churning in all pairs at top-right; ink at left that changed in 3 pairs.
+  paint(75, 5, 18, 14, pairs);
+  paint(10, 40, 30, 4, 3);
+  const zone = webcamZone(churn, pairs, W, H, 0.8);
+  assert(zone !== null, "an always-churning patch becomes the webcam zone");
+  assert(
+    zone !== null && zone.x <= 75 && zone.x + zone.w >= 93 && zone.y <= 5 && zone.y + zone.h >= 19,
+    "the zone covers the churning patch"
+  );
+  assert(zone !== null && !(zone.x <= 10 && zone.y <= 40 && zone.y + zone.h >= 44), "ink stays outside the zone");
+
+  // The same threshold finds nothing when nothing churns persistently.
+  churn.fill(0);
+  paint(10, 40, 30, 4, 3);
+  assert(webcamZone(churn, pairs, W, H, 0.8) === null, "slides-only churn yields no zone");
+
+  // A churn region most of the frame wide (instructor at a whiteboard, camera video) is NOT
+  // an inset — declaring it one would veto the board itself.
+  churn.fill(0);
+  paint(5, 20, 90, 70, pairs);
+  assert(webcamZone(churn, pairs, W, H, 0.8) === null, "frame-scale churn is not called a webcam");
+
+  // Too few samples to mean anything.
+  churn.fill(0);
+  paint(75, 5, 18, 14, 4);
+  assert(webcamZone(churn, 4, W, H, 0.8) === null, "too few pairs -> no verdict");
+
+  // Hysteresis: the zone floods from the always-churning core into the CONNECTED
+  // sometimes-churning halo (the head's occasional reach — a lean, a gesture), but a
+  // disconnected mid-churn blob elsewhere (slide content turning over) stays out.
+  churn.fill(0);
+  paint(75, 5, 18, 14, pairs); // core: churns in every pair
+  paint(65, 5, 10, 20, Math.round(pairs * 0.55)); // halo, touching the core's left side
+  paint(10, 50, 20, 20, Math.round(pairs * 0.55)); // same churn rate, but disconnected
+  const fz = webcamZone(churn, pairs, W, H, 0.8);
+  assert(fz !== null && fz.x <= 65, `zone floods into the connected halo (x=${fz?.x})`);
+  assert(fz !== null && !(fz.y + fz.h >= 50), "a disconnected mid-churn blob is not swallowed");
+
+  // Edge expansion: the churn core sits inside an inset whose BORDER is a persistent-edge
+  // rectangle (a video-in-video boundary, present in every frame). The zone must grow to
+  // that border — the inset's quiet side churns less than the slide, so churn alone can
+  // never find it (measured: inset-left 0.13 vs slide 0.44 of pairs).
+  const edges = new Uint8Array(W * H);
+  const vline = (x0: number, y0: number, y1: number) => { for (let y = y0; y <= y1; y++) edges[y * W + x0] = 1; };
+  const hline = (y0: number, x0: number, x1: number) => { for (let x = x0; x <= x1; x++) edges[y0 * W + x] = 1; };
+  // Inset rectangle x 60..97, y 2..30; churn core only at x 75..93.
+  vline(60, 2, 30); vline(97, 2, 30); hline(2, 60, 97); hline(30, 60, 97);
+  const core = { x: 75, y: 5, w: 18, h: 14 };
+  const grown = expandZoneToEdges(core, edges, W, H);
+  assert(grown.x === 60 && grown.x + grown.w >= 97 && grown.y + grown.h >= 30,
+    `zone grows to the inset's static border (got ${grown.x},${grown.y} ${grown.w}x${grown.h})`);
+  // No border anywhere -> no growth.
+  const same = expandZoneToEdges(core, new Uint8Array(W * H), W, H);
+  assert(same.x === core.x && same.w === core.w && same.h === core.h, "no persistent border, no growth");
 }
 
 // 6. Range bookkeeping: coverage is a set of segments, and gaps get backfilled in order.

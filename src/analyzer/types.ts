@@ -45,6 +45,7 @@ export type AnalysisParams = {
   persistInvalidFrac: number; // an activity with at least this share of its nodes flagged as
   // structural is marked invalid (and so never highlighted). 1 = off.
   sceneChangeFrac: number; // share of the frame that must change for a scene cut to be declared
+  webcamPairFrac: number; // webcam pre-pass: pixel churning in this share of sparse pairs = webcam
   sceneMinLen: number; // minimum seconds between cuts (debounce)
   spanTh: number; // seconds; max time gap for linking nodes (study: 1.0)
   distRatio: number; // max spatial gap for linking, fraction of frame diagonal (0.05)
@@ -65,6 +66,7 @@ export const DEFAULT_PARAMS: AnalysisParams = {
   persistFrac: 0.35,
   persistInvalidFrac: 0.5,
   sceneChangeFrac: 0.08,
+  webcamPairFrac: 0.8,
   sceneMinLen: 1.0,
   spanTh: 1.0,
   distRatio: 0.05,
@@ -92,6 +94,9 @@ export type WorkerMsg =
   | { type: "meta"; meta: AnalysisMeta }
   | { type: "activity"; activity: Activity }
   | { type: "scene"; scene: Scene }
+  // The webcam pre-pass verdict: where the talking-head inset is (null = none found).
+  // `blob` is a debug-only heatmap of the churn map with the zone outlined.
+  | { type: "webcam"; zone: Box | null; wallMs: number; sampled: number; blob?: Blob }
   | { type: "progress"; analyzedUpTo: number; xRealtime: number; openClusters: number; ranges: Range[] }
   | { type: "done"; wallMs: number; xRealtime: number; ranges: Range[] }
   | { type: "error"; message: string }

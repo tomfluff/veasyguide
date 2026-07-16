@@ -310,6 +310,64 @@ guard. Worth knowing about if you touch `ranges.ts`.
 
 ---
 
+## D16 — Webcam suppression is a pre-pass, not streaming accumulation
+
+**Decision.** The talking-head inset is located *before* analysis starts, by diffing ~24
+frames sampled minutes apart (`pipeline.ts: webcamZone`), and detections inside the zone are
+dropped at detection time. A streaming approach — accumulating a global churn map during
+analysis and vetoing retroactively — was designed first and rejected.
+
+**Why the existing veto wasn't enough.** The per-pixel occupancy veto (D-adjacent to
+`persistFrac`) judges pixels individually. The inset's *rim* — silhouette edges that move
+only when the head does — churns too rarely per-pixel to trip it. Measured on a 59-minute
+lecture with a corner webcam: **171 of 602 valid moments were the webcam** (the veto caught
+79); the leaked ones showed `flaggedFrac` 0–0.37 against the 0.5 threshold, exactly the rim
+signature. The veto is also per-segment, so every seek/backfill re-learns the webcam blind.
+
+**Why pre-pass beats streaming accumulation.** Timing. A zone known before the first
+activity exists means the veto happens *before clustering* — no webcam activity is ever
+created, nothing is ever retracted, and the sidebar never shows a row that later vanishes.
+The streaming design needed confidence gating ("the zone may tighten but not jump") and
+retroactive invalidation, both of which are state machines with edge cases. The pre-pass is
+24 sparse decodes: **1.5 s on a 59-minute video**, before playback unlocks.
+
+**Why sparse sampling works at all.** A person in an inset has always moved between two
+frames minutes apart → webcam pixels churn in ~every consecutive pair. Slide pixels change
+only in pairs straddling a slide turn; ink only in pairs straddling its writing. The churn
+heatmap (visible under `?debug=1`) shows the head silhouette at ~100% of pairs against
+everything else far below. This is broadcast TV's logo/PiP detection trick inverted: find
+what never stays, instead of what never changes.
+
+**Why churn alone could not find the inset's EXTENT — and edges could.** The first,
+churn-only zone was tight around the silhouette, and 110 user-facing moments still leaked
+from the inset's quiet side — webcam background the person only occasionally leans into.
+Reading churn levels off the heatmap: that quiet side sits at **0.13** of pairs while the
+slide sits at **0.44**. The churn ordering is inverted — any threshold loose enough to take
+the halo takes the slide first, so no flood can work. What separates them is not how often
+they change but whether they are inside the inset's rectangle, and the rectangle's border
+is a *persistent edge* (present in ~every sampled frame). So the pre-pass accumulates an
+edge map alongside the churn map and grows the zone to the enclosing persistent-edge
+rectangle — the original un-inverted TV-logo trick. Both signals were proposed at the
+design stage; the measurement is what proved BOTH are needed: churn for the core (edges
+alone can't tell the inset's border from the slide's border) and edges for the extent
+(churn can't reach where the person rarely moves).
+
+**Deliberate refusals.**
+- A churn blob above ~20% of the frame is **not** a zone: a camera video of an instructor at
+  a board looks exactly like a giant webcam, and vetoing where they write would be the worst
+  possible behaviour. Verified: the whiteboard test video yields no zone.
+- **No face detection.** It would work, but needs a model, and "no model, no training,
+  nothing to download" is a load-bearing product claim (About dialog). Revisit only if the
+  model-free signal fails on real footage.
+- **No skin-colour heuristics.** Fragile across skin tones and lighting — an accessibility
+  tool whose suppression works better for some instructors' skin than others is not shipping.
+
+**Known limitation.** An inset present for only part of the video dilutes the pair-churn
+signature below threshold (a 50%-of-video webcam changes in ~50% of pairs). The per-pixel
+occupancy veto remains as the second line of defense for that case.
+
+---
+
 ## D15 — Enhance filters run as WebGL shaders, not CSS/SVG filters
 
 **Decision.** `EnhanceCanvas` and `MagnificationOverlay` render through a small WebGL

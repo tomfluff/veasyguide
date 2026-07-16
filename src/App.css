@@ -772,3 +772,7 @@
 .debug-legend .sw { display: inline-block; width: 10px; height: 10px; margin-right: 4px; }
 .sw.red { background: #ff5252; }
 .sw.green { background: #00e676; }
+
+/* Webcam pre-pass card (debug-only) */
+.webcam-line { font-size: 13px; color: #666; margin: 0 0 8px; }
+.webcam-heat { width: 480px; max-width: 100%; image-rendering: pixelated; border: 1px solid #ddd; border-radius: 4px; }

@@ -47,6 +47,7 @@ type ParamField = {
 
 // Pipeline-stage grouping: mirrors the order data flows through the analyzer.
 const PARAM_GROUPS: { title: string; note: string; keys: (keyof AnalysisParams)[] }[] = [
+  { title: "0 · Webcam pre-pass", note: "find the talking-head inset before analysis; drop detections inside it", keys: ["webcamPairFrac"] },
   { title: "1 · Sampling", note: "which pixels the analyzer looks at", keys: ["analysisWidth", "sampleInterval"] },
   { title: "2 · Change detection", note: "frame pair → changed regions (red mask / green boxes / blue = habitually moving)", keys: ["diffThresh", "dilateIters", "contourAreaLowFrac", "contourAreaHighFrac", "persistFrac"] },
   { title: "3 · Scene detection", note: "slide changes / cuts — activities never span one", keys: ["sceneChangeFrac", "sceneMinLen"] },
@@ -55,6 +56,11 @@ const PARAM_GROUPS: { title: string; note: string; keys: (keyof AnalysisParams)[
 ];
 
 const PARAM_FIELDS: ParamField[] = [
+  {
+    key: "webcamPairFrac", label: "Webcam churn (frac of pairs)", step: 0.05,
+    what: "Before analysis, ~24 frames are sampled minutes apart and diffed pairwise. A pixel that changed in at least this fraction of the pairs counts as permanently churning; the compact blob of such pixels becomes the webcam zone, and detections mostly inside it are dropped before clustering.",
+    why: "A person in an inset has always moved between two frames minutes apart, so webcam pixels churn in ~every pair; slide pixels change only across slide turns and ink only in the pairs that straddle its writing — the distributions barely overlap. The per-pixel occupancy veto alone missed the inset's rim (silhouette edges change too rarely per-pixel): measured on a 59-min lecture, 171 of 602 valid moments were the webcam. A frame-scale churn blob (camera video of an instructor at a board) is deliberately NOT called a webcam — see the area cap in pipeline.webcamZone. Lower = more aggressive (risks capturing a region the instructor reworks constantly); higher = a sleepy talking head slips through.",
+  },
   {
     key: "analysisWidth", label: "Analysis width (px)", step: 40,
     what: "Frames are downscaled to this width before any pixel work; detected coordinates are scaled back up for the overlays.",
@@ -222,6 +228,8 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
+  // Webcam pre-pass verdict (zone is analysis-res px; url is the debug heatmap).
+  const [webcam, setWebcam] = useState<{ zone: Box | null; wallMs: number; sampled: number; url: string | null } | null>(null);
   const [ranges, setRanges] = useState<Range[]>([]);
   const [openClusters, setOpenClusters] = useState(0);
   const [framesCount, setFramesCount] = useState(0);
@@ -265,6 +273,7 @@ export default function App() {
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
     setDone(false); setError(null); setOpenClusters(0);
     setFramesCount(0); setViewIdx(-1); setScenes([]); setRanges([]);
+    setWebcam((old) => { if (old?.url) URL.revokeObjectURL(old.url); return null; });
     setCurrMoment(null);
     setErrorDismissed(false);
     setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
@@ -290,6 +299,13 @@ export default function App() {
         setActivityCount((c) => c + 1);
         if (m.activity.isValid) setValidCount((c) => c + 1);
       } else if (m.type === "scene") { setScenes((s) => [...s, m.scene]); }
+      else if (m.type === "webcam") {
+        const blob = m.blob;
+        setWebcam((old) => {
+          if (old?.url) URL.revokeObjectURL(old.url);
+          return { zone: m.zone, wallMs: m.wallMs, sampled: m.sampled, url: blob ? URL.createObjectURL(blob) : null };
+        });
+      }
       else if (m.type === "progress") { setAnalyzedUpTo(m.analyzedUpTo); setXRealtime(m.xRealtime); setOpenClusters(m.openClusters); setRanges(m.ranges); }
       else if (m.type === "done") {
         setDone(true); setXRealtime(m.xRealtime); setAnalyzedUpTo(Infinity); setRanges(m.ranges);
@@ -388,6 +404,13 @@ export default function App() {
     () => validActivities(activitiesRef.current, params.minDuration),
     [activityCount, params.minDuration]
   );
+
+  // Debug console access to the raw activity list (valid AND invalid, with features), for
+  // interrogating the analyzer's judgments on a real video without adding UI.
+  if (DEBUG) {
+    (window as unknown as { __dumpActivities?: () => Activity[] }).__dumpActivities =
+      () => activitiesRef.current;
+  }
 
   const selectOpts = useMemo(
     () => ({ lead: params.highlightLead, linger: params.highlightLinger }),
@@ -680,6 +703,24 @@ export default function App() {
           snippetsDefault={SNIPPETS}
           seekTo={(t) => seekFnRef.current(t)}
         />
+      )}
+
+      {DEBUG && webcam && (
+        <div className="debug">
+          <h2>Webcam pre-pass</h2>
+          <p className="webcam-line">
+            {webcam.zone
+              ? `zone ${webcam.zone.x},${webcam.zone.y} ${webcam.zone.w}×${webcam.zone.h}` +
+                (meta ? ` (${(((webcam.zone.w * webcam.zone.h) / (meta.analysisWidth * meta.analysisHeight)) * 100).toFixed(1)}% of frame)` : "")
+              : "no webcam overlay detected"}
+            {` · ${webcam.sampled} frames in ${(webcam.wallMs / 1000).toFixed(1)}s`}
+          </p>
+          {webcam.url && (
+            // The churn heatmap: black = never changed across the sparse pairs, red -> yellow =
+            // changed in more of them. The green outline is the extracted zone.
+            <img className="webcam-heat" src={webcam.url} alt="Webcam churn heatmap" />
+          )}
+        </div>
       )}
 
       {DEBUG && capture && (

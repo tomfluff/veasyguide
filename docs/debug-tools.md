@@ -68,6 +68,19 @@ in-session.
 
 ---
 
+## The webcam pre-pass card (`?debug=1`)
+
+Shows the pre-pass verdict — the zone box (analysis-res px and % of frame) and its cost —
+and, when capture is on, the **churn heatmap**: black = never changed across the sparse
+pairs, red → yellow = changed in more of them, cyan = persistent edges (static structure — the
+second signal, which sets the zone's extent), green outline = the extracted zone. A real
+webcam reads as a saturated-yellow head silhouette; slide content stays red. If a zone
+appears where there is no webcam, `webcamPairFrac` is too low; if an obvious talking head
+gets no zone, check whether it is present for the whole video (a part-time inset dilutes the
+pair-churn signature — see parameters.md §2b).
+
+---
+
 ## The scene strip (`?debug=1`)
 
 ![Scene strip](media/scene-strip.png)
@@ -88,6 +101,10 @@ See [research-data.md](research-data.md) for what the features mean and how to e
 ---
 
 ## Dev-only handles
+
+`window.__dumpActivities()` (under `?debug=1`) returns the raw activity list — valid and
+invalid, with feature vectors — for interrogating the analyzer's judgments on a real video
+from the console. It is how the webcam-leak counts in D16 were measured.
 
 `window.__magSettings` (`{ get(), set(partial) }`) exists in dev builds only. The player's
 settings live inside popovers that close on focus loss, which makes them awkward to drive from

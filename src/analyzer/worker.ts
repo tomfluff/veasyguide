@@ -9,12 +9,12 @@
 // ranges, not one frontier.
 
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from "mediabunny";
-import { changedFrac, componentRegions, diffMask, dilate, toGray, updateOccupancy } from "./pipeline";
+import { accumulateEdges, changedFrac, componentRegions, diffMask, dilate, expandZoneToEdges, toGray, updateOccupancy, webcamZone } from "./pipeline";
 import { GLAnalyzer } from "./glPipeline";
 import { computeFeatures } from "./features";
 import { StreamingClusterer, type RawActivity } from "./graph";
 import { addRange, isAnalyzed, nextGap } from "./ranges";
-import type { Activity, AnalysisMeta, InMsg, Range, WorkerMsg } from "./types";
+import type { Activity, AnalysisMeta, Box, InMsg, Range, WorkerMsg } from "./types";
 
 const post = (m: WorkerMsg) => (self as unknown as Worker).postMessage(m);
 
@@ -103,6 +103,97 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
   const debugCanvas = debug ? new OffscreenCanvas(aw, ah) : null;
   const debugCtx = debugCanvas?.getContext("2d") ?? null;
   const sink = new VideoSampleSink(track);
+
+  // --- Webcam pre-pass ------------------------------------------------------
+  // Find the talking-head inset BEFORE any activity exists, so the veto happens at detection
+  // time and nothing ever has to be retracted. ~24 frames sampled minutes apart: a person in
+  // an inset has always moved between two such frames, so webcam pixels churn in ~every
+  // consecutive pair, while slide pixels change only across slide turns and ink only in the
+  // pairs that straddle its writing (see pipeline.webcamZone). Justified by measurement: on a
+  // 59-minute lecture with a corner webcam, 171 of 602 valid moments were the webcam — the
+  // per-pixel occupancy veto misses the inset's rim, whose pixels individually change too
+  // rarely (silhouette edges move only when the head does).
+  post({ type: "status", stage: "Checking for a webcam overlay…" });
+  let webcam: Box | null = null;
+  {
+    const preStart = performance.now();
+    const WEBCAM_SAMPLES = 24;
+    const preTs: number[] = [];
+    for (let i = 0; i < WEBCAM_SAMPLES; i++) preTs.push(((i + 0.5) / WEBCAM_SAMPLES) * duration);
+    const churn = new Uint16Array(aw * ah);
+    const edgeCounts = new Uint16Array(aw * ah);
+    let prev: Uint8Array | null = null;
+    let pairs = 0;
+    let sampled = 0;
+    for await (const sample of sink.samplesAtTimestamps(preTs)) {
+      if (!sample) continue;
+      sample.draw(ctx, 0, 0, aw, ah);
+      sample.close();
+      const gray = toGray(ctx.getImageData(0, 0, aw, ah).data, aw, ah);
+      sampled++;
+      accumulateEdges(gray, aw, ah, edgeCounts);
+      if (prev) {
+        const d = diffMask(prev, gray, aw, ah, params.diffThresh);
+        const m = dilate(d.mask, aw, ah, params.dilateIters);
+        for (let i = 0; i < m.length; i++) churn[i] += m[i];
+        pairs++;
+      }
+      prev = gray;
+    }
+    webcam = webcamZone(churn, pairs, aw, ah, params.webcamPairFrac);
+
+    // Churn finds the core; the inset's static border says how far the box reaches (the
+    // inset's quiet side churns LESS than the slide, so no churn threshold can find it —
+    // see pipeline.expandZoneToEdges).
+    const edges = new Uint8Array(aw * ah);
+    if (sampled > 0) {
+      const need = Math.ceil(0.85 * sampled);
+      for (let i = 0; i < edges.length; i++) edges[i] = edgeCounts[i] >= need ? 1 : 0;
+    }
+    if (webcam) webcam = expandZoneToEdges(webcam, edges, aw, ah);
+
+    // Debug heatmap: churn as heat (black -> red -> yellow), the zone outlined in green.
+    let blob: Blob | undefined;
+    if (debugCanvas && debugCtx && pairs > 0) {
+      const img = new Uint8ClampedArray(aw * ah * 4);
+      for (let i = 0, p = 0; i < churn.length; i++, p += 4) {
+        const v = churn[i] / pairs;
+        img[p] = Math.round(Math.min(1, v * 2) * 255);
+        img[p + 1] = Math.round(Math.max(0, v * 2 - 1) * 255);
+        img[p + 2] = 24;
+        img[p + 3] = 255;
+        // Persistent edges in cyan — the second signal, so the card shows WHY the zone
+        // reaches past the churn (it grew to the inset's static border).
+        if (edges[i]) { img[p] = 0; img[p + 1] = 200; img[p + 2] = 220; }
+      }
+      if (webcam) {
+        const { x, y, w: zw, h: zh } = webcam;
+        const green = (px: number, py: number) => {
+          if (px < 0 || py < 0 || px >= aw || py >= ah) return;
+          const p = (py * aw + px) * 4;
+          img[p] = 0; img[p + 1] = 255; img[p + 2] = 80;
+        };
+        for (let d = 0; d < 2; d++) {
+          for (let px = x - d; px <= x + zw + d; px++) { green(px, y - d); green(px, y + zh + d); }
+          for (let py = y - d; py <= y + zh + d; py++) { green(x - d, py); green(x + zw + d, py); }
+        }
+      }
+      debugCtx.putImageData(new ImageData(img, aw, ah), 0, 0);
+      blob = await debugCanvas.convertToBlob({ type: "image/webp", quality: 0.9 });
+    }
+    post({ type: "webcam", zone: webcam, wallMs: performance.now() - preStart, sampled, blob });
+  }
+
+  // A region mostly inside the webcam zone is the webcam, not the instructor — drop it at
+  // detection time, before clustering, so no bogus activity is ever created. 0.6 rather than
+  // full containment: the head's churn bleeds past the zone's edge by a dilation or two.
+  const WEBCAM_OVERLAP_FRAC = 0.6;
+  const inWebcam = (b: Box): boolean => {
+    if (!webcam) return false;
+    const ix = Math.max(0, Math.min(b.x + b.w, webcam.x + webcam.w) - Math.max(b.x, webcam.x));
+    const iy = Math.max(0, Math.min(b.y + b.h, webcam.y + webcam.h) - Math.max(b.y, webcam.y));
+    return (ix * iy) / (b.w * b.h) >= WEBCAM_OVERLAP_FRAC;
+  };
 
   // GPU path. A rotated track stays on the CPU: sample.draw() applies the rotation
   // metadata, a raw VideoFrame texture upload would not. Disposing the previous run's
@@ -237,7 +328,8 @@ async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMs
       // change would otherwise poison by nudging every pixel toward "always moving".)
       if (mask && mag && gray && !isCut) {
         updateOccupancy(mask, occ);
-        const regions = componentRegions(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac, mag, occ);
+        const regions = componentRegions(mask, aw, ah, params.contourAreaLowFrac, params.contourAreaHighFrac, mag, occ)
+          .filter((r) => !inWebcam(r.box));
         const boxes = regions.map((r) => r.box);
         for (const r of regions) {
           for (const act of clusterer.add({ t, box: r.box, detail: r })) {

@@ -98,6 +98,53 @@ otherwise nudge *every* pixel toward "always moving".
 
 ---
 
+## 2b · Webcam pre-pass — the talking-head inset
+
+### `webcamPairFrac` = 0.8
+Before analysis starts, ~24 frames are sampled **minutes apart** across the whole video and
+diffed pairwise. A pixel that changed in at least this fraction of the pairs is permanently
+churning; the compact blob of such pixels becomes the **webcam zone**, and any detection
+region mostly inside it (≥60% overlap) is dropped *before clustering* — no webcam activity is
+ever created, so nothing has to be retracted later.
+
+**Why sparse pairs separate so cleanly.** A person in an inset has always moved between two
+frames minutes apart, so webcam pixels churn in essentially *every* pair. A slide pixel
+changes only in the pairs that straddle a slide turn; ink only in the pairs that straddle its
+writing. Measured on a 59-minute lecture, the churn heatmap shows the head silhouette at
+~100% of pairs against slide content well below — the distributions barely overlap. (This is
+the broadcast-TV logo/PiP detection trick, inverted: find what never *stays* instead of what
+never changes.)
+
+**Why the per-pixel occupancy veto (above) wasn't enough on its own.** It judges pixels
+individually, and the inset's *rim* — silhouette edges that move only when the head does —
+churns too rarely per-pixel: measured leaked activities showed `flaggedFrac` 0–0.37 against
+the 0.5 veto. On that lecture, **171 of 602 valid moments were the webcam**. The occupancy
+veto stays as the second line of defense (e.g. for an inset present only part of the video,
+which dilutes the pair-churn signature below threshold).
+
+**Churn finds the core; the static border finds the extent.** The zone is built in three
+steps (`pipeline.ts`): seed at `webcamPairFrac` (the always-churning silhouette), flood to
+the *connected* region at 62.5% of that threshold (the head's frequent reach), then expand to
+the inset's **persistent-edge border** — the video-in-video boundary, present in ~every
+sampled frame. The third step is not optional: measured on the same lecture, the inset's
+quiet side (webcam background the person only occasionally leans into) churns at **0.13** of
+pairs while the *slide* churns at **0.44** — no churn threshold can take one without the
+other. What separates them is the rectangle, and the rectangle is found by edge persistence
+(the classic TV-logo/PiP trick).
+
+**Deliberate refusal:** a churn blob above ~20% of the frame is *not* called a webcam, and an
+edge expansion that balloons past the same cap is discarded (`WEBCAM_MAX_AREA_FRAC` in
+pipeline.ts). A camera recording of an instructor at a board looks exactly like a giant
+webcam, and vetoing where they write would be the worst possible behaviour — verified against
+the whiteboard test video, which correctly yields no zone.
+
+Cost: ~0.7 s on a 30 s clip, ~1.5 s on a 59-minute lecture (24 sparse decodes at analysis
+resolution), added once before playback unlocks. **Lower** = more aggressive (risks capturing
+a region the instructor reworks constantly); **higher** = a sleepy talking head slips through.
+Changing it requires **Re-analyze**.
+
+---
+
 ## 3 · Scene detection — slide changes / cuts
 
 ### `sceneChangeFrac` = 0.08

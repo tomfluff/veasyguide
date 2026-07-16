@@ -237,3 +237,134 @@ function huMoments(
     (e30 - 3 * e12) * (e21 + e03) * (3 * (e30 + e12) ** 2 - (e21 + e03) ** 2);
   return [h1, h2, h3, h4, h5, h6, h7];
 }
+
+// --- Webcam pre-pass -------------------------------------------------------
+// Zone bounds, as fractions of the frame. Below the floor it's noise; above the cap it is
+// not an inset — it's the video itself churning (a camera recording of an instructor at a
+// board looks exactly like a giant webcam, and vetoing where they write would be the worst
+// possible behaviour), so we declare NO zone and leave suppression to the per-pixel veto.
+export const WEBCAM_MIN_AREA_FRAC = 0.003;
+export const WEBCAM_MAX_AREA_FRAC = 0.2;
+
+// Where the talking-head webcam overlay is, if there is one.
+//
+// `churn[i]` counts, over N frames sampled MINUTES apart across the whole video, in how many
+// consecutive pairs pixel i changed. That spacing is the trick: a person in an inset has
+// always moved between two frames minutes apart, so webcam pixels churn in ~every pair; a
+// slide pixel changes only in the pairs that straddle a slide change, and ink only in the
+// pairs that straddle its writing. The distributions barely overlap — threshold at
+// `pairFrac` of pairs, consolidate, and the webcam is the compact blob that remains.
+// (The classic TV-logo/PiP trick from broadcast video, inverted: instead of finding what
+// never changes, find what never stays.)
+// Flood threshold, as a fraction of the seed threshold (0.8 × 0.625 = half the pairs).
+// The head's core churns in ~every pair, but its OCCASIONAL reach — a lean, a gesture —
+// churns in only some of them, and activities born from that halo are exactly the ones a
+// tight zone lets through (measured: 110 user-facing leaks around a core-only zone).
+const WEBCAM_FLOOD_RATIO = 0.625;
+
+// Accumulate a per-pixel edge count for one frame: a pixel is an edge if its forward
+// gradient exceeds `thresh`. Called once per pre-pass frame; `persistentEdges` below turns
+// the counts into "edges present in ~every frame" — static structure.
+export function accumulateEdges(gray: Uint8Array, w: number, h: number, counts: Uint16Array, thresh = 30): void {
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w - 1; x++) {
+      const i = y * w + x;
+      if (Math.abs(gray[i + 1] - gray[i]) + Math.abs(gray[i + w] - gray[i]) > thresh) counts[i]++;
+    }
+  }
+}
+
+// Grow the churn-detected zone to the enclosing rectangle of PERSISTENT edges — the inset's
+// own border, present in every sampled frame (a video-in-video boundary never moves).
+//
+// Why this exists: churn alone cannot find the inset's full extent. Measured on a real
+// lecture, the inset's quiet side (webcam background the person only occasionally leans
+// into) churns at ~0.13 of pairs while the SLIDE churns at ~0.44 — any churn threshold loose
+// enough to take the halo takes the slide first. What separates them is not how often they
+// change but whether they sit inside the inset's rectangle. So: churn finds the core, the
+// static border says how far the box actually reaches. (This is the classic TV-logo/PiP
+// edge-persistence trick, finally used the right way round.)
+//
+// For each side not already at the frame edge, search outward up to one zone-dimension for
+// the farthest column/row where persistent edges span most of the zone's cross-section.
+// Bounded and conservative: no qualifying border, no growth on that side.
+export function expandZoneToEdges(zone: Box, edges: Uint8Array, w: number, h: number): Box {
+  const SPAN = 0.55; // an inset border must cover this much of the zone's cross-section
+  let { x, y, w: zw, h: zh } = zone;
+
+  const colStrength = (cx: number, y0: number, y1: number) => {
+    let s = 0;
+    for (let yy = y0; yy < y1; yy++) s += edges[yy * w + cx];
+    return s / (y1 - y0);
+  };
+  const rowStrength = (ry: number, x0: number, x1: number) => {
+    let s = 0;
+    for (let xx = x0; xx < x1; xx++) s += edges[ry * w + xx];
+    return s / (x1 - x0);
+  };
+
+  // Left, then right, then top, then bottom — each searched over the CURRENT y/x span so a
+  // grown side benefits the next search.
+  for (let cx = Math.max(0, x - zw); cx < x; cx++) {
+    if (colStrength(cx, y, y + zh) >= SPAN) { zw += x - cx; x = cx; break; }
+  }
+  for (let cx = Math.min(w - 1, x + zw + zw); cx > x + zw; cx--) {
+    if (colStrength(cx, y, y + zh) >= SPAN) { zw = cx - x + 1; break; }
+  }
+  for (let ry = Math.max(0, y - zh); ry < y; ry++) {
+    if (rowStrength(ry, x, x + zw) >= SPAN) { zh += y - ry; y = ry; break; }
+  }
+  for (let ry = Math.min(h - 1, y + zh + zh); ry > y + zh; ry--) {
+    if (rowStrength(ry, x, x + zw) >= SPAN) { zh = ry - y + 1; break; }
+  }
+
+  // Growth is capped by the same sanity bound as detection: an expansion past it means the
+  // "border" we found is slide structure, and the unexpanded zone is the honest answer.
+  if ((zw * zh) / (w * h) > WEBCAM_MAX_AREA_FRAC) return zone;
+  return { x, y, w: zw, h: zh };
+}
+
+export function webcamZone(
+  churn: Uint16Array,
+  pairs: number,
+  w: number,
+  h: number,
+  pairFrac: number
+): Box | null {
+  // Too few pairs and "changed in all of them" stops meaning "always changing".
+  if (pairs < 8) return null;
+
+  // Seed strictly: the compact blob of pixels that changed in ~every pair.
+  const seedNeed = Math.ceil(pairFrac * pairs);
+  const seedMask = new Uint8Array(w * h);
+  for (let i = 0; i < seedMask.length; i++) seedMask[i] = churn[i] >= seedNeed ? 1 : 0;
+  // The head's churn fragments (face vs shoulders); fuse before extracting.
+  const seeds = componentRegions(dilate(seedMask, w, h, 2), w, h, WEBCAM_MIN_AREA_FRAC, 1);
+  if (seeds.length === 0) return null;
+  let seed = seeds[0];
+  for (const r of seeds) if (r.mass > seed.mass) seed = r;
+  if ((seed.box.w * seed.box.h) / (w * h) > WEBCAM_MAX_AREA_FRAC) return null;
+
+  // Flood loosely: grow to the CONNECTED sometimes-churning region around the seed. Spatial
+  // connectivity is what keeps this safe — the inset sits inside a static moat (its own
+  // border/background), so the flood cannot jump to slide content that also churns at
+  // middling rates as slides turn over.
+  const floodNeed = Math.ceil(pairFrac * WEBCAM_FLOOD_RATIO * pairs);
+  const floodMask = new Uint8Array(w * h);
+  for (let i = 0; i < floodMask.length; i++) floodMask[i] = churn[i] >= floodNeed ? 1 : 0;
+  const halos = componentRegions(dilate(floodMask, w, h, 2), w, h, WEBCAM_MIN_AREA_FRAC, 1);
+  // The seed's pixels are flood pixels by construction (floodNeed <= seedNeed), so exactly
+  // one halo actually contains the seed — the one whose box overlaps the seed's box most.
+  const overlap = (a: Box, b: Box) =>
+    Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
+    Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  let home: Region | null = null;
+  for (const r of halos) {
+    if (!home || overlap(r.box, seed.box) > overlap(home.box, seed.box)) home = r;
+  }
+  if (home && overlap(home.box, seed.box) === 0) home = null;
+  // If the flood ballooned past the cap (or somehow lost the seed), fall back to the
+  // conservative core rather than vetoing a frame-scale area.
+  if (!home || (home.box.w * home.box.h) / (w * h) > WEBCAM_MAX_AREA_FRAC) return seed.box;
+  return home.box;
+}

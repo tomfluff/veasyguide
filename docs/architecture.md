@@ -27,6 +27,19 @@ downscaling happens: the pixel work costs a quarter of what it would at 720p.
 Sampling is **time-based**, not frame-index-based, so variable-frame-rate screen recordings
 degrade gracefully.
 
+### 1b. Webcam pre-pass (`pipeline.ts: webcamZone`)
+
+Before the main loop, ~24 frames sampled minutes apart are diffed pairwise; pixels that
+changed in ≥`webcamPairFrac` of the pairs form the zone's CORE (a person in an inset has
+always moved between two frames minutes apart; slides and ink haven't), which is then grown
+to the inset's persistent-edge border — the video-in-video boundary present in every frame —
+because the inset's quiet side churns less than the slide does and only the rectangle tells
+them apart. Detection regions
+mostly inside the zone are dropped before clustering, so webcam activities are never created.
+A frame-scale churn blob is deliberately *not* a zone — that's a camera video of the
+instructor, not an inset. Costs ~1.5 s on an hour-long video; the churn heatmap and zone are
+visible under `?debug=1`.
+
 ### 2. Scene detection (`pipeline.ts: changedFrac`)
 
 Each sampled frame is compared against the previous one, and a **cut** is declared when more
