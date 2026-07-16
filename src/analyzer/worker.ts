@@ -50,6 +50,15 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
 };
 
 async function run({ file, params, debug, collectNodes, forceCpu }: Extract<InMsg, { type: "start" }>) {
+  // The debug params panel is a trust boundary: a 0 (or NaN, or negative) here becomes a
+  // zero-width ImageData throw or an endless timestamp loop, and either one leaves playback
+  // gated forever with no way out but a reload. Floors, not validation UI — this is a
+  // debug-only surface and the analyzer should simply never explode on a typo.
+  params = {
+    ...params,
+    analysisWidth: Math.max(40, params.analysisWidth) || 480,
+    sampleInterval: Math.max(0.02, params.sampleInterval) || 0.2,
+  };
   // These strings are read by a person who is waiting, not by us. "Reading container" and
   // "probing the demuxer" are true and useless; what they want to know is that something is
   // happening to THEIR video and roughly what.
