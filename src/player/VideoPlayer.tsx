@@ -898,9 +898,16 @@ const VideoPlayer = (props: Props) => {
         {props.canPlay && atUnanalyzed && (
           <Box className="overlay-catching-up">Analyzing this part…</Box>
         )}
-        {/* Moving someone's playhead without saying so feels like a glitch. Say so. */}
+        {/* Moving someone's playhead without saying so feels like a glitch. Say so.
+            Anchored above the MEASURED bar height: the pill only ever shows while the
+            Appearance sheet is open, which is exactly when the bar is up — a fixed bottom
+            offset put it behind the bar, illegible at every zoom. */}
         {previewJumped && (
-          <Box className="overlay-preview-jump" role="status">
+          <Box
+            className="overlay-preview-jump"
+            role="status"
+            style={{ bottom: barHeight + 12 }}
+          >
             Jumped to a moment so you can see your changes · returns when you close
           </Box>
         )}
