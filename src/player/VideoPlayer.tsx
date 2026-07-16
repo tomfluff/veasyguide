@@ -553,12 +553,38 @@ const VideoPlayer = (props: Props) => {
           e.stopPropagation();
         }}
       >
+        {/* The scrubber is a slider to the keyboard and AT, not just a mouse strip: it was
+            the one player control with no non-pointer equivalent beyond the global ±5s keys.
+            Arrow keys reuse handleTimeShift so the flash indicators and clamping match; the
+            bar's stopPropagation keeps the same press from also reaching the global hotkeys. */}
         <Box
           className="timeline-container"
           ref={trackRef}
           my={6}
           onMouseMove={handleSeek}
           onMouseDown={handleSeek}
+          tabIndex={0}
+          role="slider"
+          aria-label="Seek"
+          aria-valuemin={0}
+          aria-valuemax={Math.round(totalTime)}
+          aria-valuenow={Math.round(currTime)}
+          aria-valuetext={`${convertSecondsToTimecode(currTime)} of ${convertSecondsToTimecode(totalTime)}`}
+          aria-disabled={!props.canPlay || undefined}
+          onKeyDown={(e) => {
+            const video = videoRef.current;
+            if (!video || !props.canPlay) return;
+            if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+              e.preventDefault();
+              handleTimeShift(e.key === "ArrowLeft" ? -5 : 5);
+            } else if (e.key === "Home") {
+              e.preventDefault();
+              video.currentTime = 0;
+            } else if (e.key === "End") {
+              e.preventDefault();
+              video.currentTime = totalTime;
+            }
+          }}
         >
           <Box className="timeline">
             {/* Analyzed coverage (striped) behind the playback progress. */}

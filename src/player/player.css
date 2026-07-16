@@ -122,6 +122,27 @@
   cursor: pointer;
   display: flex;
   align-items: center;
+  position: relative;
+}
+
+/* The 44px pointer target (WCAG 2.5.5), centred on the 16px visual strip without moving it —
+   the bar's vertical rhythm is hand-tuned and must not grow. The zone reaches ~3px above the
+   bar and into the moment lane's row below; the lane's marks are positioned elements in a
+   LATER sibling, so they still win hit-testing, and a click in the lane's empty gaps seeking
+   the video is the same thing clicking the strip does. */
+.timeline-container::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
+.timeline-container:focus-visible {
+  outline: 3px solid var(--brand-300);
+  outline-offset: 2px;
 }
 
 /* A constant, usable height. It used to be 8px, growing to 12px ON HOVER — which meant the
