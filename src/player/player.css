@@ -153,6 +153,10 @@
   width: 100%;
   position: relative;
   border-radius: var(--r-sm);
+  /* The track's boundary against the bar was 1.76:1 — below the 3:1 UI-component floor.
+     A border carries it (#5c6879 vs the bar = 3.2:1) instead of lightening the fill, which
+     would cost the purple progress its contrast against the track (7:1 → 2.5:1). */
+  border: 1px solid #5c6879;
 }
 
 /* Purple, not red. The moment marks are red (--activity); if progress is red too, the two
@@ -188,6 +192,7 @@
   padding: 0.25rem;
   border-radius: 0.25rem;
   font-size: 0.75rem;
+  font-variant-numeric: tabular-nums; /* DESIGN.md: timecodes must not jitter */
   display: none;
 }
 
@@ -377,7 +382,9 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  background-color: #4d5765;
+  /* Stripes, not a solid: the analyzed/unanalyzed split was two greys 1.4:1 apart —
+     effectively invisible. The pattern is the channel now; lightness merely helps. */
+  background: repeating-linear-gradient(-45deg, #4d5765 0 5px, #66738a 5px 10px);
   border-radius: var(--r-sm);
 }
 
@@ -513,6 +520,18 @@
      control (the keys, the buttons, the sidebar) — that is 2.5.8's Equivalent exception. */
 }
 
+/* The 24px hit area the comment above promises — the visual mark is 14px (18px lane minus
+   the 2px insets), so the pseudo-element makes up the difference without growing the lane.
+   Same trick as the scrubber's 44px zone. */
+.moment-mark::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px;
+  bottom: -5px;
+}
+
 .moment-mark:hover { filter: brightness(1.25); }
 
 .moment-mark.now {
@@ -542,6 +561,7 @@
   border: 1px solid rgba(102, 113, 133, 0.75);
   color: var(--d-text);
   font-size: 1rem;
+  font-variant-numeric: tabular-nums; /* DESIGN.md: timecodes must not jitter */
 }
 
 .now-line.empty { color: var(--d-muted); }

@@ -145,6 +145,9 @@
 .avatar-link {
   display: flex; align-items: center; justify-content: center;
   flex: none;
+  /* No UA default blue/underline: if the image ever fails, the alt text renders — and
+     rgb(0,0,238) on the dark bar is 1.8:1. (Same fix the footer link already got.) */
+  color: inherit; text-decoration: none;
   min-width: 44px; min-height: 44px; /* 44px hit area around the 28px image */
   margin-left: 8px;
   border-radius: 50%;
@@ -300,7 +303,7 @@
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--line);
 }
-.moments-side .side-title { font-size: 1.25rem; font-weight: 650; }
+.moments-side .side-title { font-size: 1.25rem; font-weight: 650; margin: 0; }
 .moments-side .side-pos { font-size: 0.9375rem; color: var(--muted); margin-top: 0; }
 .moments-side .side-pos b { color: var(--ink); }
 
@@ -786,5 +789,5 @@
 .sw.green { background: #00e676; }
 
 /* Webcam pre-pass card (debug-only) */
-.webcam-line { font-size: 13px; color: #666; margin: 0 0 8px; }
-.webcam-heat { width: 480px; max-width: 100%; image-rendering: pixelated; border: 1px solid #ddd; border-radius: 4px; }
+.webcam-line { font-size: 0.8125rem; color: var(--muted); margin: 0 0 8px; }
+.webcam-heat { width: 480px; max-width: 100%; image-rendering: pixelated; border: 1px solid var(--line); border-radius: 4px; }

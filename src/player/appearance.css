@@ -72,7 +72,7 @@
 
 .ap-tile-name {
   display: block; padding: 4px 3px 5px;
-  font-size: 0.6875rem; font-weight: 650; text-align: center;
+  font-size: 0.75rem; font-weight: 650; text-align: center; /* DESIGN.md's dense-panel floor */
   color: var(--ap-muted); background: #12161d;
 }
 .ap-tile.sel .ap-tile-name { color: var(--d-text); }
