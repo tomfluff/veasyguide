@@ -695,10 +695,15 @@ const VideoPlayer = (props: Props) => {
         )}
 
         <Group className="controls" gap={3} align="center" mt={4}>
+          {/* aria-disabled, not disabled: the click is already a guarded no-op while gated,
+              and a hard disabled would throw keyboard focus somewhere else the moment the
+              gate lifts. This way AT hears "dimmed" instead of a button that eats presses
+              silently. */}
           <UnstyledButton
             onClick={handlePlayPause}
             onKeyDown={stopPlayerHotkeys}
             aria-label={isPlaying ? "Pause" : "Play"}
+            aria-disabled={!props.canPlay || undefined}
           >
             {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
           </UnstyledButton>
@@ -895,28 +900,33 @@ const VideoPlayer = (props: Props) => {
             </div>
           </Box>
         )}
-        {props.canPlay && atUnanalyzed && (
-          <Box className="overlay-catching-up">Analyzing this part…</Box>
-        )}
+        {/* The three transient notices stay MOUNTED and toggle their content instead of
+            mounting populated: a live region inserted together with its text is not a
+            change, and most screen reader/browser pairs never announce it. The :empty
+            state is hidden with opacity (player.css) — visibility/display would drop the
+            region from the accessibility tree and lose the announcement the same way. */}
+        <Box className="overlay-catching-up" role="status">
+          {props.canPlay && atUnanalyzed ? "Analyzing this part…" : null}
+        </Box>
         {/* Moving someone's playhead without saying so feels like a glitch. Say so.
             Anchored above the MEASURED bar height: the pill only ever shows while the
             Appearance sheet is open, which is exactly when the bar is up — a fixed bottom
             offset put it behind the bar, illegible at every zoom. */}
-        {previewJumped && (
-          <Box
-            className="overlay-preview-jump"
-            role="status"
-            style={{ bottom: barHeight + 12 }}
-          >
-            Jumped to a moment so you can see your changes · returns when you close
-          </Box>
-        )}
-        {sceneNotice && (
-          <Box className={classNames("overlay-scene", { stacked: atUnanalyzed })} role="status">
-            <IconSwitchHorizontal size={16} />
-            Possible scene change
-          </Box>
-        )}
+        <Box
+          className="overlay-preview-jump"
+          role="status"
+          style={{ bottom: barHeight + 12 }}
+        >
+          {previewJumped ? "Jumped to a moment so you can see your changes · returns when you close" : null}
+        </Box>
+        <Box className={classNames("overlay-scene", { stacked: atUnanalyzed })} role="status">
+          {sceneNotice ? (
+            <>
+              <IconSwitchHorizontal size={16} />
+              Possible scene change
+            </>
+          ) : null}
+        </Box>
       </Box>
       {/* The fullscreen mount of the moments list. Same component as the page sidebar —
           the current row and the on-video highlight come from this player's own

@@ -395,6 +395,18 @@
   pointer-events: none;
 }
 
+/* The transient notices stay mounted (so their role=status regions announce — see the
+   overlay block in VideoPlayer.tsx) and hide by opacity when empty. Not visibility or
+   display: those drop the region from the accessibility tree, which un-fixes the
+   announcement. Killing the animation while empty also makes it re-run when content
+   arrives — the animation-name changing from none back is what restarts it. */
+.video-overlay .overlay-catching-up:empty,
+.video-overlay .overlay-preview-jump:empty,
+.video-overlay .overlay-scene:empty {
+  opacity: 0;
+  animation: none;
+}
+
 /* The pre-playback gate. A full scrim, not a pill: until the first PLAYBACK_LEAD seconds are
    analyzed there is nothing to interact with, and dimming the frame says that plainly — the
    old pill floated over a video that looked ready but wasn't. */
