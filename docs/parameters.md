@@ -17,7 +17,9 @@ A parameter without a documented *why* doesn't get added. That's the rule.
 
 ### `analysisWidth` = 480 px
 Frames are downscaled to this width before any pixel work; detected coordinates are scaled
-back up for the overlays.
+back up for the overlays. Floored at **40 px** in the worker (and `sampleInterval` at
+**0.02 s**): a 0/NaN from the debug panel used to throw a zero-width `ImageData` (or build
+an endless timestamp array) and leave playback gated forever.
 
 **Why.** Pixel cost scales with area, and slide content is coarse enough to survive
 downscaling — 480p is ~4× cheaper than 720p. The Python analyzer ran at native resolution,
@@ -126,7 +128,12 @@ which dilutes the pair-churn signature below threshold).
 steps (`pipeline.ts`): seed at `webcamPairFrac` (the always-churning silhouette), flood to
 the *connected* region at 62.5% of that threshold (the head's frequent reach), then expand to
 the inset's **persistent-edge border** — the video-in-video boundary, present in ~every
-sampled frame. The third step is not optional: measured on the same lecture, the inset's
+sampled frame. A fourth step pads the final zone by **6 px** (analysis resolution, clamped to
+the frame): measured on the same lecture, the edge expansion still sat ~6 px short of the
+inset's lower-left corner — a soft border/shadow never clears the 85% edge-persistence bar —
+and shoulder-movement boxes straddling that rim passed the 60% overlap veto and were
+highlighted. 6 px of a 480-wide frame is 1.25%; slide ink that close to the inset is rare, a
+highlight on the presenter's chest is not. The third step is not optional: measured on the same lecture, the inset's
 quiet side (webcam background the person only occasionally leans into) churns at **0.13** of
 pairs while the *slide* churns at **0.44** — no churn threshold can take one without the
 other. What separates them is the rectangle, and the rectangle is found by edge persistence

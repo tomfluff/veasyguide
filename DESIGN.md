@@ -49,11 +49,26 @@ change them. They must never be swapped for the brand purple: the brand is chrom
 overlay is content the user tuned for their own vision.
 
 ```
---activity   #FF5A4D   moment markers in the timeline lane, moment cards
+--activity   #FF5A4D   moment ACCENTS: the sidebar's Now row, moment cards
 --ok         #7EE3A4   privacy promise, success
 --warn       #FFB020   partial failure
 --danger     #FF6B6B   fatal error
 ```
+
+The timeline lane's moment marks are **slate `#7e8b9e`, not `--activity`**, and only the
+*current* mark is coloured (amber `#ffc233`). Red is the colour of a problem, and a lecture
+with 141 moments rendered as 141 red alarms — while the moments are the single best thing
+the analyzer produces. The lane is a map; only the current mark is an answer. (This
+originally shipped as a deviation from the table above; it is the contract now.)
+
+### The always-dark player
+
+The player and its control bar are dark in both themes and keep their own neutral tier
+(`#0f1319`, `#151921`, `#21262f`-family greys, declared in player.css) alongside the shared
+`--d-*` tokens. That tier is sanctioned: the player is a distinct dark surface, not page
+chrome, and forcing its ~10 tuned greys into the six-token page palette would flatten real
+distinctions (bar vs. track vs. analyzed-range vs. lane). The rule that carries over
+unchanged: every text pairing ≥4.5:1, every component boundary ≥3:1 — measured, not assumed.
 
 ## Typography
 
@@ -77,8 +92,8 @@ panels below 1rem are fine, as long as they are rem-based and scale with the pag
 --font: "Atkinson Hyperlegible", sans-serif;
 
 Body / controls   1rem / 1.5        the default; inherits the browser's base size
-Secondary / meta  0.875–0.9375rem   chips, nav, timestamps, footer
-Dense panels      down to 0.75rem   the Appearance sheet; scales with zoom like everything
+Secondary / meta  0.875–0.9375rem   chips, nav, timestamps
+Dense panels      down to 0.75rem   the Appearance sheet, the footer byline; scales with zoom
 Section titles    1.25rem / 650
 Page headline     1.6875rem / 700
 Numerals          font-variant-numeric: tabular-nums  (timecodes must not jitter)
@@ -125,6 +140,12 @@ understand cold (Moments keeps its word; the chevron does not need one).
 users localize and actively harms users with vestibular disorders or photosensitivity, so it
 is opt-in, and every animation honors `prefers-reduced-motion` by falling back to a static
 stronger state rather than silently dropping the cue.
+
+One documented exception: the highlight **pulse** ignores `prefers-reduced-motion`, because
+it is only ever running when the user explicitly turned it on in the Appearance sheet — an
+explicit per-feature choice outranks the OS-wide default it contradicts. Everything that
+moves *without* being asked (control bar, scene notice, sidebar follow-scroll, the
+magnifier's pan/zoom) honors the setting.
 
 Transitions are functional only: 150ms ease-out on the control bar's show/hide, 200ms on
 sidebar open. Nothing decorative.
