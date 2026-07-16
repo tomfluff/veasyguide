@@ -27,9 +27,12 @@ type Props = {
   // (fullscreen, where the page is invisible). These let the overlay mount position itself.
   className?: string;
   style?: CSSProperties;
+  // Overlay mount only: Escape should dismiss the overlay like any transient panel. The
+  // page mount is permanent chrome and passes nothing.
+  onEscape?: () => void;
 };
 
-export default function MomentsSidebar({ activities, scenes, thumbs, current, done, canPlay, lead, onJump, className, style }: Props) {
+export default function MomentsSidebar({ activities, scenes, thumbs, current, done, canPlay, lead, onJump, className, style, onEscape }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
   const groupByScene = useViewSettingsStore((s) => s.groupByScene);
@@ -109,10 +112,15 @@ export default function MomentsSidebar({ activities, scenes, thumbs, current, do
     <aside
       className={className ? `moments-side ${className}` : "moments-side"}
       style={style}
-      onKeyDown={(e) => e.stopPropagation()}
+      aria-label="Moments"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onEscape?.();
+        e.stopPropagation();
+      }}
     >
       <div className="side-head">
-        <div className="side-title">Moments</div>
+        {/* A real heading: the working screen's structure under the h1 is this list. */}
+        <h2 className="side-title">Moments</h2>
         <div className="side-pos" role="status">
           {activities.length === 0
             ? done ? "None found" : "Looking…"

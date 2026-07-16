@@ -37,6 +37,19 @@ type Screen = "root" | "box" | "pointer" | "zoom" | "motion" | "ink";
 
 const BORDER_COLORS = ["#ff0000", "#000000", "#0057ff", "#00a3a3", "#ffffff"];
 const FILL_COLORS = ["#ffcc00", "#ffff00", "#00e5ff", "#ff8a00", "#ffffff"];
+// Spoken names for the swatches: a screen reader announcing "#00a3a3" tells the user
+// nothing, least of all a low-vision user choosing a color they can distinguish.
+const COLOR_NAMES: Record<string, string> = {
+  "#ff0000": "Red",
+  "#000000": "Black",
+  "#0057ff": "Blue",
+  "#00a3a3": "Teal",
+  "#ffffff": "White",
+  "#ffcc00": "Amber",
+  "#ffff00": "Yellow",
+  "#00e5ff": "Cyan",
+  "#ff8a00": "Orange",
+};
 
 /* ---- primitives ------------------------------------------------------- */
 
@@ -152,7 +165,7 @@ const Swatches = ({
         key={c}
         role="radio"
         aria-checked={value === c}
-        aria-label={c}
+        aria-label={COLOR_NAMES[c] ?? c}
         style={{ backgroundColor: c }}
         className={value === c ? "ap-swatch sel" : "ap-swatch"}
         onClick={() => onChange(c)}

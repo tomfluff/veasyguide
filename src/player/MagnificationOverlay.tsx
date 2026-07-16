@@ -176,8 +176,14 @@ const MagnificationOverlay = (props: Props) => {
 
   // Only `transform` animates — see setZoom(). Animating transform-origin alongside it
   // (as the original did, at a different duration) is what made the motion jump.
+  // The transform IS motion (the frame slides and scales), so it is the one transition
+  // prefers-reduced-motion must kill — the zoom then lands as a static jump, per
+  // DESIGN.md's "static stronger state" fallback. The opacity crossfade above stays: a
+  // fade is not vestibular motion. Read per render, like the CSS media query it mirrors.
   const zoomTransitionPosition = {
-    transition: `transform ${animationSpeeds.transform}ms ease-in-out`,
+    transition: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "none"
+      : `transform ${animationSpeeds.transform}ms ease-in-out`,
   };
 
   return (

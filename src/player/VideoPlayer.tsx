@@ -491,6 +491,15 @@ const VideoPlayer = (props: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.src]);
 
+  // Opening the fullscreen moments overlay moves focus into it — without this a keyboard
+  // user opens a panel they then have to Tab hunt for (it is several stops away).
+  useEffect(() => {
+    if (!momentsOpen) return;
+    containerRef.current
+      ?.querySelector<HTMLElement>(".moments-side.overlay .side-row")
+      ?.focus();
+  }, [momentsOpen]);
+
   useEffect(() => {
     if (props.seekFnRef) {
       props.seekFnRef.current = (t: number) => {
@@ -935,6 +944,13 @@ const VideoPlayer = (props: Props) => {
       {isFullscreen && momentsOpen && (
         <MomentsSidebar
           className="overlay"
+          onEscape={() => {
+            handleMomentsOpen.close();
+            // Return focus to the toggle that opened it, like the Appearance popover does.
+            containerRef.current
+              ?.querySelector<HTMLButtonElement>('button[aria-label="Moments list"]')
+              ?.focus();
+          }}
           activities={props.activities}
           scenes={props.scenes}
           thumbs={props.thumbs ?? EMPTY_THUMBS}
