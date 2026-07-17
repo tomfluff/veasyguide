@@ -40,6 +40,7 @@ import {
   IconArrowBigLeftLineFilled,
   IconArrowBigRightLineFilled,
   IconZoom,
+  IconZoomInAreaFilled,
   IconSwitchHorizontal,
   IconPlayerTrackPrevFilled,
   IconPlayerTrackNextFilled,
@@ -153,6 +154,8 @@ const VideoPlayer = (props: Props) => {
   const chromeTimeRef = useRef(-1);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [previewJumped, setPreviewJumped] = useState(false);
+  // For the "Magnifier on · 1.7×" chip; same 1 + strength display the Appearance sheet uses.
+  const zoomStrength = useMagnificationSettingsStore((s) => s.zoom_strength);
   // Where the viewer was before we jumped them to a moment to preview against.
   const preAppearanceTimeRef = useRef<number | null>(null);
 
@@ -691,6 +694,14 @@ const VideoPlayer = (props: Props) => {
                 </>
               )}
             </Text>
+            {/* Mode state as persistent TEXT, not just the transient on-video icon: a
+                low-vision user cannot be asked to notice a subtle glyph to know what mode
+                their player is in. Lives in the status line they already anchor on. */}
+            {isZoomIn && (
+              <Text className="now-zoom">
+                Magnifier on · {(1 + zoomStrength).toFixed(1)}×
+              </Text>
+            )}
             {upcoming && nextIsKnown && (
               <Text className="now-next">
                 Next at <b>{convertSecondsToTimecode(upcoming.start)}</b>
@@ -782,6 +793,21 @@ const VideoPlayer = (props: Props) => {
             <Text>{convertSecondsToTimecode(totalTime)}</Text>
           </Group>
           {props.extraHud}
+          {/* The magnifier gets an on-screen toggle: it was keyboard-only (Z), which made
+              it unreachable on touch and its STATE invisible — the core user toggled it off
+              by accident and diagnosed a black screen for thirty seconds. aria-pressed and
+              the amber pressed style are the always-visible answer to "is it on?". */}
+          <UnstyledButton
+            className={classNames("collapse-hide", "zoom-toggle", { on: isZoomIn })}
+            onClick={() => { showControls(); handleZoom(); }}
+            onKeyDown={stopPlayerHotkeys}
+            aria-label={isZoomIn ? "Stop magnifying" : "Magnify the highlighted area"}
+            aria-pressed={isZoomIn}
+            aria-disabled={!isZoomIn && !stableActivity ? true : undefined}
+            title={isZoomIn ? "Stop magnifying (Z)" : "Magnify (Z)"}
+          >
+            <IconZoomInAreaFilled />
+          </UnstyledButton>
           <Popover
             position="top-end"
             withinPortal={false}

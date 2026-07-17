@@ -93,6 +93,24 @@
   outline-offset: 2px;
 }
 
+/* The magnifier toggle's ON state: amber, the same "this is the current one" accent the NOW
+   moment mark uses. A mode the core user keeps toggling must be readable at a glance, not
+   inferred from a subtle glyph on the video. */
+.video-controls-container .controls > button.zoom-toggle.on {
+  background: rgba(255, 194, 51, 0.18);
+  color: #ffc233;
+}
+.video-controls-container .controls > button[aria-disabled="true"] {
+  opacity: 0.45;
+}
+
+/* The mode chip in the now-line. Amber on the dark bar: 10.4:1. */
+.now-zoom {
+  color: #ffc233;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .video-controls-container .controls > button svg,
 .video-controls-container .controls > .volume-container > button svg {
   width: 22px;
