@@ -8,7 +8,7 @@
 // emitting scenes all along; this is the first thing that reads them.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Menu } from "@mantine/core";
-import { IconDownload } from "@tabler/icons-react";
+import { IconChevronDown, IconDownload } from "@tabler/icons-react";
 import type { Activity, Scene } from "./analyzer/types";
 import { convertSecondsToTimecode } from "./utils/misc";
 import { seekTargetFor, groupByScenes } from "./player/moments";
@@ -157,8 +157,14 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
         {onExport && done && activities.length > 0 && (
           <Menu position="bottom-end" classNames={{ dropdown: "side-save-pop" }}>
             <Menu.Target>
+              {/* Framed, and with a caret. A bare glyph read as decoration rather than a
+                  control, and a lone download icon promises a file on click — what happens
+                  is a menu. The border says pressable, the caret says something opens.
+                  Mantine already supplies aria-haspopup="menu" and aria-expanded, so the
+                  screen reader was never the one being misled; this is for the eyes. */}
               <button type="button" className="side-save" aria-label="Save a moments file or notes" title="Save…">
                 <IconDownload size={20} />
+                <IconChevronDown size={14} className="side-save-caret" />
               </button>
             </Menu.Target>
             <Menu.Dropdown>

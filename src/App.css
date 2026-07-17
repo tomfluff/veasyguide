@@ -373,7 +373,10 @@
    Accent text says "action", matching the top bar's Change video. */
 /* Parked in the header's top corner and taken out of the flow entirely: a 44px control on
    its own row pushed every moment down the scroll to advertise a once-per-lecture action.
-   Absolute, so the target stays finger-sized without the header growing to fit it. */
+   Absolute, so the target stays finger-sized without the header growing to fit it.
+   Bordered and carried on the card colour because a borderless glyph in a corner reads as
+   an ornament — the frame is what says "press this", and the caret says a menu opens
+   rather than a file downloading on the spot. */
 .side-save {
   position: absolute;
   top: 6px;
@@ -381,15 +384,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
+  gap: 1px;
+  min-width: 44px;
   height: 44px;
-  border: 0;
+  padding: 0 6px 0 8px;
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: none;
+  background: var(--card);
   color: var(--accent);
   cursor: pointer;
 }
-.side-save:hover { background: var(--hover); }
+.side-save:hover { background: var(--hover); border-color: var(--accent); }
+.side-save-caret { transition: transform 120ms ease; }
+/* Open state on the caret, driven by the aria Mantine already sets — the visual and the
+   announced state cannot drift apart if they read from the same attribute. */
+.side-save[aria-expanded="true"] .side-save-caret { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .side-save-caret { transition: none; }
+}
 .side-save:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 /* The menu explains the two files; the label is the choice, the line under it is why you
    would pick that one. Width is capped so the sentence wraps rather than the dropdown
