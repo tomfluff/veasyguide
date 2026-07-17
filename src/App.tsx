@@ -195,7 +195,8 @@ function Preparing({ stage, fileName, onCancel }: {
 
 export default function App() {
   // Lets debug UI (analyzer view, scene strip) seek the player's video element.
-  const seekFnRef = useRef<(t: number) => void>(() => {});
+  // `play` starts playback after the seek — moment navigation wants it, debug seeks don't.
+  const seekFnRef = useRef<(t: number, play?: boolean) => void>(() => {});
   const debugCanvasRef = useRef<HTMLCanvasElement>(null);
   const workerRef = useRef<Worker | null>(null);
   const snipRef = useRef<Worker | null>(null);
@@ -698,7 +699,7 @@ export default function App() {
           done={done}
           canPlay={canPlay}
           lead={params.highlightLead}
-          onJump={(t) => seekFnRef.current(t)}
+          onJump={(t) => seekFnRef.current(t, true)}
         />
         </div>
       )}

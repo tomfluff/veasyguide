@@ -63,6 +63,7 @@ import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
+import { useViewSettingsStore, setPlaybackRate, setAtMomentEnd, type MomentEndBehavior } from "../stores/ViewSettingsStore";
 
 import "./player.css";
 
@@ -156,6 +157,11 @@ const VideoPlayer = (props: Props) => {
   const [previewJumped, setPreviewJumped] = useState(false);
   // For the "Magnifier on · 1.7×" chip; same 1 + strength display the Appearance sheet uses.
   const zoomStrength = useMagnificationSettingsStore((s) => s.zoom_strength);
+  // Study pace: persisted playback rate + what happens at a moment's end (tempo engine).
+  const playbackRate = useViewSettingsStore((s) => s.playbackRate);
+  const atMomentEnd = useViewSettingsStore((s) => s.atMomentEnd);
+  const insideMomentRef = useRef<Activity | null>(null); // raw in-moment tracking (no lead/linger)
+  const tempoActedRef = useRef<number | null>(null); // moment id the tempo engine already acted on
   // Where the viewer was before we jumped them to a moment to preview against.
   const preAppearanceTimeRef = useRef<number | null>(null);
 
@@ -227,7 +233,23 @@ const VideoPlayer = (props: Props) => {
     // KeyboardEvent.code names ("BracketLeft"/"BracketRight"), which never match.
     ["[", () => handleStepMoment(-1)],
     ["]", () => handleStepMoment(1)],
+    // Shift+comma/period arrive as "<"/">" in event.key — but the Shift modifier must ALSO
+    // be declared, or Mantine rejects the match for having an undeclared modifier down.
+    ["shift+<", reveal(() => handleRateStep(-1))],
+    ["shift+>", reveal(() => handleRateStep(1))],
   ]);
+
+  // The rates every mainstream player offers, plus a study-slow 0.5. Stepping clamps at the
+  // ends rather than wrapping — "faster" must never surprise you with half speed. Reads the
+  // store, not the render closure: key-repeat outruns re-render, and N repeats from a stale
+  // value would all compute the same single step.
+  const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+  const handleRateStep = (dir: 1 | -1) => {
+    const cur = useViewSettingsStore.getState().playbackRate;
+    const i = RATES.findIndex((r) => r >= cur - 1e-6);
+    const at = i === -1 ? RATES.length - 1 : i;
+    setPlaybackRate(RATES[Math.min(RATES.length - 1, Math.max(0, at + dir))]);
+  };
 
   // Computed
   const totalTime = props.meta.duration;
@@ -325,6 +347,38 @@ const VideoPlayer = (props: Props) => {
     const jumped = Math.abs(t - prevTimeRef.current) > 1;
     prevTimeRef.current = t;
 
+    // The tempo engine: act ONCE when playback itself carries us across the end of the
+    // moment we were inside. Raw start/end, not the lead/linger-padded selection above —
+    // linger keeps a moment "selected" past its end, which is exactly the boundary this
+    // needs to see sharply. A user seek (jumped) resets the ledger so replaying a moment
+    // in pause mode waits again — replay is the whole point of that mode.
+    const video = videoRef.current;
+    const inside = props.activities.find((a) => t >= a.start && t <= a.end) ?? null;
+    const prevInside = insideMomentRef.current;
+    insideMomentRef.current = inside;
+    if (jumped) tempoActedRef.current = null;
+    else if (
+      video && !video.paused &&
+      atMomentEnd !== "continue" &&
+      prevInside && t >= prevInside.end &&
+      (!inside || inside.id !== prevInside.id) &&
+      tempoActedRef.current !== prevInside.id
+    ) {
+      tempoActedRef.current = prevInside.id;
+      if (atMomentEnd === "pause") {
+        video.pause();
+      } else {
+        // Skim: jump the gap to the next KNOWN moment's cue. Never backwards (an
+        // overlapping next moment has already begun), and never into unanalyzed video —
+        // the next moment by time may simply not exist yet.
+        const next = stepMoment(props.activities, t, props.selectOpts.lead, 1);
+        const target = next ? seekTargetFor(next, props.selectOpts.lead) : null;
+        if (next && target !== null && target > t && (props.done || isAnalyzed(props.ranges, next.start))) {
+          video.currentTime = target;
+        }
+      }
+    }
+
     // Track the scene by its START, not its id: scenes are a partition that re-derives when
     // analysis finds a new cut, and ids shift by one when a cut lands earlier in the video —
     // the id changing under a stationary playhead is not a scene change.
@@ -343,6 +397,12 @@ const VideoPlayer = (props: Props) => {
   };
   const updateAtTimeRef = useRef(updateAtTime);
   updateAtTimeRef.current = updateAtTime;
+
+  // The persisted rate survives reloads and new videos; the element resets to 1 whenever
+  // src changes, so re-apply on both.
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.playbackRate = playbackRate;
+  }, [playbackRate, props.src]);
 
   // Smooth tracking: requestVideoFrameCallback fires per presented frame (timeupdate
   // is only ~4 Hz). Falls back silently where rVFC is unavailable.
@@ -506,12 +566,18 @@ const VideoPlayer = (props: Props) => {
 
   useEffect(() => {
     if (props.seekFnRef) {
-      props.seekFnRef.current = (t: number) => {
-        if (videoRef.current) videoRef.current.currentTime = t;
+      // `play` is for moment navigation ("go watch this"): a jump that lands paused hands a
+      // blind user literal silence and costs everyone a second click. Debug callers (scene
+      // strip, analyzer view) omit it and keep their inspect-in-place behavior.
+      props.seekFnRef.current = (t: number, play?: boolean) => {
+        const v = videoRef.current;
+        if (!v) return;
+        v.currentTime = t;
+        if (play && props.canPlay) void v.play();
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.seekFnRef]);
+  }, [props.seekFnRef, props.canPlay]);
 
   const tooltipTime = timelineContainerRef.current
     ? (timelineX / (timelineContainerRef.current.clientWidth || 1)) * totalTime
@@ -657,7 +723,9 @@ const VideoPlayer = (props: Props) => {
                   onKeyDown={stopPlayerHotkeys}
                   onClick={() => {
                     const v = videoRef.current;
-                    if (v && props.canPlay) v.currentTime = seekTargetFor(m.activities[0], props.selectOpts.lead);
+                    if (!v || !props.canPlay) return;
+                    v.currentTime = seekTargetFor(m.activities[0], props.selectOpts.lead);
+                    void v.play(); // a jump is "go watch this" — landing paused costs a second click
                   }}
                 />
               );
@@ -792,6 +860,34 @@ const VideoPlayer = (props: Props) => {
             <Text>/</Text>
             <Text>{convertSecondsToTimecode(totalTime)}</Text>
           </Group>
+          {/* Native <select>s, not custom menus: keyboard and screen-reader behavior come
+              built in, and the bar is the one place a popup must never fight the video.
+              Speed is every player's missing-here control; Pace is the tempo engine —
+              the player already knows where every moment ends, so let it drive. */}
+          <label className="bar-select collapse-hide">
+            <span>Speed</span>
+            <select
+              value={String(playbackRate)}
+              onChange={(e) => setPlaybackRate(Number(e.target.value))}
+              onKeyDown={stopPlayerHotkeys}
+            >
+              {RATES.map((r) => (
+                <option key={r} value={String(r)}>{r}×</option>
+              ))}
+            </select>
+          </label>
+          <label className="bar-select collapse-hide">
+            <span>Pace</span>
+            <select
+              value={atMomentEnd}
+              onChange={(e) => setAtMomentEnd(e.target.value as MomentEndBehavior)}
+              onKeyDown={stopPlayerHotkeys}
+            >
+              <option value="continue">Continuous</option>
+              <option value="pause">Pause after each moment</option>
+              <option value="skip">Skip to next moment</option>
+            </select>
+          </label>
           {props.extraHud}
           {/* The magnifier gets an on-screen toggle: it was keyboard-only (Z), which made
               it unreachable on touch and its STATE invisible — the core user toggled it off
@@ -993,7 +1089,9 @@ const VideoPlayer = (props: Props) => {
           lead={props.selectOpts.lead}
           onJump={(t) => {
             const v = videoRef.current;
-            if (v && props.canPlay) v.currentTime = t;
+            if (!v || !props.canPlay) return;
+            v.currentTime = t;
+            void v.play();
           }}
           style={{ bottom: barHeight + 24, maxHeight: `calc(100% - ${barHeight + 48}px)` }}
         />

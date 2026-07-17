@@ -11,6 +11,7 @@ const KEYS: [string, string][] = [
   ["Space", "Play / pause"],
   ["← / →", "Back / forward 5 seconds"],
   ["[ / ]", "Previous / next moment"],
+  ["< / >", "Slower / faster playback"],
   ["Z", "Toggle magnification"],
   ["↑ / ↓", "Zoom in / out"],
   ["M", "Mute"],

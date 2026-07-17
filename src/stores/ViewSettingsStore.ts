@@ -7,12 +7,20 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+// What the player does when a moment's end is reached during playback (the tempo engine):
+// continue = a normal player; pause = wait for the viewer (the low-vision "don't outrun me"
+// and the blind "play me what she said, then stop"); skip = jump the gap to the next
+// moment's cue (the crammer's skim — 67% of a measured lecture is moment-free dead air).
+export type MomentEndBehavior = "continue" | "pause" | "skip";
+
 export type TViewSettings = {
   groupByScene: boolean;
+  playbackRate: number;
+  atMomentEnd: MomentEndBehavior;
 };
 
 export const useViewSettingsStore = create<TViewSettings>()(
-  persist(() => ({ groupByScene: true }), {
+  persist(() => ({ groupByScene: true, playbackRate: 1, atMomentEnd: "continue" as MomentEndBehavior }), {
     name: "view-settings",
     storage: createJSONStorage(() => localStorage),
   })
@@ -20,3 +28,9 @@ export const useViewSettingsStore = create<TViewSettings>()(
 
 export const setGroupByScene = (groupByScene: boolean) =>
   useViewSettingsStore.setState({ groupByScene });
+
+export const setPlaybackRate = (playbackRate: number) =>
+  useViewSettingsStore.setState({ playbackRate });
+
+export const setAtMomentEnd = (atMomentEnd: MomentEndBehavior) =>
+  useViewSettingsStore.setState({ atMomentEnd });

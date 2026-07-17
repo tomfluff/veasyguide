@@ -111,6 +111,31 @@
   white-space: nowrap;
 }
 
+/* Speed / Pace: native selects dressed for the always-dark bar. color-scheme: dark keeps
+   the UA-rendered popup list from flashing white over the player. */
+.bar-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--d-muted);
+  font-size: 0.9375rem;
+}
+.bar-select select {
+  font: inherit;
+  color: var(--d-text);
+  background: #1b2029;
+  border: 1px solid var(--d-line);
+  border-radius: var(--r-sm);
+  min-height: 44px; /* same target floor as the bar's buttons */
+  padding: 2px 6px;
+  color-scheme: dark;
+  cursor: pointer;
+}
+.bar-select select:focus-visible {
+  outline: 3px solid var(--brand-300);
+  outline-offset: 2px;
+}
+
 .video-controls-container .controls > button svg,
 .video-controls-container .controls > .volume-container > button svg {
   width: 22px;
