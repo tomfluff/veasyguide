@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Activity, AnalysisMeta, AnalysisParams } from "./analyzer/types";
 import { cropRect, snippetTimestamps } from "./analyzer/snippets";
-import type { SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
+import type { SnippetInMsg, SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
 
 type Props = {
   activitiesRef: React.RefObject<Activity[]>;
@@ -71,16 +71,24 @@ export default function ActivityGallery(props: Props) {
           next.set(m.activityId, seq);
           return next;
         });
-      } else if (m.type === "progress") {
-        setProgress({ done: m.done, total: m.total });
-      } else if (m.type === "done") {
+        // Counted here because the worker has no progress message and never had one: the
+        // readout was wired to a `progress` type that does not exist, so it sat at 0/N for
+        // the whole run. One arrived crop is one frame done.
+        setProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+      } else if (m.type === "batchDone") {
         setProgress(null);
         setStats({ count: m.count, bytes: m.bytes, wallMs: m.wallMs });
       } else if (m.type === "error") {
         setProgress(null);
       }
     };
-    worker.postMessage({ type: "start", file: props.file, reqs });
+    // Typed, because an untyped postMessage is what broke this: the worker speaks
+    // open/batch and this posted {type:"start"}, which matched no branch and was dropped in
+    // silence — the gallery has been asking for snippets nobody was listening for. TS could
+    // not see it because postMessage takes `any`. Through `send` the compiler checks it.
+    const send = (m: SnippetInMsg) => worker.postMessage(m);
+    send({ type: "open", file: props.file });
+    send({ type: "batch", reqs });
     workerRef.current = worker;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snippets, props.analysisDone]);

@@ -8,7 +8,7 @@
 // the FILE the creator hosts is a few kilobytes of coordinates; the video itself still
 // never moves (decisions D1/D2, proposals-parked.md).
 
-import type { Activity, AnalysisMeta, AnalysisParams, Box, Range, Scene } from "./types";
+import type { Activity, AnalysisMeta, AnalysisParams, Box, Scene } from "./types";
 import { momentDescription } from "../player/describe";
 import { convertSecondsToTimecode } from "../utils/misc";
 

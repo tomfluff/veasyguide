@@ -748,3 +748,43 @@ silently changes how the whole lecture plays — the exact bug the visible-magni
 already fixed once ("keyboard-only, state invisible"). At 1× it is a bare icon; off-default
 it goes amber with the rate, the same state language as the magnifier toggle and the NOW
 mark.
+
+---
+
+## D25 — The typecheck was checking nothing, and it was hiding a dead feature
+
+**What was wrong.** The root `tsconfig.json` is solution-style (`"files": []` plus
+references), so `tsc --noEmit` against it checks **zero files**; only `tsc -b` follows
+project references. `npm run build` (`tsc -b && vite build`) had been exiting 2 on 11
+pre-existing errors, so the build script was red and the errors sat unread.
+
+**The real bug it was hiding.** `ActivityGallery` posted `{type:"start", file, reqs}` to the
+snippet worker, which only handles `open` and `batch`. The message matched no branch and was
+dropped in silence: the research gallery has been generating **zero** snippets. It also
+listened for `progress` and `done`, neither of which exists — the worker sends `batchDone` —
+so its readout sat at "generating snippets… 0/599 frames" forever and its stats line could
+never render. Measured before/after on a 170 s clip: 0 → 749 crops, and the frozen counter
+became "599 crops · 1.8 MB in memory · 3.6s".
+
+**Why TypeScript could not save us.** `Worker.postMessage` takes `any`. The outbound half of
+the protocol was typed (`MessageEvent<SnippetOutMsg>`) and duly produced 7 errors narrowing
+to `never` — the inbound half was not, so the `start`/`open` drift was invisible. The
+gallery now sends through `const send = (m: SnippetInMsg) => worker.postMessage(m)`, which
+is the whole fix: a typed door the compiler can watch.
+
+**Ordering moved into the worker.** `open` must precede `batch`, and that was the caller's
+job by convention — a contract no caller can keep, because there is no ack to wait for. An
+`async` onmessage does not serialize: `batch`'s handler starts the moment `open`'s first
+await yields. App.tsx got away with it only because its two posts sit in different effects
+with real time between them. The worker now chains messages through a promise, so the order
+holds for every caller.
+
+**The other three.** `momentsFile.ts` imported `Range` unused. `App.tsx` (×2) hit the same
+narrowing wall documented in D23: `parseMomentsFile`'s union discriminates on `error:
+string`, and a non-literal type cannot narrow it, so `parsed.file` stays possibly-undefined
+however you check — destructuring narrows. `ViewSettingsStore` inferred `groupByScene: true`
+as the literal `true`, so the persist initializer never type-checked against
+`TViewSettings`; it is annotated now.
+
+**Result.** `tsc -b` reports 0 errors and `npm run build` exits 0, for the first time on
+this branch. Use `tsc -b`, never `tsc --noEmit`, in this repo.

@@ -44,13 +44,21 @@ let frameCtx: OffscreenCanvasRenderingContext2D | null = null;
 // Budget is cumulative across batches, not per batch — it caps what we hold, not what we do.
 let totalBytes = 0;
 
-self.onmessage = async (e: MessageEvent<SnippetInMsg>) => {
-  try {
-    if (e.data.type === "open") await open(e.data.file);
-    else if (e.data.type === "batch") await run(e.data.reqs);
-  } catch (err) {
-    post({ type: "error", message: err instanceof Error ? err.message : String(err) });
-  }
+// Handled strictly in order, one at a time. An `async` onmessage does NOT serialize by
+// itself: the handler for a `batch` starts the moment `open`'s first await yields, so `run`
+// sees a null sink and throws "got a batch before the file". This used to be the caller's
+// job by convention ("the caller serializes them"), which is a contract a caller cannot
+// keep — there is no ack to wait for. Chaining puts it where it can actually be enforced.
+let chain: Promise<void> = Promise.resolve();
+self.onmessage = (e: MessageEvent<SnippetInMsg>) => {
+  chain = chain.then(async () => {
+    try {
+      if (e.data.type === "open") await open(e.data.file);
+      else if (e.data.type === "batch") await run(e.data.reqs);
+    } catch (err) {
+      post({ type: "error", message: err instanceof Error ? err.message : String(err) });
+    }
+  });
 };
 
 async function open(file: File) {
@@ -67,7 +75,7 @@ async function run(reqs: SnippetReq[]) {
     post({ type: "batchDone", count: 0, bytes: 0, wallMs: 0 });
     return;
   }
-  // A batch can only arrive after `open` — the caller serializes them.
+  // A batch can only arrive after `open` — the message chain above guarantees the order.
   if (!sink || !frame || !frameCtx) throw new Error("Snippet worker got a batch before the file");
 
   // Sort by time and group requests that share a timestamp: one decoded frame can

@@ -479,16 +479,19 @@ export default function App() {
       return;
     }
     void sidecar.text().then((text) => {
-      const parsed = parseMomentsFile(text);
+      // Destructured for the same reason as the sidecar-only path above: the union
+      // discriminates on `error: string`, and a non-literal type cannot narrow it, so
+      // `parsed.file` stays `MomentsFile | undefined` no matter what you check.
+      const { file: sidecarFile, error } = parseMomentsFile(text);
       // setNotice AFTER loadFile: analyze()'s reset clears it, and this message is the
       // reason the viewer is watching an analysis they expected to skip. State updates in
       // one handler apply in call order, so the note survives the reset.
-      if (parsed.error) {
+      if (error || !sidecarFile) {
         loadFile(video);
-        setNotice(`${parsed.error} Analyzing the video fresh instead.`);
+        setNotice(`${error ?? "That moments file couldn't be read."} Analyzing the video fresh instead.`);
         return;
       }
-      if (!sidecarMatchesFile(parsed.file, video.size)) {
+      if (!sidecarMatchesFile(sidecarFile, video.size)) {
         loadFile(video);
         setNotice("That moments file belongs to a different video (the sizes don't match). Analyzing fresh instead.");
         return;
@@ -506,7 +509,7 @@ export default function App() {
       setCurrentTime(0);
       setFileName(video.name);
       setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(video); });
-      hydrateFrom(parsed.file);
+      hydrateFrom(sidecarFile);
     });
   }
 

@@ -23,11 +23,14 @@ export type TViewSettings = {
 
 export const useViewSettingsStore = create<TViewSettings>()(
   persist(
-    () => ({
+    // Annotated, not inferred: `groupByScene: true` infers the literal type `true`, not
+    // `boolean`, so the initializer silently failed to match TViewSettings and the whole
+    // persist call went unchecked against the type it claims to build.
+    (): TViewSettings => ({
       groupByScene: true,
       playbackRate: 1,
-      pinSize: "m" as PinSize,
-      pinCorner: "tr" as PinCorner,
+      pinSize: "m",
+      pinCorner: "tr",
     }),
     {
       name: "view-settings",
