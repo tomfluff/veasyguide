@@ -94,9 +94,10 @@ export default function About({
       <h3>Moments files</h3>
       <p>
         When analysis finishes, the sidebar can save a small <b>.veasyguide.json</b> moments
-        file. Load it together with the same video later — or hand it to a classmate — and
-        playback starts instantly, no re-analysis. Finished analyses are also remembered on
-        this device. Either way the file holds timestamps and coordinates, never the video;
+        file. Drop it in with the same video later — or hand it to a classmate — and playback
+        starts instantly, no re-analysis. If a video is already open you can drop the file on
+        its own, even mid-analysis, and it takes over. Finished analyses are also remembered
+        on this device. Either way the file holds timestamps and coordinates, never the video;
         there's a Markdown export too, for notes.
       </p>
 

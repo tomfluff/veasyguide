@@ -98,6 +98,63 @@
 }
 .about::backdrop { background: rgba(15, 18, 25, 0.55); }
 
+/* The sidecar confirm. Same dialog furniture as .about — one modal look in the app. */
+.confirm {
+  width: min(30rem, calc(100vw - 32px));
+  padding: 26px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgba(15, 18, 25, 0.28);
+}
+.confirm::backdrop { background: rgba(15, 18, 25, 0.55); }
+.confirm h2 { margin: 0 0 10px; font-size: 1.25rem; }
+.confirm p { margin: 0 0 10px; }
+.confirm-cost { color: var(--muted); font-size: 0.9375rem; }
+.confirm-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.confirm-row button {
+  min-height: 44px;
+  padding: 0 1rem;
+  border-radius: var(--r-md);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.confirm-no { border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.confirm-no:hover { background: var(--hover); }
+.confirm-yes { border: 1px solid transparent; background: var(--accent); color: var(--card); }
+.confirm-yes:hover { filter: brightness(1.08); }
+.confirm-row button:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
+
+/* Drag-over veil: the whole screen is the target, and it says which files mean something.
+   z-index clears the player chrome (control bar 50) — a target you can drop THROUGH is a
+   target that loses the file to the browser's own navigation. */
+.drop-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 18, 25, 0.7);
+}
+.drop-veil-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px 30px;
+  border: 2px dashed var(--brand-300);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  color: var(--ink);
+  text-align: center;
+  /* The card must never eat the drop: the veil owns every pointer/drag event so that
+     dragleave fires once, on leaving the window, not on crossing into this box. */
+  pointer-events: none;
+}
+.drop-veil-card b { font-size: 1.125rem; }
+
 .about-x {
   position: absolute;
   top: 14px; right: 14px;

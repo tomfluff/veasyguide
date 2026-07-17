@@ -671,3 +671,42 @@ anyway.
 **Trust boundary.** `params` is read as `f.params?.minDuration ?? 0` — `parseMomentsFile`
 does not require the field, so a hand-edited sidecar must not crash the export it is being
 read for (D18).
+
+---
+
+## D23 — A moments file can arrive at any time, and it asks before it lands
+
+**Decision.** Drop a `.veasyguide.json` on its own, onto a video that is already open — even
+one mid-analysis — and it takes over after a confirm. The video element, the file and the
+viewer's playhead are untouched; only the analysis is replaced (`applySidecar`, which is
+`hydrateFrom` plus the same reset the drop-both path does, minus everything about the
+video). The whole player screen becomes a drop target while a file is over it.
+
+**Why.** Before this, `loadFiles` was wired only to `<Landing>`, which unmounts the moment a
+video loads — so there was no drop target at all on the player screen, and a dropped file
+made the browser navigate away, losing the analysis outright (the same bug the Landing zone
+was written to fix, on the screen with more to lose). A sidecar alone was answered with
+"drop it together with its video", which asked a viewer who had just realised a classmate
+sent them the file to throw away what they were watching in order to save time. Nobody
+takes that trade. The common case IS mid-analysis: that is when the file is worth most.
+
+**Why confirm.** Applying discards an analysis the viewer may have waited twenty minutes
+for. Cancel is autofocused and is what Esc and the backdrop both do — the risk is
+destroying that work with a stray Enter, not the cost of one more click. The wording names
+the actual cost, which differs by state: mid-analysis you stop waiting; finished, you
+replace a complete run.
+
+**The veil is the drop target, not the shell.** `dragleave` on a container fires every time
+the pointer crosses a child boundary, so the flag would flicker. A veil covering everything
+is the one element whose `dragleave` means "actually left"; its card is
+`pointer-events: none` for the same reason.
+
+**A native `<dialog>`**, like About: `showModal()` brings focus trapping, Esc and a backdrop.
+A confirm that can be tabbed behind is worse than no confirm.
+
+**Caught in review.** The dialog first counted `activities.filter(isValid)` and said "26
+moments" where the sidebar showed 20 — the same drift D22 had just fixed in the notes
+export, reintroduced within the hour. It now calls `validActivities`, which is the one place
+that owns the rule. A confirm that misstates what you are about to get is worse than none.
+The mismatch notice says "Nothing changed" rather than naming a state ("still analyzing")
+that is wrong half the time it fires.

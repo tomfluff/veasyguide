@@ -13,6 +13,7 @@ import Landing from "./Landing";
 import { TopBar, Footer } from "./Shell";
 import { feedbackMailto } from "./feedback";
 import About from "./About";
+import ConfirmSidecar from "./ConfirmSidecar";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
 
@@ -250,6 +251,13 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  // A parsed, matched sidecar waiting for the viewer's yes. Held rather than applied because
+  // applying throws away an analysis they may have been waiting on for twenty minutes.
+  const [pendingSidecar, setPendingSidecar] = useState<MomentsFile | null>(null);
+  // Dragging a file anywhere over the player screen. The veil it raises is also the drop
+  // target: dragleave on the shell fires every time the pointer crosses a child boundary, so
+  // a veil that covers everything is the one element whose dragleave means "actually left".
+  const [dragging, setDragging] = useState(false);
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -416,6 +424,21 @@ export default function App() {
   }
 
   // The landing hands over everything dropped at once: a video, or a video plus its
+  // Swap a finished analysis in under the video that is already playing. The video element,
+  // the viewer's position and the file itself are untouched — only the analysis is replaced,
+  // which is the whole difference between this and the drop-both path below.
+  function applySidecar(f: MomentsFile) {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    framesRef.current = [];
+    framesBytesRef.current = 0;
+    snipDoneRef.current = new Set();
+    setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
+    setXRealtime(0); setFramesCount(0); setViewIdx(-1);
+    setError(null); setErrorDismissed(false); setCurrMoment(null);
+    hydrateFrom(f);
+  }
+
   // .veasyguide.json moments sidecar (analyze once, share the file — see momentsFile.ts).
   // A sidecar that fails any check degrades to a normal analysis with the reason shown;
   // a wrong file must never mean a broken player.
@@ -423,7 +446,28 @@ export default function App() {
     const video = files.find((f) => f.type.startsWith("video/") || /\.(mp4|webm|mkv)$/i.test(f.name));
     const sidecar = files.find((f) => /\.json$/i.test(f.name));
     if (!video) {
-      if (sidecar) setError("That's a moments file. Drop it together with its video — the file holds coordinates, not the lecture.");
+      if (!sidecar) return;
+      // A sidecar alone, with a video already open: the common case is realising mid-analysis
+      // that a classmate sent you the file. Requiring the video to be re-dropped alongside it
+      // asked the viewer to throw away what they were watching to save time, which is not a
+      // trade anyone would take. It applies to what is already loaded instead — after a
+      // confirm, because it discards an analysis the viewer may have waited on.
+      const current = fileRef.current;
+      if (!current) {
+        setError("That's a moments file. Drop it together with its video — the file holds coordinates, not the lecture.");
+        return;
+      }
+      void sidecar.text().then((text) => {
+        const parsed = parseMomentsFile(text);
+        if (parsed.error) return setNotice(parsed.error);
+        if (!sidecarMatchesFile(parsed.file, current.size)) {
+          // "Nothing changed", not "still analyzing": this fires whether the analysis is
+          // running or long finished, and a message that names the wrong state is its own
+          // small lie. What the viewer needs to know is that their analysis survived.
+          return setNotice("That moments file belongs to a different video (the sizes don't match). Nothing changed.");
+        }
+        setPendingSidecar(parsed.file);
+      });
       return;
     }
     if (!sidecar) {
@@ -648,8 +692,15 @@ export default function App() {
     done,
   });
 
+  const canDrop = !!videoUrl && !fatal;
+
   return (
-    <div className="shell">
+    <div
+      className="shell"
+      // Only once a video is up: before that the Landing's own zone owns dropping, and two
+      // overlapping drop targets is how a file ends up loaded twice.
+      onDragOver={canDrop ? (e) => { e.preventDefault(); setDragging(true); } : undefined}
+    >
       <TopBar
         file={videoUrl && !fatal ? fileName : null}
         status={chip}
@@ -657,6 +708,33 @@ export default function App() {
         onChangeVideo={reset}
       />
       <About open={aboutOpen} onClose={() => setAboutOpen(false)} feedbackHref={feedbackHref} />
+      {/* Drag a file over the player and the whole screen becomes the target. Without this
+          the browser navigates away to the dropped file, losing the analysis outright —
+          the same bug the Landing zone was written to fix, on the screen where there is
+          more to lose. */}
+      {canDrop && dragging && (
+        <div
+          className="drop-veil"
+          onDragOver={(e) => e.preventDefault()}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (e.dataTransfer.files.length > 0) loadFiles([...e.dataTransfer.files]);
+          }}
+        >
+          <div className="drop-veil-card">
+            <b>Drop to load</b>
+            <span>A <b>.veasyguide.json</b> moments file to skip the wait, or another video.</span>
+          </div>
+        </div>
+      )}
+      <ConfirmSidecar
+        file={pendingSidecar}
+        analyzing={!done}
+        onCancel={() => setPendingSidecar(null)}
+        onConfirm={() => { if (pendingSidecar) applySidecar(pendingSidecar); setPendingSidecar(null); }}
+      />
       {/* The page grows a right-hand column once a video is up; before that the narrow
           reading width is right for the drop zone. */}
       <main className={videoUrl && !fatal ? "app with-side" : "app"}>
