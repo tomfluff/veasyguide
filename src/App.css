@@ -311,6 +311,31 @@
 /* List / By scene. A segmented pair, not a checkbox: both arrangements are named, so the one
    you are NOT in is legible as a place to go rather than a state to infer. Compact on purpose:
    panel chrome is rem-sized and browser zoom (the magnification path) grows it with the page. */
+/* The two exports, styled like the arrange toggle below them: quiet chrome, not content.
+   Accent text says "action", matching the top bar's Change video. */
+.side-export {
+  display: flex;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.side-export button {
+  flex: 1;
+  min-height: 2rem;
+  border: 0;
+  background: var(--card);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.side-export button + button { border-left: 1px solid var(--line); }
+.side-export button:hover { background: var(--hover); }
+.side-export button:focus-visible { outline: 3px solid var(--ring); outline-offset: -3px; }
+.moments-side.overlay .side-export { display: none; }
+
 .side-view {
   display: flex;
   margin-top: 6px;

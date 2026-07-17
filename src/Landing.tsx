@@ -7,15 +7,15 @@
 import { useRef, useState } from "react";
 import { IconLock, IconUpload } from "@tabler/icons-react";
 
-export default function Landing({ onFile, error }: { onFile: (f: File) => void; error?: string | null }) {
+export default function Landing({ onFiles, error }: { onFiles: (fs: File[]) => void; error?: string | null }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
 
   // The zone said "Drop a lecture video here" and only ever handled a click — dropping one did
   // nothing except make the browser navigate away to the file. These handlers are what make the
   // sentence true.
-  const take = (f: File | undefined) => {
-    if (f) onFile(f);
+  const take = (fs: FileList | null | undefined) => {
+    if (fs && fs.length > 0) onFiles([...fs]);
   };
 
   return (
@@ -28,7 +28,7 @@ export default function Landing({ onFile, error }: { onFile: (f: File) => void; 
 
       {error && (
         <div className="landing-error" role="alert">
-          <b>That video didn't work.</b> {error}
+          <b>That didn't work.</b> {error}
         </div>
       )}
 
@@ -41,20 +41,25 @@ export default function Landing({ onFile, error }: { onFile: (f: File) => void; 
         onDrop={(e) => {
           e.preventDefault();
           setOver(false);
-          take(e.dataTransfer.files[0]);
+          take(e.dataTransfer.files);
         }}
       >
         <IconUpload size={24} />
         <span className="drop-h">Drop a lecture video here</span>
-        <small>MP4, WebM or MKV — playback starts in seconds while analysis keeps running</small>
+        <small>
+          MP4, WebM or MKV — playback starts in seconds while analysis keeps running.
+          Have a <b>.veasyguide.json</b> moments file for it? Drop both together and skip
+          the analysis.
+        </small>
         <span className="drop-btn">Choose a file</span>
       </button>
       <input
         ref={inputRef}
         type="file"
-        accept="video/*"
+        accept="video/*,.json"
+        multiple
         hidden
-        onChange={(e) => take(e.target.files?.[0])}
+        onChange={(e) => take(e.target.files)}
       />
 
       <div className="privacy">

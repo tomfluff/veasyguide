@@ -526,3 +526,32 @@ no-account, offline-first promises. The instructor's biggest ask (parked-pen det
 deliberately NOT here: it is analyzer research with false-positive risk against the app's
 "never highlight the wrong thing" promise, and it is parked with a cost estimate rather
 than rushed.
+
+---
+
+## D18 — The moments file: one serialization, three consumers
+
+**Decision.** A finished analysis serializes to a single JSON shape (`momentsFile.ts`,
+`format: "veasyguide-moments"`, versioned): video identity (size + duration + frame size —
+rename-proof; the name is carried for humans, never matched on), analyzer params, meta,
+webcam zone, scenes, activities. It is consumed three ways: an IndexedDB cache keyed by
+that identity (reopening a video restores instantly; newest 20 kept), an exportable /
+importable sidecar (drop video + `.veasyguide.json` together on the landing to skip
+analysis), and a Markdown export (scene-grouped, worded, timestamped moments with gaps
+≥ 15 s called out).
+
+**Why.** Four of five deliberation personas independently asked for some face of this:
+no-cache re-analysis burned every reopen (~25 min for a 90-minute lecture, times 300
+students for an instructor), and the analysis data had no accessible artifact. The sidecar
+is the architecture-honest redesign of the parked "paste a link / embed" proposal: what the
+creator hosts is a few kilobytes of coordinates; the video never moves (D1/D2 intact).
+
+**Trust boundary.** A sidecar is an untrusted file from a forum. Parsing returns human
+error STRINGS, not exceptions; a wrong or corrupt file degrades to a normal fresh analysis
+with the reason shown in a dismissible strip — a bad import must never mean a broken player.
+Matching is by file size at import (cheap, pre-demux); an explicit Re-analyze bypasses the
+cache and overwrites it, so debug parameter runs stay fresh.
+
+**Rejected.** localStorage (5–10 MB quota vs multi-MB activity lists); hashing file bytes
+for identity (reading a 2 GB file to fingerprint it costs the time the cache exists to
+save); CSV export (the JSON is the machine-readable form; Markdown is the human one).

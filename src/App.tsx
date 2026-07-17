@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Range, type Scene, type WorkerMsg } from "./analyzer/types";
 import { coverage, isAnalyzed } from "./analyzer/ranges";
 import { validActivities } from "./analyzer/select";
+import { buildMomentsFile, keyOf, momentsMarkdown, parseMomentsFile, sidecarMatchesFile, videoKey, type MomentsFile } from "./analyzer/momentsFile";
+import { cacheGet, cachePut } from "./utils/analysisCache";
 import { thumbRect } from "./analyzer/snippets";
 import { convertSecondsToTimecode } from "./utils/misc";
 import type { SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
@@ -209,6 +211,9 @@ export default function App() {
   const followRef = useRef(true); // scrubber follows the analysis frontier until user scrubs
   const lastDrawRef = useRef(0);
   const fileRef = useRef<File | null>(null);
+  // The finished analysis, serialized (momentsFile.ts): what the export buttons save and
+  // what the cache stored. Set on done / cache hit / sidecar import; null while analyzing.
+  const momentsFileRef = useRef<MomentsFile | null>(null);
 
   const [params, setParams] = useState<AnalysisParams>(DEFAULT_PARAMS);
   const [showParams, setShowParams] = useState(false);
@@ -239,6 +244,10 @@ export default function App() {
   const [currMoment, setCurrMoment] = useState<Activity | null>(null);
   const [thumbs, setThumbs] = useState<ReadonlyMap<number, string>>(new Map());
   const [errorDismissed, setErrorDismissed] = useState(false);
+  // A non-fatal, human note about the CURRENT load (e.g. "that sidecar didn't match, so
+  // this is a fresh analysis"). The error state can't carry it: errors either replace the
+  // landing (fatal) or mean a stopped analysis (partial) — this is neither.
+  const [notice, setNotice] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -263,7 +272,29 @@ export default function App() {
 
   const canPlay = done || analyzedUpTo >= PLAYBACK_LEAD;
 
-  function analyze(file: File, p: AnalysisParams, cap = captureRef.current) {
+  // Everything a finished analysis IS, in one place: the state a fresh worker run fills in,
+  // and the same state a cache hit or an imported sidecar fills in without one.
+  function hydrateFrom(f: MomentsFile) {
+    activitiesRef.current = [...f.activities].sort((a, b) => a.start - b.start);
+    setActivityCount(f.activities.length);
+    setValidCount(f.activities.filter((a) => a.isValid).length);
+    setScenes(f.scenes);
+    setRanges([{ start: 0, end: f.meta.duration }]);
+    setWebcam((old) => {
+      if (old?.url) URL.revokeObjectURL(old.url);
+      return { zone: f.webcam, wallMs: 0, sampled: 0, url: null };
+    });
+    setMeta(f.meta);
+    setStage(null);
+    setDone(true);
+    setAnalyzedUpTo(Infinity);
+    setOpenClusters(0);
+    momentsFileRef.current = f;
+  }
+
+  // `allowCache`: initial loads may restore a finished analysis; an explicit Re-analyze
+  // must not — its whole point is fresh results (it overwrites the cache when done).
+  function analyze(file: File, p: AnalysisParams, cap = captureRef.current, allowCache = true) {
     workerRef.current?.terminate();
     captureRef.current = cap;
     fileRef.current = file;
@@ -271,14 +302,22 @@ export default function App() {
     framesRef.current = [];
     framesBytesRef.current = 0;
     followRef.current = true;
+    momentsFileRef.current = null;
     setMeta(null); setAnalyzedUpTo(0); setXRealtime(0); setActivityCount(0); setValidCount(0);
     setDone(false); setError(null); setOpenClusters(0);
     setFramesCount(0); setViewIdx(-1); setScenes([]); setRanges([]);
     setWebcam((old) => { if (old?.url) URL.revokeObjectURL(old.url); return null; });
     setCurrMoment(null);
     setErrorDismissed(false);
+    setNotice(null);
     setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
     setStage("Getting ready…");
+
+    // Per-run captures for the moments file: the done handler needs meta/scenes/webcam, and
+    // the state values it closes over would be stale.
+    let runMeta: AnalysisMeta | null = null;
+    let runScenes: Scene[] = [];
+    let runWebcam: Box | null = null;
 
     const worker = new Worker(new URL("./analyzer/worker.ts", import.meta.url), { type: "module" });
     // Without these, a worker that fails to load or throws outside our try/catch dies
@@ -294,7 +333,23 @@ export default function App() {
     worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
       const m = e.data;
       if (m.type === "status") setStage(m.stage);
-      else if (m.type === "meta") { setStage(null); setMeta(m.meta); }
+      else if (m.type === "meta") {
+        setStage(null); setMeta(m.meta);
+        runMeta = m.meta;
+        // Now the video's identity is known (size + duration + frame size) — if a finished
+        // analysis of this exact video is cached, restore it and stop the worker. Async:
+        // the worker keeps going while IndexedDB answers; a stale hit is ignored if another
+        // run has replaced this worker meanwhile.
+        if (allowCache) {
+          const key = videoKey(file.size, m.meta.duration, m.meta.videoWidth, m.meta.videoHeight);
+          void cacheGet(key).then((hit) => {
+            if (!hit || workerRef.current !== worker) return;
+            worker.terminate();
+            workerRef.current = null;
+            hydrateFrom(hit);
+          });
+        }
+      }
       else if (m.type === "activity") {
         // Insert in start order. Segments emit chronologically, but a backfill segment
         // (started by a seek) emits earlier moments after later ones — and everything
@@ -305,9 +360,10 @@ export default function App() {
         list.splice(i, 0, m.activity);
         setActivityCount((c) => c + 1);
         if (m.activity.isValid) setValidCount((c) => c + 1);
-      } else if (m.type === "scenes") { setScenes(m.scenes); }
+      } else if (m.type === "scenes") { setScenes(m.scenes); runScenes = m.scenes; }
       else if (m.type === "webcam") {
         const blob = m.blob;
+        runWebcam = m.zone;
         setWebcam((old) => {
           if (old?.url) URL.revokeObjectURL(old.url);
           return { zone: m.zone, wallMs: m.wallMs, sampled: m.sampled, url: blob ? URL.createObjectURL(blob) : null };
@@ -323,6 +379,16 @@ export default function App() {
           wallMs: m.wallMs, xRealtime: m.xRealtime, capture: cap, width: p.analysisWidth,
           label: `${cap ? "debug frames" : "no capture"} @ ${p.analysisWidth}px`,
         }]);
+        // Persist the finished analysis: the export buttons read it, and the cache makes
+        // the next open of this video instant. Freshest run wins the cache slot.
+        if (runMeta) {
+          const mf = buildMomentsFile({
+            fileName: file.name, fileSize: file.size, params: p, meta: runMeta,
+            webcam: runWebcam, scenes: runScenes, activities: [...activitiesRef.current],
+          });
+          momentsFileRef.current = mf;
+          void cachePut(keyOf(mf), mf);
+        }
       }
       else if (m.type === "error") { setError(m.message); setStage(null); }
       else if (m.type === "debugFrame") {
@@ -349,8 +415,72 @@ export default function App() {
     analyze(file, params);
   }
 
+  // The landing hands over everything dropped at once: a video, or a video plus its
+  // .veasyguide.json moments sidecar (analyze once, share the file — see momentsFile.ts).
+  // A sidecar that fails any check degrades to a normal analysis with the reason shown;
+  // a wrong file must never mean a broken player.
+  function loadFiles(files: File[]) {
+    const video = files.find((f) => f.type.startsWith("video/") || /\.(mp4|webm|mkv)$/i.test(f.name));
+    const sidecar = files.find((f) => /\.json$/i.test(f.name));
+    if (!video) {
+      if (sidecar) setError("That's a moments file. Drop it together with its video — the file holds coordinates, not the lecture.");
+      return;
+    }
+    if (!sidecar) {
+      loadFile(video);
+      return;
+    }
+    void sidecar.text().then((text) => {
+      const parsed = parseMomentsFile(text);
+      // setNotice AFTER loadFile: analyze()'s reset clears it, and this message is the
+      // reason the viewer is watching an analysis they expected to skip. State updates in
+      // one handler apply in call order, so the note survives the reset.
+      if (parsed.error) {
+        loadFile(video);
+        setNotice(`${parsed.error} Analyzing the video fresh instead.`);
+        return;
+      }
+      if (!sidecarMatchesFile(parsed.file, video.size)) {
+        loadFile(video);
+        setNotice("That moments file belongs to a different video (the sizes don't match). Analyzing fresh instead.");
+        return;
+      }
+      // Same pre-run reset analyze() does, minus the worker — then hydrate from the file.
+      workerRef.current?.terminate();
+      workerRef.current = null;
+      fileRef.current = video;
+      framesRef.current = [];
+      framesBytesRef.current = 0;
+      snipDoneRef.current = new Set();
+      setXRealtime(0); setFramesCount(0); setViewIdx(-1);
+      setError(null); setErrorDismissed(false); setCurrMoment(null);
+      setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
+      setCurrentTime(0);
+      setFileName(video.name);
+      setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(video); });
+      hydrateFrom(parsed.file);
+    });
+  }
+
+  // Download helpers for the two exports. Client-side blob downloads — nothing leaves.
+  function download(name: string, text: string, type: string) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function exportMoments(kind: "json" | "md") {
+    const mf = momentsFileRef.current;
+    if (!mf) return;
+    const base = (fileName ?? "lecture").replace(/\.[^.]+$/, "");
+    if (kind === "json") download(`${base}.veasyguide.json`, JSON.stringify(mf, null, 2), "application/json");
+    else download(`${base}.moments.md`, momentsMarkdown(mf), "text/markdown");
+  }
+
   function reanalyze(cap = captureRef.current) {
-    if (fileRef.current) analyze(fileRef.current, params, cap);
+    if (fileRef.current) analyze(fileRef.current, params, cap, false);
   }
 
   // Back to the landing screen — the way out of a stuck read. The worker must be terminated,
@@ -364,12 +494,14 @@ export default function App() {
     snipDoneRef.current = new Set();
     snipBusyRef.current = false;
     fileRef.current = null;
+    momentsFileRef.current = null;
     setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return null; });
     setThumbs((old) => { old.forEach((u) => URL.revokeObjectURL(u)); return new Map(); });
     setFileName(null);
     setMeta(null);
     setStage(null);
     setError(null);
+    setNotice(null);
   }
 
   // Dev-only auto-load for headless smoke tests: ?test=<name> fetches public/_test/<name>.
@@ -531,7 +663,7 @@ export default function App() {
 
       {/* A fatal error belongs ON the landing screen, beside the drop zone: whatever went
           wrong, the next thing the viewer wants is to try another file. */}
-      {(!videoUrl || fatal) && <Landing onFile={loadFile} error={error} />}
+      {(!videoUrl || fatal) && <Landing onFiles={loadFiles} error={error} />}
 
       {videoUrl && !fatal && (
         <div className="stage-row">
@@ -544,6 +676,14 @@ export default function App() {
                 past that point.
               </span>
               <button type="button" onClick={() => setErrorDismissed(true)} aria-label="Dismiss">
+                ✕
+              </button>
+            </div>
+          )}
+          {notice && (
+            <div className="strip" role="status">
+              <span>{notice}</span>
+              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss">
                 ✕
               </button>
             </div>
@@ -700,6 +840,7 @@ export default function App() {
           canPlay={canPlay}
           lead={params.highlightLead}
           onJump={(t) => seekFnRef.current(t, true)}
+          onExport={done ? exportMoments : undefined}
         />
         </div>
       )}

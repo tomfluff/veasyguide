@@ -34,9 +34,12 @@ type Props = {
   // Overlay mount only: Escape should dismiss the overlay like any transient panel. The
   // page mount is permanent chrome and passes nothing.
   onEscape?: () => void;
+  // Page mount, analysis done: save the moments file (.veasyguide.json — analyze once,
+  // share with the class) or the Markdown notes. The overlay mount omits it.
+  onExport?: (kind: "json" | "md") => void;
 };
 
-export default function MomentsSidebar({ activities, scenes, frameW, frameH, thumbs, current, done, canPlay, lead, onJump, className, style, onEscape }: Props) {
+export default function MomentsSidebar({ activities, scenes, frameW, frameH, thumbs, current, done, canPlay, lead, onJump, className, style, onEscape, onExport }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
   const groupByScene = useViewSettingsStore((s) => s.groupByScene);
@@ -136,6 +139,18 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
               ? <>Now at <b>{currIndex + 1}</b> of <b>{activities.length}</b>{done ? "" : "+"}</>
               : <><b>{activities.length}</b>{done ? "" : "+"} in this lecture</>}
         </div>
+        {onExport && done && activities.length > 0 && (
+          <div className="side-export">
+            <button type="button" onClick={() => onExport("json")}
+              title="A small JSON of the analysis. Load it with the video next time — or hand it to someone — and skip the wait.">
+              Save moments file
+            </button>
+            <button type="button" onClick={() => onExport("md")}
+              title="The moments as timestamped, worded Markdown notes — includes the gaps.">
+              Save notes
+            </button>
+          </div>
+        )}
         {groups.length > 0 && (
           <div className="side-view" role="group" aria-label="Arrange moments">
             <button
