@@ -7,6 +7,7 @@
 // happened in, so the list collapses to a handful of slides you can open. The analyzer has been
 // emitting scenes all along; this is the first thing that reads them.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Menu } from "@mantine/core";
 import type { Activity, Scene } from "./analyzer/types";
 import { convertSecondsToTimecode } from "./utils/misc";
 import { seekTargetFor, groupByScenes } from "./player/moments";
@@ -142,17 +143,29 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
               ? <>Now at <b>{currIndex + 1}</b> of <b>{activities.length}</b>{done ? "" : "+"}</>
               : <><b>{activities.length}</b>{done ? "" : "+"} in this lecture</>}
         </div>
+        {/* One menu, not two buttons: saving is rare and the list is the point of this
+            column — two permanent buttons sat above the moments competing with them.
+            What each file IS lives inside the menu rather than in a title tooltip: a
+            tooltip is invisible to touch and unreliable on keyboard focus, so the one
+            sentence that tells you which file you want was hidden from the people most
+            likely to need it. Mantine's Menu carries the roles, arrow keys, Escape and
+            focus return; hand-rolling those is how a menu ends up keyboard-hostile. */}
         {onExport && done && activities.length > 0 && (
-          <div className="side-export">
-            <button type="button" onClick={() => onExport("json")}
-              title="A small JSON of the analysis. Load it with the video next time — or hand it to someone — and skip the wait.">
-              Save moments file
-            </button>
-            <button type="button" onClick={() => onExport("md")}
-              title="The moments as timestamped, worded Markdown notes — includes the gaps.">
-              Save notes
-            </button>
-          </div>
+          <Menu position="bottom-start" classNames={{ dropdown: "side-save-pop" }}>
+            <Menu.Target>
+              <button type="button" className="side-save">Save…</button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item onClick={() => onExport("json")}>
+                <span className="save-t">Moments file</span>
+                <span className="save-d">Load it with the video next time — or hand it to a classmate — and skip the wait.</span>
+              </Menu.Item>
+              <Menu.Item onClick={() => onExport("md")}>
+                <span className="save-t">Notes</span>
+                <span className="save-d">Timestamped Markdown of every moment, gaps included.</span>
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         )}
         {groups.length > 0 && (
           <div className="side-view" role="group" aria-label="Arrange moments">
