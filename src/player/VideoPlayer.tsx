@@ -58,7 +58,7 @@ import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
 import { timelineMarkers, stepMoment, seekTargetFor } from "./moments";
-import { momentDescription, momentLabel } from "./describe";
+import { momentDescription, momentPlace } from "./describe";
 import { cropRect } from "../analyzer/snippets";
 import MomentsSidebar from "../MomentsSidebar";
 import AppearanceSheet from "./AppearanceSheet";
@@ -813,9 +813,9 @@ const VideoPlayer = (props: Props) => {
                   Moment <b>{currIndex + 1}</b>
                   {props.done ? <> of <b>{props.activities.length}</b></> : null}
                   {" · "}
-                  {/* The worded geometry (describe.ts): tells you WHAT and WHERE, not just when —
+                  {/* The worded geometry (describe.ts): tells you WHERE, not just when —
                       the same words the screen reader gets. */}
-                  {momentLabel(props.activities[currIndex], props.meta.analysisWidth, props.meta.analysisHeight).toLowerCase()}
+                  {momentPlace(props.activities[currIndex], props.meta.analysisWidth, props.meta.analysisHeight)}
                   {" · "}
                   <b>{convertSecondsToTimecode(props.activities[currIndex].start)}</b>,{" "}
                   {(props.activities[currIndex].end - props.activities[currIndex].start).toFixed(1)}s
@@ -1163,7 +1163,7 @@ const VideoPlayer = (props: Props) => {
           />
           <Box className="pin-cap">
             <Text>
-              {momentLabel(pinned.activity, props.meta.analysisWidth, props.meta.analysisHeight)}
+              {momentPlace(pinned.activity, props.meta.analysisWidth, props.meta.analysisHeight)}
               {" · "}
               {convertSecondsToTimecode(pinned.activity.start)}
             </Text>

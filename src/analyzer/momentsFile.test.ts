@@ -65,7 +65,7 @@ describe("momentsMarkdown", () => {
     expect(md).toContain("## Scene 1");
     expect(md).toContain("## Scene 2");
     // Worded, timestamped entries.
-    expect(md).toContain("**00:05** (4.0s) — Writing");
+    expect(md).toContain("**00:05** (4.0s) — top left, medium size");
     // The 14s -> 70s stretch is a flagged gap (56s >= 15s threshold).
     expect(md).toMatch(/00:14–01:10: no visual activity \(56s\)/);
     // The invalid activity at 40s is not listed.

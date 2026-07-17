@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Activity, Scene } from "./analyzer/types";
 import { convertSecondsToTimecode } from "./utils/misc";
 import { seekTargetFor, groupByScenes } from "./player/moments";
-import { momentDescription, momentLabel } from "./player/describe";
+import { momentDescription, momentPlace } from "./player/describe";
 import { useViewSettingsStore, setGroupByScene } from "./stores/ViewSettingsStore";
 
 type Props = {
@@ -110,7 +110,7 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
             <span className="side-d">{(a.end - a.start).toFixed(1)}s</span>
           </span>
           {/* The worded geometry — what the analyzer knows, as a readable index entry. */}
-          <span className="side-desc">{momentLabel(a, frameW, frameH)}</span>
+          <span className="side-desc">{momentPlace(a, frameW, frameH)}</span>
         </span>
       </button>
     );

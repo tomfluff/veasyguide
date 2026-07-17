@@ -555,3 +555,26 @@ cache and overwrites it, so debug parameter runs stay fresh.
 **Rejected.** localStorage (5–10 MB quota vs multi-MB activity lists); hashing file bytes
 for identity (reading a 2 GB file to fingerprint it costs the time the cache exists to
 save); CSV export (the JSON is the machine-readable form; Markdown is the human one).
+
+---
+
+## D19 — Moments are described by geometry, not by a guessed verb
+
+**Decision.** The spatial description (`describe.ts`) says WHERE and HOW BIG only — "top
+right, medium size". The verb tier shipped in D17 (Writing / Pointing / Motion, inferred
+from `growth` and `meanConsecIoU`) is removed, along with `momentLabel`, which was left a
+pure alias of `momentPlace`. Duration is unchanged: every call site already prints it from
+`start`/`end`, so composing it into the description string would only double-speak it.
+
+**Why.** The verb was wrong too often to earn its place. A confident wrong word costs more
+than no word at all: the user who most needs the description is the one who cannot glance
+at the frame to catch the error, so a mislabelled "Writing" is not noise, it is a false
+statement they have to act on. Box geometry is measured; the verb was inferred from two
+features that turned out not to separate the classes cleanly outside the calibration clips.
+Size stays for the same reason location does — it is measured, not guessed.
+
+**What this does not close.** Naming the act is still worth doing; it needs the analyzer
+research parked in proposals-parked.md (activity clustering — what the `features` block was
+always collected for), not a pair of hand-tuned thresholds. The removal note in
+`describe.ts` records the thresholds tried, so the next attempt starts from the failure
+rather than reinventing it.
