@@ -18,7 +18,7 @@
 // force a zoom-out and drop the stable activity; that traded a stale highlight for a
 // worse disruption — being yanked out of a magnified view mid-explanation — and scene
 // detection is a heuristic that fires on build animations and camera moves too.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Box, Text, Group, UnstyledButton, Slider, Popover, Menu } from "@mantine/core";
 import {
   useElementSize,
@@ -650,6 +650,13 @@ const VideoPlayer = (props: Props) => {
   return (
     <Box
       className={videoContainerClasses}
+      // The lecture's real shape, from the analyzer's own metadata. The CSS used to hardcode
+      // 16/9 for both the video box and the container's width cap, which is a guess that is
+      // wrong for every other video: at 2.4:1 it letterboxed the picture inside a 16:9 box
+      // and left an 89px black strip between the ink and the control bar — the bar sitting
+      // flush to a box that was not the video. One var drives both (calc multiplies through
+      // the `w / h`), so the player is exactly the shape of what is playing.
+      style={{ "--vid-ar": `${props.meta.videoWidth} / ${props.meta.videoHeight}` } as CSSProperties}
       ref={containerRef}
       onMouseMove={showControls}
       // The reveal triggers that make auto-hide safe. Pointer movement alone would delete the

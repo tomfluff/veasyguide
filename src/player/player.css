@@ -9,7 +9,10 @@
      it just left the lecture small with grey space around it — the opposite of what this app is
      for. The bound is now the viewport, not a magic number: a 16:9 video this wide is exactly
      as tall as the space left once the two bars and the page padding are taken. */
-  max-width: calc((100vh - 160px) * 16 / 9);
+  /* Same var: the cap is "as wide as this video can be while still fitting the height left
+     over", so it has to be THIS video's ratio, not 16:9. A 4:3 lecture capped at a 16:9
+     width is taller than the space it was measured against. */
+  max-width: calc((100vh - 160px) * var(--vid-ar, 16 / 9));
   display: flex;
   justify-content: center;
   margin-inline: auto;
@@ -31,7 +34,12 @@
 
 .video-container video {
   width: 100%;
-  aspect-ratio: 16/9;
+  /* The real ratio, set from the analyzer's metadata (VideoPlayer sets --vid-ar); 16/9 only
+     until it is known. Hardcoding 16/9 forced every video into a 16:9 box: anything wider
+     letterboxed inside it, so the picture stopped short of the control bar and left a black
+     strip between the ink and the controls (measured: 89px on a 2.4:1 clip). The bar was
+     never misplaced — it was flush to a box that wasn't the video. */
+  aspect-ratio: var(--vid-ar, 16 / 9);
 }
 
 /* A dark surface with a floor, not a gradient. The original gradient faded to NOTHING at the
