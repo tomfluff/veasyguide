@@ -398,6 +398,11 @@
   cursor: pointer;
 }
 .side-save:hover { background: var(--hover); color: var(--ink); }
+/* Dimmed while there is nothing to save. Same 0.45 the bar's gated buttons use, and no
+   hover lift — a control that lights up under the cursor but does nothing is worse than one
+   that plainly says it is not ready yet. */
+.side-save[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+.side-save[aria-disabled="true"]:hover { background: none; color: var(--muted); }
 .side-save-caret { transition: transform 120ms ease; }
 /* Open state on the caret, driven by the aria Mantine already sets — the visual and the
    announced state cannot drift apart if they read from the same attribute. */

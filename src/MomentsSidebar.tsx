@@ -36,8 +36,9 @@ type Props = {
   // Overlay mount only: Escape should dismiss the overlay like any transient panel. The
   // page mount is permanent chrome and passes nothing.
   onEscape?: () => void;
-  // Page mount, analysis done: save the moments file (.veasyguide.json — analyze once,
-  // share with the class) or the Markdown notes. The overlay mount omits it.
+  // Page mount: save the moments file (.veasyguide.json — analyze once, share with the
+  // class) or the Markdown notes. The overlay mount omits it. Passed regardless of whether
+  // the analysis has finished; this component dims the control until it has.
   onExport?: (kind: "json" | "md") => void;
 };
 
@@ -46,6 +47,16 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
   const groupByScene = useViewSettingsStore((s) => s.groupByScene);
   const currIndex = current ? activities.indexOf(current) : -1;
+  // Both halves matter: a still-running analysis has no file to serialize yet, and a
+  // finished one with nothing in it has nothing worth saving.
+  const exportGated = !done || activities.length === 0;
+  // Controlled, because Mantine's `disabled` is the wrong tool: on Popover (which Menu
+  // extends) it means "do not RENDER the dropdown", not "ignore the trigger". The press
+  // still flipped Menu's internal opened state with nothing on screen, so the state
+  // desynced and the first real click after the gate lifted just toggled it back off —
+  // a dead button exactly when it finally became live. Owning the state means the gated
+  // press changes nothing at all.
+  const [exportOpen, setExportOpen] = useState(false);
 
   // One scene is not a grouping — it is the whole lecture with a header on top. A lecture shot
   // in one continuous take (no slides, no cuts) produces exactly that, so both the switch and
@@ -154,8 +165,13 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
             sentence that tells you which file you want was hidden from the people most
             likely to need it. Mantine's Menu carries the roles, arrow keys, Escape and
             focus return; hand-rolling those is how a menu ends up keyboard-hostile. */}
-        {onExport && done && activities.length > 0 && (
-          <Menu position="bottom-end" classNames={{ dropdown: "side-save-pop" }}>
+        {onExport && (
+          <Menu
+            position="bottom-end"
+            classNames={{ dropdown: "side-save-pop" }}
+            opened={exportOpen && !exportGated}
+            onChange={(o) => setExportOpen(o && !exportGated)}
+          >
             <Menu.Target>
               {/* Framed, worded, and with a caret. A bare glyph read as decoration rather
                   than a control; a lone download icon promises a file on click when what
@@ -163,8 +179,20 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
                   the caret says something opens. No aria-label: the visible word IS the
                   accessible name, and a label that restates it only invites the two to
                   drift. Mantine already supplies aria-haspopup="menu" and aria-expanded,
-                  so the screen reader was never the one being misled here. */}
-              <button type="button" className="side-save" title="Export a moments file or notes">
+                  so the screen reader was never the one being misled here.
+                  Mounted from the start and dimmed, rather than appearing when the analysis
+                  lands: a control that pops into existence is one you have to notice, and
+                  present-but-dim says "this is where the file comes from, once there is
+                  one". aria-disabled, not disabled — the house rule for gates that lift on
+                  their own (see the Play button): a hard `disabled` is skipped by AT and
+                  drops keyboard focus the instant the gate opens under you. The controlled
+                  Menu above is what makes the gated press a true no-op. */}
+              <button
+                type="button"
+                className="side-save"
+                aria-disabled={exportGated || undefined}
+                title={exportGated ? "Export — ready when the analysis finishes" : "Export a moments file or notes"}
+              >
                 <IconDownload size={18} />
                 Export
                 <IconChevronDown size={14} className="side-save-caret" />

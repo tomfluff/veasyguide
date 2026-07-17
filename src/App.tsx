@@ -925,7 +925,10 @@ export default function App() {
           canPlay={canPlay}
           lead={params.highlightLead}
           onJump={(t) => seekFnRef.current(t, true)}
-          onExport={done ? exportMoments : undefined}
+          // Passed whenever this mount can export at all, not only once it can export NOW:
+          // the sidebar shows the control from the start and dims it until there is
+          // something to save. exportMoments is a no-op without a finished file anyway.
+          onExport={exportMoments}
         />
         </div>
       )}
