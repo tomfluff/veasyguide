@@ -132,7 +132,10 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
       <div className="side-head">
         {/* A real heading: the working screen's structure under the h1 is this list. */}
         <h2 className="side-title">Moments</h2>
-        <div className="side-pos" role="status">
+        {/* NOT a live region: the player's now-line announces every moment change with the
+            richer sentence (worded geometry included), and two role=status regions updating
+            together double-speak under NVDA — the blind persona heard both, every 1-2s. */}
+        <div className="side-pos">
           {activities.length === 0
             ? done ? "None found" : "Looking…"
             : currIndex >= 0
