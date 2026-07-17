@@ -710,3 +710,41 @@ export, reintroduced within the hour. It now calls `validActivities`, which is t
 that owns the rule. A confirm that misstates what you are about to get is worse than none.
 The mismatch notice says "Nothing changed" rather than naming a state ("still analyzing")
 that is wrong half the time it fires.
+
+---
+
+## D24 — Speed becomes an icon menu; Pace is removed
+
+**Decision.** The control bar's two `<select>`s are gone. Speed is an icon that opens its
+rates in a menu, showing the rate beside the icon only when it is not 1×. Pace — the
+moment-aware tempo engine (continue / pause-after-each-moment / skip-to-next) — is removed
+entirely: the select, the engine in the per-time update, `tempoActedRef`, and
+`atMomentEnd` / `MomentEndBehavior` / `setAtMomentEnd` from `ViewSettingsStore`.
+
+**Why.** The bar had run out of room. Two labelled selects, each sized to its widest option
+("Pause after each moment"), spent roughly a third of the bar's width on every frame to
+advertise two settings. Speed now costs 44px idle.
+
+**The cost, stated plainly.** D17 records the tempo engine as the convergence of four of
+five personas — the low-vision "don't outrun me", the blind learner's audio-scoped
+playback, and the crammer's skim over a measured 67% of moment-free dead air. Removing it
+removes all of that. This was the owner's call with that history in view; it is recorded
+here so the next person reads a decision, not an oversight. `[` / `]` (previous / next
+moment) still serve the skim case by hand.
+
+**What was lost with the `<select>`.** The old code chose native selects deliberately:
+"keyboard and screen-reader behavior come built in, and the bar is the one place a popup
+must never fight the video." Mantine's Menu carries the roles, arrow keys, Escape and focus
+return, but the native mobile picker and the select's "1×, 3 of 7" announcement are gone
+for real. The trigger's `aria-label` carries the current rate instead, and `Shift+<` /
+`Shift+>` are untouched.
+
+**`withinPortal={false}` is load-bearing.** Portalled to `<body>`, the dropdown is invisible
+in fullscreen — the same reason the Appearance popover sets it. Verified open inside the
+fullscreen element.
+
+**The rate is visible when off-default.** Icon-only at every rate would hide a setting that
+silently changes how the whole lecture plays — the exact bug the visible-magnifier work
+already fixed once ("keyboard-only, state invisible"). At 1× it is a bare icon; off-default
+it goes amber with the rate, the same state language as the magnifier toggle and the NOW
+mark.

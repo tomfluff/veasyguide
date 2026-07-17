@@ -458,15 +458,19 @@ export default function App() {
         return;
       }
       void sidecar.text().then((text) => {
-        const parsed = parseMomentsFile(text);
-        if (parsed.error) return setNotice(parsed.error);
-        if (!sidecarMatchesFile(parsed.file, current.size)) {
+        // Destructured, not `parsed.file`: parseMomentsFile's union discriminates on an
+        // `error: string`, and `string` is not a literal type, so TS cannot narrow the union
+        // through `if (parsed.error)` — the file stays `MomentsFile | undefined` and every
+        // use of it is an error under `tsc -b`. Narrowing on the binding itself does work.
+        const { file, error } = parseMomentsFile(text);
+        if (error || !file) return setNotice(error ?? "That moments file couldn't be read.");
+        if (!sidecarMatchesFile(file, current.size)) {
           // "Nothing changed", not "still analyzing": this fires whether the analysis is
           // running or long finished, and a message that names the wrong state is its own
           // small lie. What the viewer needs to know is that their analysis survived.
           return setNotice("That moments file belongs to a different video (the sizes don't match). Nothing changed.");
         }
-        setPendingSidecar(parsed.file);
+        setPendingSidecar(file);
       });
       return;
     }

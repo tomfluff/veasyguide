@@ -19,7 +19,7 @@
 // worse disruption — being yanked out of a magnified view mid-explanation — and scene
 // detection is a heuristic that fires on build animations and camera moves too.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Box, Text, Group, UnstyledButton, Slider, Popover } from "@mantine/core";
+import { Box, Text, Group, UnstyledButton, Slider, Popover, Menu } from "@mantine/core";
 import {
   useElementSize,
   useDisclosure,
@@ -31,6 +31,7 @@ import {
 import {
   IconArrowsDiagonal,
   IconArrowsDiagonalMinimize2,
+  IconGauge,
   IconLayoutDistributeHorizontal,
   IconPlayerPlayFilled,
   IconPlayerPauseFilled,
@@ -70,7 +71,7 @@ import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
 import {
-  useViewSettingsStore, setPlaybackRate, setAtMomentEnd, type MomentEndBehavior,
+  useViewSettingsStore, setPlaybackRate,
   setPinSize, setPinCorner, nextPinSize, nextPinCorner, PIN_SIZE_NAMES, PIN_CORNER_NAMES,
 } from "../stores/ViewSettingsStore";
 
@@ -168,11 +169,9 @@ const VideoPlayer = (props: Props) => {
   const zoomStrength = useMagnificationSettingsStore((s) => s.zoom_strength);
   // Study pace: persisted playback rate + what happens at a moment's end (tempo engine).
   const playbackRate = useViewSettingsStore((s) => s.playbackRate);
-  const atMomentEnd = useViewSettingsStore((s) => s.atMomentEnd);
   const pinSize = useViewSettingsStore((s) => s.pinSize);
   const pinCorner = useViewSettingsStore((s) => s.pinCorner);
   const insideMomentRef = useRef<Activity | null>(null); // raw in-moment tracking (no lead/linger)
-  const tempoActedRef = useRef<number | null>(null); // moment id the tempo engine already acted on
   // Pinned snapshot: a full-res crop of a moment's final ink, captured from the live video
   // element the instant playback crosses the moment's end (the end frame is what's on screen
   // right then — no seeking needed). The newest capture is kept even when nothing is pinned,
@@ -420,11 +419,9 @@ const VideoPlayer = (props: Props) => {
     const jumped = Math.abs(t - prevTimeRef.current) > 1;
     prevTimeRef.current = t;
 
-    // The tempo engine: act ONCE when playback itself carries us across the end of the
-    // moment we were inside. Raw start/end, not the lead/linger-padded selection above —
-    // linger keeps a moment "selected" past its end, which is exactly the boundary this
-    // needs to see sharply. A user seek (jumped) resets the ledger so replaying a moment
-    // in pause mode waits again — replay is the whole point of that mode.
+    // Track which moment playback is inside, on raw start/end rather than the lead/linger-
+    // padded selection above: linger keeps a moment "selected" past its end, and the pinned
+    // snapshot needs that boundary sharp to know when the ink is finished.
     const video = videoRef.current;
     const inside = props.activities.find((a) => t >= a.start && t <= a.end) ?? null;
     const prevInside = insideMomentRef.current;
@@ -433,28 +430,6 @@ const VideoPlayer = (props: Props) => {
     // on screen after a jump belongs to the destination, not to the moment left behind.
     if (video && !jumped && prevInside && (!inside || inside.id !== prevInside.id) && t >= prevInside.end) {
       captureEndFrame(prevInside, video);
-    }
-    if (jumped) tempoActedRef.current = null;
-    else if (
-      video && !video.paused &&
-      atMomentEnd !== "continue" &&
-      prevInside && t >= prevInside.end &&
-      (!inside || inside.id !== prevInside.id) &&
-      tempoActedRef.current !== prevInside.id
-    ) {
-      tempoActedRef.current = prevInside.id;
-      if (atMomentEnd === "pause") {
-        video.pause();
-      } else {
-        // Skim: jump the gap to the next KNOWN moment's cue. Never backwards (an
-        // overlapping next moment has already begun), and never into unanalyzed video —
-        // the next moment by time may simply not exist yet.
-        const next = stepMoment(props.activities, t, props.selectOpts.lead, 1);
-        const target = next ? seekTargetFor(next, props.selectOpts.lead) : null;
-        if (next && target !== null && target > t && (props.done || isAnalyzed(props.ranges, next.start))) {
-          video.currentTime = target;
-        }
-      }
     }
 
     // Track the scene by its START, not its id: scenes are a partition that re-derives when
@@ -938,34 +913,43 @@ const VideoPlayer = (props: Props) => {
             <Text>/</Text>
             <Text>{convertSecondsToTimecode(totalTime)}</Text>
           </Group>
-          {/* Native <select>s, not custom menus: keyboard and screen-reader behavior come
-              built in, and the bar is the one place a popup must never fight the video.
-              Speed is every player's missing-here control; Pace is the tempo engine —
-              the player already knows where every moment ends, so let it drive. */}
-          <label className="bar-select collapse-hide">
-            <span>Speed</span>
-            <select
-              value={String(playbackRate)}
-              onChange={(e) => setPlaybackRate(Number(e.target.value))}
-              onKeyDown={stopPlayerHotkeys}
-            >
+          {/* Speed, as an icon that opens its values. This replaced a native <select>, whose
+              free keyboard and screen-reader behaviour was the reason it was chosen — the bar
+              had run out of room, and a labelled select showing its widest option was paying
+              for that in width on every frame. Mantine's Menu carries the roles, arrow keys,
+              Escape and focus return; what is genuinely lost is the native mobile picker and
+              the select's "1×, 2 of 7" announcement, so the trigger's own label carries the
+              current rate instead.
+              withinPortal={false} is not a style choice: portalled to body, this dropdown is
+              invisible in fullscreen — the same reason the Appearance popover sets it.
+              The rate shows next to the icon whenever it is NOT 1×. Icon-only at every rate
+              would hide a non-default state on the one control that silently changes how the
+              whole lecture behaves — the exact bug the visible-magnifier work already fixed
+              once. Idle, it costs nothing; off-default, it says so. */}
+          <Menu position="top" withinPortal={false} classNames={{ dropdown: "bar-pop" }}>
+            <Menu.Target>
+              <UnstyledButton
+                className={classNames("collapse-hide", "bar-speed", { on: playbackRate !== 1 })}
+                onKeyDown={stopPlayerHotkeys}
+                aria-label={`Playback speed: ${playbackRate}×`}
+                title={`Playback speed: ${playbackRate}×`}
+              >
+                <IconGauge />
+                {playbackRate !== 1 && <span className="bar-speed-v">{playbackRate}×</span>}
+              </UnstyledButton>
+            </Menu.Target>
+            <Menu.Dropdown onKeyDown={stopPlayerHotkeys}>
               {RATES.map((r) => (
-                <option key={r} value={String(r)}>{r}×</option>
+                <Menu.Item
+                  key={r}
+                  className={r === playbackRate ? "on" : ""}
+                  onClick={() => setPlaybackRate(r)}
+                >
+                  {r}×
+                </Menu.Item>
               ))}
-            </select>
-          </label>
-          <label className="bar-select collapse-hide">
-            <span>Pace</span>
-            <select
-              value={atMomentEnd}
-              onChange={(e) => setAtMomentEnd(e.target.value as MomentEndBehavior)}
-              onKeyDown={stopPlayerHotkeys}
-            >
-              <option value="continue">Continuous</option>
-              <option value="pause">Pause after each moment</option>
-              <option value="skip">Skip to next moment</option>
-            </select>
-          </label>
+            </Menu.Dropdown>
+          </Menu>
           {props.extraHud}
           {/* The magnifier gets an on-screen toggle: it was keyboard-only (Z), which made
               it unreachable on touch and its STATE invisible — the core user toggled it off

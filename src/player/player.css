@@ -113,28 +113,35 @@
 
 /* Speed / Pace: native selects dressed for the always-dark bar. color-scheme: dark keeps
    the UA-rendered popup list from flashing white over the player. */
-.bar-select {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--d-muted);
-  font-size: 0.9375rem;
+/* Speed: an icon in the bar, its values in a menu. Everything about how a bar button looks
+   already lives in the `.controls > button` rules above — colour, 44px target, radius,
+   hover, focus ring — so this only says where it differs: it may grow past 44px wide when
+   it carries the rate. Scoped to match those rules' specificity, which is not decoration:
+   `.controls > button` sets a fixed `width: 44px` and wins over a bare `.bar-speed`.
+   The rate rides alongside the icon only when it is NOT 1x, so the bar stays narrow in the
+   common case and never hides a setting that quietly changes how the whole lecture plays. */
+.video-controls-container .controls > button.bar-speed {
+  width: auto;
+  min-width: 44px;
+  gap: 4px;
+  padding: 0 8px;
 }
-.bar-select select {
-  font: inherit;
-  color: var(--d-text);
-  background: #1b2029;
+/* Off-default is a state, and amber is what a state looks like in this bar — the same
+   "this is the current one" accent as the magnifier toggle and the NOW mark. */
+.video-controls-container .controls > button.bar-speed.on {
+  background: rgba(255, 194, 51, 0.18);
+  color: #ffc233;
+}
+.bar-speed-v { font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* The bar's menus are dark like the bar, not like the page: they open ON the video. */
+.bar-pop {
+  background: #12161d;
   border: 1px solid var(--d-line);
-  border-radius: var(--r-sm);
-  min-height: 44px; /* same target floor as the bar's buttons */
-  padding: 2px 6px;
-  color-scheme: dark;
-  cursor: pointer;
 }
-.bar-select select:focus-visible {
-  outline: 3px solid var(--brand-300);
-  outline-offset: 2px;
-}
+.bar-pop .mantine-Menu-item { color: var(--d-text); }
+.bar-pop .mantine-Menu-item:hover { background: #21262f; }
+.bar-pop .mantine-Menu-item.on { color: #ffc233; font-weight: 700; }
 
 /* The pinned snapshot panel. Amber frame — the "current thing" accent — because the panel
    IS content (the viewer's reading matter), not chrome, and it must be findable in a

@@ -7,12 +7,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-// What the player does when a moment's end is reached during playback (the tempo engine):
-// continue = a normal player; pause = wait for the viewer (the low-vision "don't outrun me"
-// and the blind "play me what she said, then stop"); skip = jump the gap to the next
-// moment's cue (the crammer's skim — 67% of a measured lecture is moment-free dead air).
-export type MomentEndBehavior = "continue" | "pause" | "skip";
-
 // Where the pinned snapshot docks and how big it gets. Persisted because a reader who
 // needs it large needs it large on every video — making them re-enlarge it each time is
 // the tax this app exists to remove. Corners use the same vocabulary momentPlace speaks
@@ -23,7 +17,6 @@ export type PinCorner = "tl" | "tr" | "bl" | "br";
 export type TViewSettings = {
   groupByScene: boolean;
   playbackRate: number;
-  atMomentEnd: MomentEndBehavior;
   pinSize: PinSize;
   pinCorner: PinCorner;
 };
@@ -33,7 +26,6 @@ export const useViewSettingsStore = create<TViewSettings>()(
     () => ({
       groupByScene: true,
       playbackRate: 1,
-      atMomentEnd: "continue" as MomentEndBehavior,
       pinSize: "m" as PinSize,
       pinCorner: "tr" as PinCorner,
     }),
@@ -49,9 +41,6 @@ export const setGroupByScene = (groupByScene: boolean) =>
 
 export const setPlaybackRate = (playbackRate: number) =>
   useViewSettingsStore.setState({ playbackRate });
-
-export const setAtMomentEnd = (atMomentEnd: MomentEndBehavior) =>
-  useViewSettingsStore.setState({ atMomentEnd });
 
 // Both controls are cycles, not pickers: one button each, no menu to open over the very
 // video the panel is already covering.
