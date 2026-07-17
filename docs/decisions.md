@@ -637,3 +637,37 @@ one unless the pin owns it, and dismissing revokes the pin's url only when it is
 the latest. Once a pin outlives the newest capture, exactly one of the two owns each url.
 Verified live: a pin held across 12 s and several moment-ends with its image intact
 (naturalWidth 250, not broken), and dismiss + re-pin correctly jumped to the newest.
+
+---
+
+## D22 — The notes export lists every moment, including the ones the player won't show
+
+**Decision.** `momentsMarkdown` lists all activities, each marked shown or not, with the
+reason: `size outside the range the analyzer accepts` (the analyzer's own `isValid`
+verdict) or `shorter than the ${minDuration}s minimum` (the display floor). The header
+counts both ("3 moments · 2 found but not shown"). Gaps are measured between SHOWN moments
+and renamed "no moments" from "no visual activity".
+
+**Why.** Two things were wrong, and they pulled in opposite directions. The export filtered
+on `isValid` alone while the player shows `isValid && duration >= minDuration`
+(select.ts `validActivities`) — so the notes listed moments the sidebar does not, and a
+note-taker comparing the two would find entries that don't exist in the app. And it dropped
+rejected activities silently, so a creator asking "did it miss my pen stroke?" got a
+shorter list rather than an answer. A file that says "not shown: size outside the range"
+answers the question; a file that omits the line pretends there was nothing there.
+
+**Ordering.** Entries carry their timestamp and are sorted, rather than pushed as
+encountered. A gap is only discovered when the next shown moment arrives, so emitting it
+at that point printed it after the not-shown entries lying inside it — a document claiming
+"no moments 00:14–01:10" underneath the two it had just listed at 00:40 and 00:50. This
+was invisible while rejected moments were unlisted; listing them exposed it.
+
+**Why "no moments", not "no visual activity".** A rejected blip is still something the
+analyzer saw. Letting one close a gap would claim the screen was busy when the viewer had
+nothing to follow; calling the stretch activity-free contradicts a not-shown entry printed
+inside it. Gaps describe what the viewer gets; the not-shown entries say what was there
+anyway.
+
+**Trust boundary.** `params` is read as `f.params?.minDuration ?? 0` — `parseMomentsFile`
+does not require the field, so a hand-edited sidecar must not crash the export it is being
+read for (D18).

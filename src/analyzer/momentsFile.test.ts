@@ -58,19 +58,41 @@ describe("moments file round trip", () => {
 });
 
 describe("momentsMarkdown", () => {
-  it("groups by scene, words each moment, flags long gaps, skips invalid moments", () => {
+  it("groups by scene, words each moment, flags long gaps, marks what is not shown", () => {
     const md = momentsMarkdown(sample());
     expect(md).toContain("# Moments — lecture.mp4");
-    expect(md).toContain("3 moments · 2 scenes");
+    expect(md).toContain("3 moments · 1 found but not shown · 2 scenes");
     expect(md).toContain("## Scene 1");
     expect(md).toContain("## Scene 2");
     // Worded, timestamped entries.
     expect(md).toContain("**00:05** (4.0s) — top left, medium size");
     // The 14s -> 70s stretch is a flagged gap (56s >= 15s threshold).
-    expect(md).toMatch(/00:14–01:10: no visual activity \(56s\)/);
-    // The invalid activity at 40s is not listed.
-    expect(md).not.toContain("00:40");
+    expect(md).toMatch(/00:14–01:10: no moments \(56s\)/);
+    // The invalid activity at 40s IS listed now, and says why it isn't shown.
+    expect(md).toContain("**00:40** (1.0s) — top left, medium size — not shown: size outside the range the analyzer accepts");
     // Tail gap 75 -> 120 flagged too.
-    expect(md).toMatch(/01:15–02:00: no visual activity \(45s\)/);
+    expect(md).toMatch(/01:15–02:00: no moments \(45s\)/);
+  });
+
+  it("a moment shorter than minDuration is listed as not shown, and does not close a gap", () => {
+    // The divergence this fixes: the player hides sub-minDuration moments (select.ts
+    // validActivities), the export used to list them as if the sidebar had them.
+    const f = buildMomentsFile({
+      fileName: "l.mp4", fileSize: 1, params: { ...DEFAULT_PARAMS, minDuration: 0.1 },
+      meta: META, webcam: null, scenes: [{ id: 0, start: 0, end: 120 }],
+      activities: [act(0, 5, 9), { ...act(1, 60, 60.05), id: 1 }],
+    });
+    const md = momentsMarkdown(f);
+    expect(md).toContain("1 moments · 1 found but not shown");
+    expect(md).toContain("not shown: shorter than the 0.1s minimum");
+    // The blip at 60s sits inside the 9s->120s stretch but must not break it: the gap runs
+    // from the last SHOWN moment's end all the way to the video's end.
+    expect(md).toMatch(/00:09–02:00: no moments \(111s\)/);
+  });
+
+  it("survives a sidecar with no params rather than crashing the export", () => {
+    // parseMomentsFile does not require params; an untrusted file must not throw here.
+    const f = { ...sample(), params: undefined } as unknown as Parameters<typeof momentsMarkdown>[0];
+    expect(() => momentsMarkdown(f)).not.toThrow();
   });
 });

@@ -102,17 +102,40 @@ export function sidecarMatchesFile(f: MomentsFile, fileSize: number): boolean {
 // diagnostic ("static screen — voice only"), and the crammer's measured 67% dead air.
 export const EXPORT_GAP_MIN = 15;
 
+// Why the player doesn't show this moment, or null if it does. The player shows a moment
+// when the analyzer accepted its size (isValid) AND it lasts at least the display floor
+// (params.minDuration) — see select.ts `validActivities`, which is the one place that
+// decides. Null means shown.
+//
+// The export used to filter on isValid alone and say nothing about it, which was wrong
+// twice: it listed moments shorter than minDuration that the sidebar does NOT show (the
+// notes and the app disagreeing about which moments exist), and it dropped rejected ones
+// silently, so a creator asking "did it miss my pen stroke?" got a shorter list instead of
+// an answer. Now every moment is listed and says for itself which side of the line it is on.
+export function hiddenReason(a: Activity, minDuration: number): string | null {
+  if (!a.isValid) return "size outside the range the analyzer accepts";
+  if (a.end - a.start < minDuration) return `shorter than the ${minDuration}s minimum`;
+  return null;
+}
+
 // The Markdown export: a scene-grouped, timestamped index of every moment, with long
 // moment-free stretches called out. Text is the one rendering of this data a screen
 // reader, a text editor, and a diff all read natively.
 export function momentsMarkdown(f: MomentsFile): string {
   const { meta } = f;
-  const acts = [...f.activities].filter((a) => a.isValid).sort((a, b) => a.start - b.start);
+  const acts = [...f.activities].sort((a, b) => a.start - b.start);
+  // An untrusted sidecar may be missing params (parseMomentsFile does not require them),
+  // so a hand-edited file must not crash the export it is being read for. No floor = the
+  // analyzer's size verdict is the only filter, which is what a params-less file states.
+  const minDuration = f.params?.minDuration ?? 0;
+  const hiddenCount = acts.filter((a) => hiddenReason(a, minDuration)).length;
   const lines: string[] = [];
   lines.push(`# Moments — ${f.video.name}`);
   lines.push("");
   lines.push(
-    `${acts.length} moments · ${f.scenes.length} scene${f.scenes.length === 1 ? "" : "s"} · ` +
+    `${acts.length - hiddenCount} moments · ` +
+    (hiddenCount ? `${hiddenCount} found but not shown · ` : "") +
+    `${f.scenes.length} scene${f.scenes.length === 1 ? "" : "s"} · ` +
     `${convertSecondsToTimecode(f.video.duration)} · analyzed ${f.savedAt.slice(0, 10)} by veasyguide (in-browser, video never uploaded)`
   );
 
@@ -122,28 +145,41 @@ export function momentsMarkdown(f: MomentsFile): string {
     return idx;
   };
 
-  let lastScene = -1;
+  // Gaps are measured between SHOWN moments and named "no moments", not "no visual
+  // activity": a rejected blip is still something the analyzer saw, so letting one close a
+  // gap would claim the screen was busy when the viewer had nothing to follow, and calling
+  // the stretch activity-free would contradict a not-shown entry printed inside it. Gaps
+  // describe what the viewer gets; the not-shown entries say what was there anyway.
+  //
+  // Collected with their start time and sorted, not pushed as we go: a gap is only
+  // discovered when the next shown moment arrives, so emitting it there printed it AFTER
+  // the not-shown entries lying inside it — a document claiming "no moments 00:14–01:10"
+  // below the two it just listed at 00:40 and 00:50. Every line goes where its timestamp
+  // says, which is the only order a timeline can be read in.
+  const gapLine = (from: number, to: number) =>
+    `- _${convertSecondsToTimecode(from)}–${convertSecondsToTimecode(to)}: no moments (${Math.round(to - from)}s)_`;
+  const entries: { t: number; line: string }[] = [];
   let lastEnd = 0;
   for (const a of acts) {
-    const gap = a.start - lastEnd;
-    if (gap >= EXPORT_GAP_MIN) {
-      lines.push(`- _${convertSecondsToTimecode(lastEnd)}–${convertSecondsToTimecode(a.start)}: no visual activity (${Math.round(gap)}s)_`);
-    }
-    const s = sceneFor(a.start);
+    const hidden = hiddenReason(a, minDuration);
+    if (!hidden && a.start - lastEnd >= EXPORT_GAP_MIN) entries.push({ t: lastEnd, line: gapLine(lastEnd, a.start) });
+    const entry = `**${convertSecondsToTimecode(a.start)}** (${(a.end - a.start).toFixed(1)}s) — ${momentDescription(a, meta.analysisWidth, meta.analysisHeight)}`;
+    entries.push({ t: a.start, line: hidden ? `- _${entry} — not shown: ${hidden}_` : `- ${entry}` });
+    if (!hidden) lastEnd = Math.max(lastEnd, a.end);
+  }
+  if (f.video.duration - lastEnd >= EXPORT_GAP_MIN) entries.push({ t: lastEnd, line: gapLine(lastEnd, f.video.duration) });
+  entries.sort((x, y) => x.t - y.t);
+
+  let lastScene = -1;
+  for (const e of entries) {
+    const s = sceneFor(e.t);
     if (s !== lastScene) {
       lastScene = s;
       lines.push("");
       lines.push(`## Scene ${s + 1} — from ${convertSecondsToTimecode(f.scenes[s]?.start ?? 0)}`);
       lines.push("");
     }
-    lines.push(
-      `- **${convertSecondsToTimecode(a.start)}** (${(a.end - a.start).toFixed(1)}s) — ${momentDescription(a, meta.analysisWidth, meta.analysisHeight)}`
-    );
-    lastEnd = Math.max(lastEnd, a.end);
-  }
-  const tail = f.video.duration - lastEnd;
-  if (tail >= EXPORT_GAP_MIN) {
-    lines.push(`- _${convertSecondsToTimecode(lastEnd)}–${convertSecondsToTimecode(f.video.duration)}: no visual activity (${Math.round(tail)}s)_`);
+    lines.push(e.line);
   }
   lines.push("");
   return lines.join("\n");
