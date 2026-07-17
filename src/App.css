@@ -285,6 +285,7 @@
 }
 .moments-side.overlay .side-now { color: #ffc233; }
 .moments-side.overlay .side-d { color: var(--d-muted); }
+.moments-side.overlay .side-desc { color: var(--d-muted); }
 .moments-side.overlay .side-thumb { border-color: var(--d-line); }
 .moments-side.overlay .side-thumb.ph { background: #2a303a; color: var(--d-muted); }
 .moments-side.overlay .side-view { border-color: var(--d-line); }
@@ -436,6 +437,9 @@
 }
 
 .side-meta { min-width: 0; line-height: 1.35; }
+.side-top { display: block; }
+/* The worded geometry line ("Writing · top right"). Muted: it's the index entry's subtitle. */
+.side-desc { display: block; color: var(--muted); font-size: 0.9375rem; }
 .side-now {
   display: block;
   color: #8a5200;

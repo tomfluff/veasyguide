@@ -689,6 +689,10 @@ export default function App() {
         <MomentsSidebar
           activities={activities}
           scenes={scenes}
+          // The sidebar mounts BEFORE meta (see comment above) — but no activity can exist
+          // before meta either, so these fallbacks never reach a rendered description.
+          frameW={meta?.analysisWidth ?? 1}
+          frameH={meta?.analysisHeight ?? 1}
           thumbs={thumbs}
           current={currMoment}
           done={done}

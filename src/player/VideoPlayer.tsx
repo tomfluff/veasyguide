@@ -55,6 +55,7 @@ import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
 import { timelineMarkers, stepMoment, seekTargetFor } from "./moments";
+import { momentDescription, momentLabel } from "./describe";
 import MomentsSidebar from "../MomentsSidebar";
 import AppearanceSheet from "./AppearanceSheet";
 import HighlightIndicator from "./HighlightIndicator";
@@ -637,7 +638,7 @@ const VideoPlayer = (props: Props) => {
               const isNow = currIndex >= 0 && m.activities.some((a) => a === currActivity);
               const label =
                 m.activities.length === 1
-                  ? `Moment ${m.index}, ${convertSecondsToTimecode(m.activities[0].start)}, ${(
+                  ? `Moment ${m.index}, ${momentDescription(m.activities[0], props.meta.analysisWidth, props.meta.analysisHeight)}, ${convertSecondsToTimecode(m.activities[0].start)}, ${(
                       m.activities[0].end - m.activities[0].start
                     ).toFixed(1)} seconds`
                   : `Moments ${m.index} to ${m.index + m.activities.length - 1}, from ${convertSecondsToTimecode(
@@ -672,6 +673,10 @@ const VideoPlayer = (props: Props) => {
                 <>
                   Moment <b>{currIndex + 1}</b>
                   {props.done ? <> of <b>{props.activities.length}</b></> : null}
+                  {" · "}
+                  {/* The worded geometry (describe.ts): tells you WHAT and WHERE, not just when —
+                      the same words the screen reader gets. */}
+                  {momentLabel(props.activities[currIndex], props.meta.analysisWidth, props.meta.analysisHeight).toLowerCase()}
                   {" · "}
                   <b>{convertSecondsToTimecode(props.activities[currIndex].start)}</b>,{" "}
                   {(props.activities[currIndex].end - props.activities[currIndex].start).toFixed(1)}s
@@ -953,6 +958,8 @@ const VideoPlayer = (props: Props) => {
           }}
           activities={props.activities}
           scenes={props.scenes}
+          frameW={props.meta.analysisWidth}
+          frameH={props.meta.analysisHeight}
           thumbs={props.thumbs ?? EMPTY_THUMBS}
           current={currActivity}
           done={props.done}

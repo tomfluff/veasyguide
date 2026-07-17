@@ -10,11 +10,15 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Activity, Scene } from "./analyzer/types";
 import { convertSecondsToTimecode } from "./utils/misc";
 import { seekTargetFor, groupByScenes } from "./player/moments";
+import { momentDescription, momentLabel } from "./player/describe";
 import { useViewSettingsStore, setGroupByScene } from "./stores/ViewSettingsStore";
 
 type Props = {
   activities: Activity[];
   scenes: Scene[];
+  // Analysis-frame dimensions, for wording each moment's geometry (describe.ts).
+  frameW: number;
+  frameH: number;
   // activity id → object URL of its thumbnail crop. Filled after analysis completes;
   // rows show a placeholder until then.
   thumbs: ReadonlyMap<number, string>;
@@ -32,7 +36,7 @@ type Props = {
   onEscape?: () => void;
 };
 
-export default function MomentsSidebar({ activities, scenes, thumbs, current, done, canPlay, lead, onJump, className, style, onEscape }: Props) {
+export default function MomentsSidebar({ activities, scenes, frameW, frameH, thumbs, current, done, canPlay, lead, onJump, className, style, onEscape }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
   const groupByScene = useViewSettingsStore((s) => s.groupByScene);
@@ -89,7 +93,7 @@ export default function MomentsSidebar({ activities, scenes, thumbs, current, do
         aria-current={now ? "true" : undefined}
         disabled={!canPlay}
         onClick={() => onJump(seekTargetFor(a, lead))}
-        aria-label={`Moment ${i + 1}, ${convertSecondsToTimecode(a.start)}, ${(a.end - a.start).toFixed(1)} seconds`}
+        aria-label={`Moment ${i + 1}, ${momentDescription(a, frameW, frameH)}, ${convertSecondsToTimecode(a.start)}, ${(a.end - a.start).toFixed(1)} seconds`}
       >
         {url ? (
           <img className="side-thumb" src={url} alt="" />
@@ -97,9 +101,13 @@ export default function MomentsSidebar({ activities, scenes, thumbs, current, do
           <span className="side-thumb ph" aria-hidden="true">{i + 1}</span>
         )}
         <span className="side-meta">
-          {now && <span className="side-now">Now</span>}
-          <span className="side-t">{convertSecondsToTimecode(a.start)}</span>
-          <span className="side-d">{(a.end - a.start).toFixed(1)}s</span>
+          <span className="side-top">
+            {now && <span className="side-now">Now</span>}
+            <span className="side-t">{convertSecondsToTimecode(a.start)}</span>
+            <span className="side-d">{(a.end - a.start).toFixed(1)}s</span>
+          </span>
+          {/* The worded geometry — what the analyzer knows, as a readable index entry. */}
+          <span className="side-desc">{momentLabel(a, frameW, frameH)}</span>
         </span>
       </button>
     );
