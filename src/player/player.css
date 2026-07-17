@@ -41,11 +41,19 @@
    #f2f4f7 icons at 10.7:1 — recheck that number if the alpha drops. */
 .video-controls-container {
   position: absolute;
-  bottom: 0;
+  /* -1px, with the padding giving it back: a hairline of video under the controls at
+     fractional device-pixel ratios. The player's height is width * 9/16, so its bottom edge
+     lands wherever it lands — at 125% Windows scaling (dpr 1.25) that is 940.469 device px,
+     mid-pixel. The bar is its own composited layer (it animates opacity), so it and the
+     video underneath round that .469 independently; when they disagree, one device pixel of
+     video shows below the bar. Overshooting by a whole CSS pixel means the bar's background
+     always wins the rounding, and `padding-bottom: 5px` (4 + the 1 borrowed) keeps the
+     controls exactly where they were — this changes what is PAINTED, never the layout. */
+  bottom: -1px;
   left: 0;
   right: 0;
   z-index: 50;
-  padding: 4px 12px 4px;
+  padding: 4px 12px 5px;
   background-color: rgba(18, 22, 29, 0.85);
   border-top: 1px solid var(--d-line);
   color: var(--d-text);
