@@ -578,3 +578,35 @@ research parked in proposals-parked.md (activity clustering — what the `featur
 always collected for), not a pair of hand-tuned thresholds. The removal note in
 `describe.ts` records the thresholds tried, so the next attempt starts from the failure
 rather than reinventing it.
+
+---
+
+## D20 — The pinned snapshot's corner and size belong to the reader
+
+**Decision.** The pin panel gets two cycle buttons in its caption — size (small /
+medium / large) and corner (top right → bottom right → bottom left → top left) — both
+persisted in `ViewSettingsStore`. Corners reuse the vocabulary `momentPlace` speaks, so
+the panel's position and the moments' descriptions agree on words. Persisted, because a
+reader who needs it large needs it large on every video; re-enlarging it each time is the
+tax this app exists to remove.
+
+**Why cycles, not a picker.** A menu would open over the very video the panel is already
+covering. One button each, and each label names where the next press lands ("Snapshot
+size: medium. Change to large."), so the choice is knowable without sight and without
+having to try it first. No new hotkeys: the buttons are in the tab order, and the
+keyboard map is already dense.
+
+**Rejected: `resize: both`.** Free, native, one line — and pointer-only. Unusable by
+keyboard, which is precisely the audience. Laziness that excludes the user is not
+laziness, it is a bug.
+
+**Two layout facts the browser had to teach us.** (1) `max-width` did nothing: the panel
+is absolutely positioned, so it shrink-to-fits its image, and any crop narrower than the
+cap made all three sizes render identically — the control was inert for every ordinary
+moment. The size classes set `width`. (2) The control bar is z-50 and the panel is z-35,
+so a tall panel grew UNDER the bar and the bar swallowed the panel's own caption
+controls. The panel's height is now capped at the space the measured bar leaves
+(`calc(100% - barHeight - 24px)`), the same trick the fullscreen moments overlay uses,
+with the image shrinking (`min-height: 0`) rather than pushing the caption out of reach.
+Verified across all 12 size×corner combinations: each clears the bar, stays in the
+viewport, and keeps every button hittable.

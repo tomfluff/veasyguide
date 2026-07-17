@@ -141,30 +141,64 @@
    peripheral glance. No animation: it appears, it sits still, it goes. */
 .pin-panel {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
   z-index: 35; /* above the notices (25-30), below the control bar (50) */
-  max-width: min(46%, 640px);
+  display: flex;
+  flex-direction: column;
   background: rgba(13, 15, 19, 0.92);
   border: 2px solid #ffc233;
   border-radius: var(--r-md);
   overflow: hidden;
 }
+/* Which corner the reader parked it in. Top corners anchor to the frame; bottom corners
+   get their `bottom` from JS instead — the control bar's height is measured, not fixed,
+   and the panel must never sit under the controls. */
+.pin-panel.at-tl { top: 0.75rem; left: 0.75rem; }
+.pin-panel.at-tr { top: 0.75rem; right: 0.75rem; }
+.pin-panel.at-bl { left: 0.75rem; }
+.pin-panel.at-br { right: 0.75rem; }
+
+/* Three sizes, not a drag handle. `resize: both` would have been free, but it is
+   pointer-only — unusable by keyboard, which is the audience this panel is for.
+   `width`, not `max-width`: the panel is absolutely positioned, so it shrink-to-fits
+   its image, and a crop narrower than the cap made all three sizes render identically
+   — the control did nothing for any ordinary moment. An explicit width makes the
+   reader's choice the thing that decides, and lets the image scale UP to fill it,
+   which is the point of a panel whose job is to be readable. */
+.pin-panel.size-s { width: min(30%, 420px); }
+.pin-panel.size-m { width: min(46%, 640px); }
+.pin-panel.size-l { width: min(72%, 1000px); }
+
+/* The image yields the vertical space, never the caption: min-height 0 lets it shrink
+   below its intrinsic height inside the panel's measured max-height (set in JS, clearing
+   the control bar), and object-fit keeps the ink undistorted while it does. Without this
+   a tall crop pushed the caption — and its controls — down under the bar, which sits
+   above the panel and swallowed the clicks. */
 .pin-panel img {
   display: block;
   width: 100%;
-  max-height: 40vh;
+  min-height: 0;
   object-fit: contain;
   background: #0d0f13;
 }
 .pin-cap {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 2px;
   padding: 2px 4px 2px 10px;
   color: var(--d-text);
   font-size: 0.9375rem;
+}
+/* The caption text yields to the buttons rather than pushing them off: at the small size
+   there is not room for both, and a truncated place-name still has the timecode beside it
+   — while a clipped button would be unreachable. The full text is on the panel's own
+   aria-label regardless. */
+.pin-cap > :first-child {
+  flex: 1;
+  min-width: 0;
+  margin-right: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pin-cap button {
   display: flex;

@@ -29,6 +29,9 @@ import {
   useTimeout,
 } from "@mantine/hooks";
 import {
+  IconArrowsDiagonal,
+  IconArrowsDiagonalMinimize2,
+  IconLayoutDistributeHorizontal,
   IconPlayerPlayFilled,
   IconPlayerPauseFilled,
   IconMaximize,
@@ -66,7 +69,10 @@ import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
-import { useViewSettingsStore, setPlaybackRate, setAtMomentEnd, type MomentEndBehavior } from "../stores/ViewSettingsStore";
+import {
+  useViewSettingsStore, setPlaybackRate, setAtMomentEnd, type MomentEndBehavior,
+  setPinSize, setPinCorner, nextPinSize, nextPinCorner, PIN_SIZE_NAMES, PIN_CORNER_NAMES,
+} from "../stores/ViewSettingsStore";
 
 import "./player.css";
 
@@ -163,6 +169,8 @@ const VideoPlayer = (props: Props) => {
   // Study pace: persisted playback rate + what happens at a moment's end (tempo engine).
   const playbackRate = useViewSettingsStore((s) => s.playbackRate);
   const atMomentEnd = useViewSettingsStore((s) => s.atMomentEnd);
+  const pinSize = useViewSettingsStore((s) => s.pinSize);
+  const pinCorner = useViewSettingsStore((s) => s.pinCorner);
   const insideMomentRef = useRef<Activity | null>(null); // raw in-moment tracking (no lead/linger)
   const tempoActedRef = useRef<number | null>(null); // moment id the tempo engine already acted on
   // Pinned snapshot: a full-res crop of a moment's final ink, captured from the live video
@@ -1146,14 +1154,24 @@ const VideoPlayer = (props: Props) => {
           ) : null}
         </Box>
       </Box>
-      {/* The pinned snapshot: a still, magnified crop of a moment's final ink, docked in
-          the top-right while the video plays on underneath. The viewer reads at their own
-          speed; the lecture keeps the instructor's. Content updates to the newest finished
-          moment while open. Anchored top-right: the bar owns the bottom, the catching-up
-          and scene notices own the top-center. */}
+      {/* The pinned snapshot: a still, magnified crop of a moment's final ink, docked in a
+          corner while the video plays on underneath. The viewer reads at their own speed;
+          the lecture keeps the instructor's. Content updates to the newest finished moment
+          while open. Corner and size are the reader's to choose and persist: one default
+          cannot be right for both a reader who wants it out of the live action and one who
+          needs it big enough to read. The top-center stays reserved either way — the
+          catching-up and scene notices own it — and a bottom-docked panel clears the
+          measured bar, so no choice can bury the controls or the notices. */}
       {pinned && (
         <Box
-          className="pin-panel"
+          className={classNames("pin-panel", `size-${pinSize}`, `at-${pinCorner}`)}
+          // The bar is measured, and it sits ABOVE this panel: anything the panel grows
+          // into, the bar covers. Capping the height at the space the bar leaves is what
+          // keeps the panel's own caption controls clickable at every size.
+          style={{
+            maxHeight: `calc(100% - ${barHeight + 24}px)`,
+            ...(pinCorner === "bl" || pinCorner === "br" ? { bottom: barHeight + 12 } : {}),
+          }}
           role="group"
           aria-label={`Pinned snapshot: ${momentDescription(pinned.activity, props.meta.analysisWidth, props.meta.analysisHeight)}, ${convertSecondsToTimecode(pinned.activity.start)}`}
         >
@@ -1167,6 +1185,25 @@ const VideoPlayer = (props: Props) => {
               {" · "}
               {convertSecondsToTimecode(pinned.activity.start)}
             </Text>
+            {/* Cycles, not menus: a picker would open over the very video the panel is
+                already covering. Each label names where the next press lands, so the
+                choice is knowable without sight and without trying it. */}
+            <UnstyledButton
+              aria-label={`Snapshot size: ${PIN_SIZE_NAMES[pinSize]}. Change to ${PIN_SIZE_NAMES[nextPinSize(pinSize)]}.`}
+              title={`Snapshot size: ${PIN_SIZE_NAMES[pinSize]}`}
+              onClick={() => setPinSize(nextPinSize(pinSize))}
+              onKeyDown={stopPlayerHotkeys}
+            >
+              {pinSize === "l" ? <IconArrowsDiagonalMinimize2 size={20} /> : <IconArrowsDiagonal size={20} />}
+            </UnstyledButton>
+            <UnstyledButton
+              aria-label={`Snapshot corner: ${PIN_CORNER_NAMES[pinCorner]}. Move to ${PIN_CORNER_NAMES[nextPinCorner(pinCorner)]}.`}
+              title={`Snapshot corner: ${PIN_CORNER_NAMES[pinCorner]}`}
+              onClick={() => setPinCorner(nextPinCorner(pinCorner))}
+              onKeyDown={stopPlayerHotkeys}
+            >
+              <IconLayoutDistributeHorizontal size={20} />
+            </UnstyledButton>
             <UnstyledButton aria-label="Dismiss pinned snapshot" onClick={handleUnpin} onKeyDown={stopPlayerHotkeys}>
               <IconX size={20} />
             </UnstyledButton>
