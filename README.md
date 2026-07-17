@@ -61,8 +61,15 @@ node --experimental-strip-types src/analyzer/selfcheck.ts
 ## Build
 
 ```bash
+npm run typecheck  # tsc -b
 npm run build      # tsc + vite build → dist/ (static site)
 npm run preview
 ```
+
+Typecheck with `npm run typecheck`, never `tsc --noEmit`. The root `tsconfig.json` is
+solution-style (`"files": []` + references), so `--noEmit` there checks **nothing**: it
+finds no files, exits 0, and looks just like a pass. Only build mode (`tsc -b`) follows the
+references to the projects that hold the code. See D25 — that silent pass hid 11 errors and
+a research feature that had stopped working.
 
 Deploy target is static hosting on Google Cloud (Firebase Hosting) — wired up in a later phase.

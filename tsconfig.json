@@ -1,3 +1,11 @@
+// Solution-style config: it owns no files itself, it only points at the two real projects.
+//
+// Therefore `tsc --noEmit` here CHECKS NOTHING. It does not follow references — it finds
+// `"files": []`, has nothing to do, and exits 0. It looks exactly like a passing typecheck.
+// That is not hypothetical: 11 errors and a silently dead feature (D25) accumulated behind
+// a command that reported success every time.
+//
+// Use `npm run typecheck` (tsc -b). Build mode is what walks the references.
 {
   "files": [],
   "references": [
