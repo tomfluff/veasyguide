@@ -358,6 +358,7 @@
 .moments-side.overlay .side-scene-c { color: var(--d-muted); }
 
 .moments-side .side-head {
+  position: relative; /* anchors .side-save in the corner */
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--line);
 }
@@ -370,17 +371,22 @@
    panel chrome is rem-sized and browser zoom (the magnification path) grows it with the page. */
 /* The two exports, styled like the arrange toggle below them: quiet chrome, not content.
    Accent text says "action", matching the top bar's Change video. */
+/* Parked in the header's top corner and taken out of the flow entirely: a 44px control on
+   its own row pushed every moment down the scroll to advertise a once-per-lecture action.
+   Absolute, so the target stays finger-sized without the header growing to fit it. */
 .side-save {
-  margin-top: 6px;
-  min-height: 2rem;
-  padding: 0 0.75rem;
-  border: 1px solid var(--line);
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
   border-radius: var(--r-md);
-  background: var(--card);
+  background: none;
   color: var(--accent);
-  font: inherit;
-  font-size: 0.9375rem;
-  font-weight: 600;
   cursor: pointer;
 }
 .side-save:hover { background: var(--hover); }

@@ -8,6 +8,7 @@
 // emitting scenes all along; this is the first thing that reads them.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Menu } from "@mantine/core";
+import { IconDownload } from "@tabler/icons-react";
 import type { Activity, Scene } from "./analyzer/types";
 import { convertSecondsToTimecode } from "./utils/misc";
 import { seekTargetFor, groupByScenes } from "./player/moments";
@@ -143,17 +144,22 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
               ? <>Now at <b>{currIndex + 1}</b> of <b>{activities.length}</b>{done ? "" : "+"}</>
               : <><b>{activities.length}</b>{done ? "" : "+"} in this lecture</>}
         </div>
-        {/* One menu, not two buttons: saving is rare and the list is the point of this
-            column — two permanent buttons sat above the moments competing with them.
+        {/* Saving is rare; the list is the point of this column. A labelled button on its own
+            row cost every moment below it a permanent slice of the scroll, to advertise a
+            thing you do once. As an icon in the corner it costs nothing and the list starts
+            higher — it is absolutely positioned, so its 44px touch target does not grow the
+            header it sits in.
             What each file IS lives inside the menu rather than in a title tooltip: a
             tooltip is invisible to touch and unreliable on keyboard focus, so the one
             sentence that tells you which file you want was hidden from the people most
             likely to need it. Mantine's Menu carries the roles, arrow keys, Escape and
             focus return; hand-rolling those is how a menu ends up keyboard-hostile. */}
         {onExport && done && activities.length > 0 && (
-          <Menu position="bottom-start" classNames={{ dropdown: "side-save-pop" }}>
+          <Menu position="bottom-end" classNames={{ dropdown: "side-save-pop" }}>
             <Menu.Target>
-              <button type="button" className="side-save">Save…</button>
+              <button type="button" className="side-save" aria-label="Save a moments file or notes" title="Save…">
+                <IconDownload size={20} />
+              </button>
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Item onClick={() => onExport("json")}>
