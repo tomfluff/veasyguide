@@ -136,6 +136,48 @@
   outline-offset: 2px;
 }
 
+/* The pinned snapshot panel. Amber frame — the "current thing" accent — because the panel
+   IS content (the viewer's reading matter), not chrome, and it must be findable in a
+   peripheral glance. No animation: it appears, it sits still, it goes. */
+.pin-panel {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 35; /* above the notices (25-30), below the control bar (50) */
+  max-width: min(46%, 640px);
+  background: rgba(13, 15, 19, 0.92);
+  border: 2px solid #ffc233;
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.pin-panel img {
+  display: block;
+  width: 100%;
+  max-height: 40vh;
+  object-fit: contain;
+  background: #0d0f13;
+}
+.pin-cap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 2px 10px;
+  color: var(--d-text);
+  font-size: 0.9375rem;
+}
+.pin-cap button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--d-text);
+  border-radius: var(--r-md);
+}
+.pin-cap button:hover { background: #21262f; }
+.pin-cap button:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
+
 .video-controls-container .controls > button svg,
 .video-controls-container .controls > .volume-container > button svg {
   width: 22px;

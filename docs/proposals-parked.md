@@ -92,6 +92,19 @@ batch would put two new persistent overlays on the video at once, which deserves
 evaluation against the "default never moves / nothing decorative" motion rules. Afterglow
 is small (display-layer only) and a good candidate to add after F1 has real-user feedback.
 
+### Sidebar thumbnail click-to-enlarge — Dev (sighted learner, part of his #4)
+
+**His rationale:** "The sidebar thumbnail already showed the finished writing at
+postage-stamp size — the exact artifact I wanted, just too small to read and not
+clickable-to-zoom."
+
+**Why parked:** The rows are `<button>`s, so a clickable thumbnail inside one is invalid
+nested-interactive markup, and the stored thumbs are 220px wide — enlarged they would blur
+exactly the ink the click was trying to read. The shipped pin panel (P / the bar's pin
+button) covers the underlying need at full capture resolution for the playback flow; an
+archive-quality per-moment enlarge wants higher-res snippet storage first (a memory-budget
+decision), then a proper row layout with a secondary control.
+
 ### Multi-video pre-queue — Dev (sighted learner, part of his #3)
 
 **His rationale:** "Exam night = 4 lectures × 90 min. Let me drop 3–4 files at once and

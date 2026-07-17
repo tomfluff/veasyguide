@@ -42,6 +42,8 @@ import {
   IconZoom,
   IconZoomInAreaFilled,
   IconSwitchHorizontal,
+  IconPinFilled,
+  IconX,
   IconPlayerTrackPrevFilled,
   IconPlayerTrackNextFilled,
   IconChevronDown,
@@ -57,6 +59,7 @@ import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
 import { timelineMarkers, stepMoment, seekTargetFor } from "./moments";
 import { momentDescription, momentLabel } from "./describe";
+import { cropRect } from "../analyzer/snippets";
 import MomentsSidebar from "../MomentsSidebar";
 import AppearanceSheet from "./AppearanceSheet";
 import HighlightIndicator from "./HighlightIndicator";
@@ -107,7 +110,7 @@ const SCENE_NOTICE_MS = 2500;
 // zoom is drawn on the video with its own indicator, and [ / ] are navigation. Kept as one set
 // so the hotkey table and the container's onKeyDown cannot drift apart and disagree. Both `z`
 // and `Z` — the container sees the raw event.key, so Shift and CapsLock both reach it.
-const NO_REVEAL_KEYS = new Set(["z", "Z", "ArrowUp", "ArrowDown", "[", "]"]);
+const NO_REVEAL_KEYS = new Set(["z", "Z", "p", "P", "ArrowUp", "ArrowDown", "[", "]"]);
 
 // Seconds of analysis before playback unlocks. Lives here because the pre-playback gate
 // PROMISES this number on screen ("the first 10 seconds"), and App gates `canPlay` on it —
@@ -162,6 +165,14 @@ const VideoPlayer = (props: Props) => {
   const atMomentEnd = useViewSettingsStore((s) => s.atMomentEnd);
   const insideMomentRef = useRef<Activity | null>(null); // raw in-moment tracking (no lead/linger)
   const tempoActedRef = useRef<number | null>(null); // moment id the tempo engine already acted on
+  // Pinned snapshot: a full-res crop of a moment's final ink, captured from the live video
+  // element the instant playback crosses the moment's end (the end frame is what's on screen
+  // right then — no seeking needed). The newest capture is kept even when nothing is pinned,
+  // so P after a moment has passed still shows what was just written.
+  const lastEndFrameRef = useRef<{ activity: Activity; url: string } | null>(null);
+  const [pinned, setPinned] = useState<{ activity: Activity; url: string } | null>(null);
+  const pinnedRef = useRef(pinned);
+  pinnedRef.current = pinned;
   // Where the viewer was before we jumped them to a moment to preview against.
   const preAppearanceTimeRef = useRef<number | null>(null);
 
@@ -227,6 +238,7 @@ const VideoPlayer = (props: Props) => {
     // No reveal — the magnifier is drawn on the video and has its own indicator; the bar has
     // no zoom control to show you. Kept in step with NO_REVEAL_KEYS below.
     ["Z", () => handleZoom()],
+    ["P", () => handlePin()],
     ["ArrowUp", () => handleZoomShift(0.1)],
     ["ArrowDown", () => handleZoomShift(-0.1)],
     // Mantine matches on event.key, which for these is literally "[" and "]" — not the
@@ -309,6 +321,57 @@ const VideoPlayer = (props: Props) => {
     setCurrTime(seekTo);
   };
 
+  // Draw the moment's crop (snippets.cropRect: box + 15% pad, native video px) from the
+  // video element into a canvas and keep it as an object URL. Kept even when nothing is
+  // pinned; if the panel is open it follows the newest capture — the panel is "what was
+  // just written", not an archive.
+  // ponytail: holds ONE frame; per-moment history would need a store and an eviction policy.
+  const captureEndFrame = (a: Activity, video: HTMLVideoElement) => {
+    const r = cropRect(a, props.meta);
+    if (r.w < 2 || r.h < 2) return;
+    const c = document.createElement("canvas");
+    c.width = r.w;
+    c.height = r.h;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    c.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const old = lastEndFrameRef.current;
+      if (old && old.url !== pinnedRef.current?.url) URL.revokeObjectURL(old.url);
+      lastEndFrameRef.current = { activity: a, url };
+      if (pinnedRef.current) {
+        const shown = pinnedRef.current.url;
+        setPinned({ activity: a, url });
+        if (shown !== url) URL.revokeObjectURL(shown);
+      }
+    }, "image/png");
+  };
+
+  // Pin the current moment's ink as it stands right now, or — between moments — the final
+  // ink of the last one that ended. Toggles off if already showing.
+  const handlePin = () => {
+    if (pinnedRef.current) {
+      handleUnpin();
+      return;
+    }
+    const video = videoRef.current;
+    const inside = insideMomentRef.current;
+    if (video && inside) captureEndFrame(inside, video);
+    // captureEndFrame is async (toBlob); pin whatever is newest once it lands. For the
+    // between-moments case the capture already exists.
+    setTimeout(() => {
+      if (lastEndFrameRef.current) setPinned(lastEndFrameRef.current);
+    }, 60);
+  };
+
+  const handleUnpin = () => {
+    const shown = pinnedRef.current;
+    if (shown && shown.url !== lastEndFrameRef.current?.url) URL.revokeObjectURL(shown.url);
+    setPinned(null);
+  };
+
   // Core per-time update: selection, stable activity, scene tracking. Kept in a ref
   // so the rVFC loop always calls the freshest closure.
   const updateAtTime = (t: number) => {
@@ -356,6 +419,11 @@ const VideoPlayer = (props: Props) => {
     const inside = props.activities.find((a) => t >= a.start && t <= a.end) ?? null;
     const prevInside = insideMomentRef.current;
     insideMomentRef.current = inside;
+    // Capture the finished ink as playback leaves a moment — but never on a seek: the frame
+    // on screen after a jump belongs to the destination, not to the moment left behind.
+    if (video && !jumped && prevInside && (!inside || inside.id !== prevInside.id) && t >= prevInside.end) {
+      captureEndFrame(prevInside, video);
+    }
     if (jumped) tempoActedRef.current = null;
     else if (
       video && !video.paused &&
@@ -904,6 +972,20 @@ const VideoPlayer = (props: Props) => {
           >
             <IconZoomInAreaFilled />
           </UnstyledButton>
+          {/* Pin: keep the last-written ink readable while the lecture moves on. The core
+              user reads at a third of normal speed — this is her time to read, decoupled
+              from the instructor's time to talk. */}
+          <UnstyledButton
+            className={classNames("collapse-hide", "zoom-toggle", { on: !!pinned })}
+            onClick={() => { showControls(); handlePin(); }}
+            onKeyDown={stopPlayerHotkeys}
+            aria-label={pinned ? "Dismiss the pinned snapshot" : "Pin a snapshot of the latest writing"}
+            aria-pressed={!!pinned}
+            aria-disabled={!pinned && !lastEndFrameRef.current && !insideMomentRef.current ? true : undefined}
+            title={pinned ? "Dismiss pinned snapshot (P)" : "Pin the latest writing (P)"}
+          >
+            <IconPinFilled />
+          </UnstyledButton>
           <Popover
             position="top-end"
             withinPortal={false}
@@ -1064,6 +1146,33 @@ const VideoPlayer = (props: Props) => {
           ) : null}
         </Box>
       </Box>
+      {/* The pinned snapshot: a still, magnified crop of a moment's final ink, docked in
+          the top-right while the video plays on underneath. The viewer reads at their own
+          speed; the lecture keeps the instructor's. Content updates to the newest finished
+          moment while open. Anchored top-right: the bar owns the bottom, the catching-up
+          and scene notices own the top-center. */}
+      {pinned && (
+        <Box
+          className="pin-panel"
+          role="group"
+          aria-label={`Pinned snapshot: ${momentDescription(pinned.activity, props.meta.analysisWidth, props.meta.analysisHeight)}, ${convertSecondsToTimecode(pinned.activity.start)}`}
+        >
+          <img
+            src={pinned.url}
+            alt={`Final ink: ${momentDescription(pinned.activity, props.meta.analysisWidth, props.meta.analysisHeight)}`}
+          />
+          <Box className="pin-cap">
+            <Text>
+              {momentLabel(pinned.activity, props.meta.analysisWidth, props.meta.analysisHeight)}
+              {" · "}
+              {convertSecondsToTimecode(pinned.activity.start)}
+            </Text>
+            <UnstyledButton aria-label="Dismiss pinned snapshot" onClick={handleUnpin} onKeyDown={stopPlayerHotkeys}>
+              <IconX size={20} />
+            </UnstyledButton>
+          </Box>
+        </Box>
+      )}
       {/* The fullscreen mount of the moments list. Same component as the page sidebar —
           the current row and the on-video highlight come from this player's own
           currActivity, so they cannot disagree. Anchored above the measured bar so it

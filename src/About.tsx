@@ -13,6 +13,7 @@ const KEYS: [string, string][] = [
   ["[ / ]", "Previous / next moment"],
   ["< / >", "Slower / faster playback"],
   ["Z", "Toggle magnification"],
+  ["P", "Pin / dismiss a snapshot of the latest writing"],
   ["↑ / ↓", "Zoom in / out"],
   ["M", "Mute"],
   ["F", "Fullscreen"],
