@@ -482,3 +482,47 @@ ids with a segment offset: still collides after any out-of-order flush.
 
 **Limitation.** A cut lying exactly on a segment boundary is invisible (neither segment
 diffs across it) — pre-existing, unchanged by this.
+
+---
+
+## D17 — The five persona features (July 2026 deliberation)
+
+**Decision.** Five personas (low-vision learner — final word on conflicts, instructor,
+sighted learner, blind learner, content creator) each used the app and proposed four
+features; twenty proposals were debated on user value, feasibility, and architectural fit
+and converged into five. Everything excluded is preserved with rationale in
+proposals-parked.md — parked, not discarded.
+
+The five, and the convergences that chose them:
+
+1. **Pinned snapshot** (low-vision #1 + sighted #4): pin a magnified crop of a moment's
+   finished ink over the playing video; sidebar thumbnails enlarge on demand. The core
+   user's top need — "give me time to READ it" — and the crammer's "let me read the final
+   board state" are the same artifact.
+2. **Study pace** (low-vision #2 + sighted #1 + sighted #2 + blind #3): a playback-speed
+   control, plus a moment-aware tempo mode with two directions on one engine — wait (pause
+   at each moment's end; the blind learner's audio-scoped playback and the low-vision
+   "don't outrun me") and skim (jump the gaps; measured 67% of a real lecture is
+   moment-free dead air).
+3. **Moments file** (instructor #1 + creator #2 + sighted #3 + blind #4 + creator #1):
+   serialize the analysis once, spend it three ways — an IndexedDB cache keyed by file
+   fingerprint (auto-restore on reopen), an exportable/importable .veasyguide.json sidecar
+   (analyze once, share with 300 students; the architecture-honest answer to "embed it"),
+   and a Markdown export (the blind learner's notes skeleton, the creator's pacing data).
+4. **Spatial descriptions** (blind #2 + instructor #3): word the geometry the analyzer
+   already computes — "Writing · top right · large" from box + features — in sidebar
+   labels, announcements, and exports. The blind persona's key finding: the data to
+   describe moments in words exists today; it is only ever spent on paint.
+5. **Visible magnifier** (creator #4 + low-vision #4): an on-screen zoom toggle with
+   pressed state and a persistent "ON · 1.7×" chip, touch-reachable, plus a full-frame
+   fallback when the zoom target is empty (the fullscreen black-screen trap). The app's
+   core interaction was a keyboard-only toggle whose state was invisible to its core user.
+
+**Why these five.** Every persona lands at least one direct win; the low-vision learner
+(the product's reason to exist) lands her top two; the blind learner's honest verdict —
+"every unit of added value is paint" — is answered with data, not paint (descriptions,
+wait-mode playback, Markdown export); and nothing violates the client-side, no-upload,
+no-account, offline-first promises. The instructor's biggest ask (parked-pen detection) is
+deliberately NOT here: it is analyzer research with false-positive risk against the app's
+"never highlight the wrong thing" promise, and it is parked with a cost estimate rather
+than rushed.
