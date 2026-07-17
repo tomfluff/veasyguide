@@ -258,6 +258,8 @@ export default function App() {
   // target: dragleave on the shell fires every time the pointer crosses a child boundary, so
   // a veil that covers everything is the one element whose dragleave means "actually left".
   const [dragging, setDragging] = useState(false);
+  // The top bar's "Load moments file" opens this; drag-and-drop was the only way in before.
+  const momentsInputRef = useRef<HTMLInputElement>(null);
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -465,10 +467,15 @@ export default function App() {
         const { file, error } = parseMomentsFile(text);
         if (error || !file) return setNotice(error ?? "That moments file couldn't be read.");
         if (!sidecarMatchesFile(file, current.size)) {
-          // "Nothing changed", not "still analyzing": this fires whether the analysis is
-          // running or long finished, and a message that names the wrong state is its own
+          // Says WHY, not just no. "Belongs to a different video" invites "so what?" from
+          // someone who has never met a moments file; the rule (it fits one exact file) is
+          // the thing that makes the refusal make sense and tells them what to look for.
+          // "Nothing changed" rather than naming a state: this fires whether the analysis is
+          // running or long finished, and a message that names the wrong one is its own
           // small lie. What the viewer needs to know is that their analysis survived.
-          return setNotice("That moments file belongs to a different video (the sizes don't match). Nothing changed.");
+          return setNotice(
+            `That moments file was made from a different video — a moments file only fits the exact file it came from, and this one doesn't match ${fileName ?? "the video you have open"}. Nothing changed.`
+          );
         }
         setPendingSidecar(file);
       });
@@ -713,6 +720,21 @@ export default function App() {
         status={chip}
         onAbout={() => setAboutOpen(true)}
         onChangeVideo={reset}
+        onLoadMoments={canDrop ? () => momentsInputRef.current?.click() : undefined}
+      />
+      {/* The picker feeds the same loadFiles as a drop, so the file goes through one set of
+          checks and one confirm however it arrived. Value is cleared after each pick or
+          choosing the same file twice in a row fires nothing the second time. */}
+      <input
+        ref={momentsInputRef}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) loadFiles([f]);
+          e.target.value = "";
+        }}
       />
       <About open={aboutOpen} onClose={() => setAboutOpen(false)} feedbackHref={feedbackHref} />
       {/* Drag a file over the player and the whole screen becomes the target. Without this

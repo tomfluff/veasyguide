@@ -649,7 +649,11 @@
    an amber strip you can dismiss, not a red panel that reads like a crash. */
 .strip {
   display: flex;
-  align-items: flex-start;
+  /* Centred, not flex-start. The dismiss button is 44px (touch target) and therefore sets
+     the strip's height; top-aligning a single line of text against it left the button's
+     own height sitting under the words as dead space, which read as a box that had failed
+     to fill itself. Centring spends that space on both sides of the text instead. */
+  align-items: center;
   gap: 12px;
   margin-bottom: 10px;
   padding: 11px 14px;

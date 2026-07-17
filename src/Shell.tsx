@@ -17,6 +17,7 @@ export function TopBar({
   status,
   onAbout,
   onChangeVideo,
+  onLoadMoments,
 }: {
   file?: string | null;
   status?: ReactNode;
@@ -24,6 +25,8 @@ export function TopBar({
   // Back to the landing screen to pick a different file. Optional: the landing screen
   // itself has no video to change.
   onChangeVideo?: () => void;
+  // Open a .veasyguide.json for the video already loaded. Optional for the same reason.
+  onLoadMoments?: () => void;
 }) {
   // setColorScheme flips Mantine's data attribute on <html>; index.css keys the token layer on
   // the same attribute, so the whole page follows from one switch. Mantine persists the choice
@@ -44,6 +47,21 @@ export function TopBar({
       {file && onChangeVideo && (
         <button type="button" className="filechip-change" onClick={onChangeVideo}>
           Change video
+        </button>
+      )}
+      {/* Loading a moments file was possible but invisible: you had to already know you could
+          drop one on the page. A feature nobody can find is a feature nobody has — and this
+          is the one that turns a 25-minute wait into nothing, which is exactly the person
+          who will not go hunting for it. Beside "Change video" because both are things you
+          do TO the lecture that is open. */}
+      {file && onLoadMoments && (
+        <button
+          type="button"
+          className="filechip-change"
+          onClick={onLoadMoments}
+          title="Load a .veasyguide.json for this video and skip the analysis"
+        >
+          Load moments file
         </button>
       )}
       <span className="grow" />
