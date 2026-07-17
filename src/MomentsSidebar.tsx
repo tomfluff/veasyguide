@@ -157,13 +157,16 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
         {onExport && done && activities.length > 0 && (
           <Menu position="bottom-end" classNames={{ dropdown: "side-save-pop" }}>
             <Menu.Target>
-              {/* Framed, and with a caret. A bare glyph read as decoration rather than a
-                  control, and a lone download icon promises a file on click — what happens
-                  is a menu. The border says pressable, the caret says something opens.
-                  Mantine already supplies aria-haspopup="menu" and aria-expanded, so the
-                  screen reader was never the one being misled; this is for the eyes. */}
-              <button type="button" className="side-save" aria-label="Save a moments file or notes" title="Save…">
-                <IconDownload size={20} />
+              {/* Framed, worded, and with a caret. A bare glyph read as decoration rather
+                  than a control; a lone download icon promises a file on click when what
+                  happens is a menu. The border says pressable, the word says what it does,
+                  the caret says something opens. No aria-label: the visible word IS the
+                  accessible name, and a label that restates it only invites the two to
+                  drift. Mantine already supplies aria-haspopup="menu" and aria-expanded,
+                  so the screen reader was never the one being misled here. */}
+              <button type="button" className="side-save" title="Export a moments file or notes">
+                <IconDownload size={18} />
+                Export
                 <IconChevronDown size={14} className="side-save-caret" />
               </button>
             </Menu.Target>

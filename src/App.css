@@ -369,14 +369,15 @@
 /* List / By scene. A segmented pair, not a checkbox: both arrangements are named, so the one
    you are NOT in is legible as a place to go rather than a state to infer. Compact on purpose:
    panel chrome is rem-sized and browser zoom (the magnification path) grows it with the page. */
-/* The two exports, styled like the arrange toggle below them: quiet chrome, not content.
-   Accent text says "action", matching the top bar's Change video. */
-/* Parked in the header's top corner and taken out of the flow entirely: a 44px control on
-   its own row pushed every moment down the scroll to advertise a once-per-lecture action.
-   Absolute, so the target stays finger-sized without the header growing to fit it.
-   Bordered and carried on the card colour because a borderless glyph in a corner reads as
-   an ornament — the frame is what says "press this", and the caret says a menu opens
-   rather than a file downloading on the spot. */
+/* Export. Parked in the header's top corner and taken out of the flow entirely: a 44px
+   control on its own row pushed every moment down the scroll to advertise a once-per-lecture
+   action. Absolute, so the target stays finger-sized without the header growing to fit it.
+   Bordered and carried on the card colour because a borderless glyph in a corner reads as an
+   ornament — the frame is what says "press this", and the caret says a menu opens rather
+   than a file downloading on the spot.
+   Muted, weight 600, same border: deliberately the same quiet chrome as the List / By scene
+   pair below it, because that is what it is. It was accent-coloured, which promoted a
+   once-a-lecture action to the loudest thing in a column whose whole job is the moments. */
 .side-save {
   position: absolute;
   top: 6px;
@@ -384,17 +385,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  min-width: 44px;
+  gap: 4px;
   height: 44px;
-  padding: 0 6px 0 8px;
+  padding: 0 8px;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--card);
-  color: var(--accent);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
   cursor: pointer;
 }
-.side-save:hover { background: var(--hover); border-color: var(--accent); }
+.side-save:hover { background: var(--hover); color: var(--ink); }
 .side-save-caret { transition: transform 120ms ease; }
 /* Open state on the caret, driven by the aria Mantine already sets — the visual and the
    announced state cannot drift apart if they read from the same attribute. */
