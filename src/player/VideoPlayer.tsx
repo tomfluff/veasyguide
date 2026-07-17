@@ -331,8 +331,15 @@ const VideoPlayer = (props: Props) => {
 
   // Draw the moment's crop (snippets.cropRect: box + 15% pad, native video px) from the
   // video element into a canvas and keep it as an object URL. Kept even when nothing is
-  // pinned; if the panel is open it follows the newest capture — the panel is "what was
-  // just written", not an archive.
+  // pinned, so P after a moment has passed still shows what was just written.
+  //
+  // A live panel does NOT follow the newest capture. It used to, and that quietly undid the
+  // point of the feature: a pin exists so the reader can take their time while the lecture
+  // takes its own, and a panel that swaps itself out mid-read hands the instructor's pace
+  // back. What you pinned is what stays until you dismiss it or pin again.
+  //
+  // The two "is this url the one on screen?" guards below and in handleUnpin are what make
+  // that safe: once a pin outlives the latest capture, exactly one of the two owns each url.
   // ponytail: holds ONE frame; per-moment history would need a store and an eviction policy.
   const captureEndFrame = (a: Activity, video: HTMLVideoElement) => {
     const r = cropRect(a, props.meta);
@@ -349,11 +356,6 @@ const VideoPlayer = (props: Props) => {
       const old = lastEndFrameRef.current;
       if (old && old.url !== pinnedRef.current?.url) URL.revokeObjectURL(old.url);
       lastEndFrameRef.current = { activity: a, url };
-      if (pinnedRef.current) {
-        const shown = pinnedRef.current.url;
-        setPinned({ activity: a, url });
-        if (shown !== url) URL.revokeObjectURL(shown);
-      }
     }, "image/png");
   };
 
@@ -1156,8 +1158,9 @@ const VideoPlayer = (props: Props) => {
       </Box>
       {/* The pinned snapshot: a still, magnified crop of a moment's final ink, docked in a
           corner while the video plays on underneath. The viewer reads at their own speed;
-          the lecture keeps the instructor's. Content updates to the newest finished moment
-          while open. Corner and size are the reader's to choose and persist: one default
+          the lecture keeps the instructor's. It holds the moment you pinned — it does not
+          follow later ones, because a panel that swaps itself out mid-read is just the
+          lecture's pace again. Corner and size are the reader's to choose and persist: one default
           cannot be right for both a reader who wants it out of the live action and one who
           needs it big enough to read. The top-center stays reserved either way — the
           catching-up and scene notices own it — and a bottom-docked panel clears the

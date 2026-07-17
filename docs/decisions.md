@@ -610,3 +610,30 @@ controls. The panel's height is now capped at the space the measured bar leaves
 with the image shrinking (`min-height: 0`) rather than pushing the caption out of reach.
 Verified across all 12 size×corner combinations: each clears the bar, stays in the
 viewport, and keeps every button hittable.
+
+---
+
+## D21 — A pin holds the moment you pinned; it does not follow the lecture
+
+**Decision.** While the pin panel is open, a newly finished moment no longer replaces its
+contents. The panel shows what you pinned until you dismiss it or pin again (dismiss +
+pin, or P twice, gives you the latest). Captures keep accruing in the background exactly
+as before, so pinning between moments still shows the ink that just finished.
+
+**Why.** The panel's whole reason to exist, from the low-vision persona's #1 need in D17,
+is "give me time to READ it" — the reader takes their time while the lecture takes its
+own. Following the newest capture handed the instructor's pace straight back: pin
+something, and the lecture rolling on would swap it out from under you mid-read, caption
+and all. The feature was quietly cancelling itself. Auto-follow was never a decision, it
+was a default nobody questioned; D17's own wording called for the opposite.
+
+**Cost, accepted.** There is no longer a "live latest writing" panel. Nobody asked for
+one; the sidebar and the now-line already say what is happening now, and both track
+playback. The pin is the one surface whose job is to NOT track playback.
+
+**Why it was a five-line deletion.** The object-URL ownership guards this needed were
+already in place from the original implementation: each new capture revokes the previous
+one unless the pin owns it, and dismissing revokes the pin's url only when it is no longer
+the latest. Once a pin outlives the newest capture, exactly one of the two owns each url.
+Verified live: a pin held across 12 s and several moment-ends with its image intact
+(naturalWidth 250, not broken), and dismiss + re-pin correctly jumped to the newest.
