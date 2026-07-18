@@ -25,10 +25,11 @@ jobs:
       - run: npm test
       - run: npm run build
       # Publishes dist/ to the gh-pages branch of veasyguide/app, which Pages
-      # serves at veasyguide.github.io/app/. Auth is the deploy key below.
+      # serves at veasyguide.github.io/app/. Auth is a fine-grained PAT scoped
+      # to veasyguide/app (Contents: write), stored as APP_DEPLOY_TOKEN.
       - uses: peaceiris/actions-gh-pages@v4
         with:
-          deploy_key: ${{ secrets.APP_DEPLOY_KEY }}
+          personal_token: ${{ secrets.APP_DEPLOY_TOKEN }}
           external_repository: veasyguide/app
           publish_dir: ./dist
           publish_branch: gh-pages
