@@ -929,7 +929,7 @@ const VideoPlayer = (props: Props) => {
           <Menu position="top" withinPortal={false} classNames={{ dropdown: "bar-pop" }}>
             <Menu.Target>
               <UnstyledButton
-                className={classNames("collapse-hide", "bar-speed", { on: playbackRate !== 1 })}
+                className={classNames("collapse-end", "bar-speed", { on: playbackRate !== 1 })}
                 onKeyDown={stopPlayerHotkeys}
                 aria-label={`Playback speed: ${playbackRate}×`}
                 title={`Playback speed: ${playbackRate}×`}
@@ -956,7 +956,7 @@ const VideoPlayer = (props: Props) => {
               by accident and diagnosed a black screen for thirty seconds. aria-pressed and
               the amber pressed style are the always-visible answer to "is it on?". */}
           <UnstyledButton
-            className={classNames("collapse-hide", "zoom-toggle", { on: isZoomIn })}
+            className={classNames("collapse-end", "zoom-toggle", { on: isZoomIn })}
             onClick={() => { showControls(); handleZoom(); }}
             onKeyDown={stopPlayerHotkeys}
             aria-label={isZoomIn ? "Stop magnifying" : "Magnify the highlighted area"}
@@ -970,7 +970,7 @@ const VideoPlayer = (props: Props) => {
               user reads at a third of normal speed — this is her time to read, decoupled
               from the instructor's time to talk. */}
           <UnstyledButton
-            className={classNames("collapse-hide", "zoom-toggle", { on: !!pinned })}
+            className={classNames("collapse-end", "zoom-toggle", { on: !!pinned })}
             onClick={() => { showControls(); handlePin(); }}
             onKeyDown={stopPlayerHotkeys}
             aria-label={pinned ? "Dismiss the pinned snapshot" : "Pin a snapshot of the latest writing"}
@@ -990,7 +990,7 @@ const VideoPlayer = (props: Props) => {
           >
             <Popover.Target>
               <UnstyledButton
-                className="collapse-hide"
+                className="collapse-end"
                 onClick={() => handleAppearanceOpen(!appearanceOpen)}
                 onKeyDown={stopPlayerHotkeys}
                 aria-label="Appearance"

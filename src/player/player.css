@@ -718,9 +718,9 @@
 
 /* --- Collapsed -----------------------------------------------------------
    The biggest picture, without losing the ability to stop what you are hearing. One line:
-   play/pause, timecode, scrubber, fullscreen, expand. Everything else — the moment marks,
-   the now-line, volume, the moment steppers, Appearance — belongs to the expanded bar. The
-   [ / ] keys still work while collapsed. */
+   play/pause, timecode, scrubber, then speed, zoom, pin, Appearance, fullscreen, expand.
+   The moment marks, the now-line, volume and the moment steppers belong to the expanded
+   bar. The [ / ] keys still work while collapsed. */
 .video-container.collapsed .now-line,
 .video-container.collapsed .moment-lane,
 .video-container.collapsed .volume-container,
