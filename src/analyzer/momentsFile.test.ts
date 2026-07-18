@@ -46,7 +46,7 @@ describe("moments file round trip", () => {
 
   it("rejects non-JSON, foreign JSON, and version drift with human messages", () => {
     expect(parseMomentsFile("not json").error).toMatch(/valid JSON/);
-    expect(parseMomentsFile("{}").error).toMatch(/isn't a veasyguide/);
+    expect(parseMomentsFile("{}").error).toMatch(/isn't a VeasyGuide/);
     const wrongVersion = { ...sample(), version: MOMENTS_VERSION + 1 };
     expect(parseMomentsFile(JSON.stringify(wrongVersion)).error).toMatch(/version/);
   });

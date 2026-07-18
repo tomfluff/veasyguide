@@ -39,7 +39,7 @@ export function TopBar({
           corners, so it gets no background plate behind it. */}
       <img className="mark" src={icon} alt="" aria-hidden="true" />
       <h1 className="ttl">
-        veasyguide <em>Lecture video, enhanced</em>
+        VeasyGuide <em>Lecture video, enhanced</em>
       </h1>
       {file && <span className="filechip" title={file}>{file}</span>}
       {/* The only way to open a different video used to be F5: the drop zone unmounts for

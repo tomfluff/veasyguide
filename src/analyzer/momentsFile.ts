@@ -78,7 +78,7 @@ export function parseMomentsFile(text: string): { file: MomentsFile; error?: nev
   }
   const f = raw as Partial<MomentsFile>;
   if (f?.format !== MOMENTS_FORMAT) {
-    return { error: "That JSON file isn't a veasyguide moments file." };
+    return { error: "That JSON file isn't a VeasyGuide moments file." };
   }
   if (f.version !== MOMENTS_VERSION) {
     return { error: `That moments file is version ${f.version}; this app reads version ${MOMENTS_VERSION}. Re-export it from a matching version.` };
@@ -136,7 +136,7 @@ export function momentsMarkdown(f: MomentsFile): string {
     `${acts.length - hiddenCount} moments · ` +
     (hiddenCount ? `${hiddenCount} found but not shown · ` : "") +
     `${f.scenes.length} scene${f.scenes.length === 1 ? "" : "s"} · ` +
-    `${convertSecondsToTimecode(f.video.duration)} · analyzed ${f.savedAt.slice(0, 10)} by veasyguide (in-browser, video never uploaded)`
+    `${convertSecondsToTimecode(f.video.duration)} · analyzed ${f.savedAt.slice(0, 10)} by VeasyGuide (in-browser, video never uploaded)`
   );
 
   const sceneFor = (t: number): number => {

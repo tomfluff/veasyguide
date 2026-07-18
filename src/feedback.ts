@@ -33,7 +33,7 @@ export function feedbackMailto(d: Diagnostics): string {
     "", // where they type
     "",
     "--- diagnostics (edit or delete freely) ---",
-    `veasyguide ${COMMIT}`,
+    `VeasyGuide ${COMMIT}`,
     navigator.userAgent,
   ];
 
@@ -51,7 +51,7 @@ export function feedbackMailto(d: Diagnostics): string {
     if (d.xRealtime) lines.push(`analysis: ${d.xRealtime.toFixed(1)}× realtime`);
   }
 
-  const subject = encodeURIComponent("veasyguide feedback");
+  const subject = encodeURIComponent("VeasyGuide feedback");
   const body = encodeURIComponent(lines.join("\n"));
   return `mailto:${USER}@${HOST}?subject=${subject}&body=${body}`;
 }

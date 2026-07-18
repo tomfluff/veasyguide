@@ -57,10 +57,10 @@ export default function About({
         <IconX size={18} />
       </button>
 
-      <h2>About veasyguide</h2>
+      <h2>About VeasyGuide</h2>
       <p className="about-lede">
         Lecture videos are hard to follow when you cannot see where the instructor is pointing.
-        veasyguide watches the video for you: it finds every moment the instructor writes,
+        VeasyGuide watches the video for you: it finds every moment the instructor writes,
         points, or sketches, then highlights that spot and magnifies it as you watch. Built for
         low-vision learners; useful to anyone who has lost the thread of a lecture.
       </p>
@@ -70,7 +70,7 @@ export default function About({
         Conventional wisdom says content-aware video accessibility needs a machine-learning model,
         and therefore a server. For slide-based lecture video it doesn't: on a slide,{" "}
         <b>whatever changes is whatever matters</b>. A pen stroke, a cursor, a sketch — they are
-        the only things moving against a static slide. So veasyguide compares sampled frames,
+        the only things moving against a static slide. So VeasyGuide compares sampled frames,
         groups the changed regions into events, and that is the detection. No model, no training,
         nothing to download.
       </p>
@@ -121,7 +121,7 @@ export default function About({
 
       <h3>Where it came from</h3>
       <p>
-        veasyguide is the successor to a research study on lecture-video accessibility for
+        VeasyGuide is the successor to a research study on lecture-video accessibility for
         low-vision learners. The detection pipeline and the player were validated in that study
         and then locked inside a lab rig — analysis ran as an offline script, results were
         pre-computed, and nobody outside the study could use any of it. This is that work, rebuilt
