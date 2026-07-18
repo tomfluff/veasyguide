@@ -34,6 +34,14 @@ Deeper dives live in [`docs/`](docs/README.md):
 | [debug-tools.md](docs/debug-tools.md) | `?debug` / `?research` / `?snippets`, and honest benchmarking |
 | [porting-notes.md](docs/porting-notes.md) | Bugs found in the original study code |
 
+## The original analyzer
+
+Detection here is a TypeScript reimplementation of the study's offline Python pipeline. That
+original script is kept in [`python-analyzer/`](python-analyzer/) for provenance and
+reproducibility — same detection idea (frame-diff → region-of-interest graph → activity
+typing), runnable on its own with its own requirements and instructions. It's the reference
+the browser port is checked against.
+
 ## Requirements
 
 A Chromium browser (Chrome, Edge or Arc) is what it's built and tested against. Firefox has
