@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The moments, as a table of contents. The timeline lane is a map (proportional, marks
 // merge when they collide); this list is the index — every moment gets the same full-width
 // row with a thumbnail of the annotated region, so you choose by sight, not by timestamp.

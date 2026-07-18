@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Where the picture actually sits inside its box.
 //
 // The analyzer reports activity boxes in VIDEO pixels. The highlight and the magnifier are

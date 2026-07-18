@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Frame-diff pipeline, pure functions on pixel buffers. Ports the used subset of
 // the Python analyzer (analyzer.py _detect_contours + _contours_to_roi_nodes):
 // grayscale absdiff -> threshold -> dilate -> connected-component boxes.

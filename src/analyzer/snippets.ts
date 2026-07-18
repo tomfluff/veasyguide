@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Planning for activity snippets: which frames to grab, and from where.
 // Pure functions — the worker does the decoding, this decides what to ask for.
 

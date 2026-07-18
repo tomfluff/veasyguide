@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Moment navigation and the timeline's marker lane.
 //
 // Pure geometry and stepping, kept out of the component so it can be tested.

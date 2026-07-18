@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// <reference lib="webworker" />
 // Analysis worker: sequential WebCodecs decode (via Mediabunny) of sampled frames
 // -> diff pipeline -> streaming clusterer -> postMessage.

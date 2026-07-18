@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Ported from VeasyGuide frontend/src/utils/Misc.ts (study-only calcTimeSpan dropped).
 
 export const convertSecondsToTimecode = (seconds: number | null): string => {

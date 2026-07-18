@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Shared analysis types. Framework-free (no React imports) — keep it that way.
 
 import type { Region } from "./pipeline";

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Zoom transform for the magnification overlay. Extracted so the edge behaviour is
 // testable: the whole point is that the pan is CONTINUOUS as an activity approaches a
 // frame edge (it saturates instead of stepping). See selfcheck.

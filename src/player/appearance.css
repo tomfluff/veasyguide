@@ -1,3 +1,6 @@
+/* Copyright (C) 2026 Yotam Sechayk
+   SPDX-License-Identifier: AGPL-3.0-or-later */
+
 /* The Appearance sheet speaks the control bar's language, not Mantine's.
    It renders INSIDE .video-controls-container (the popover is not portaled, so that it
    survives fullscreen), so it inherits the bar's near-white text — which is exactly what we

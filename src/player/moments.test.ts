@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect } from "vitest";
 import { timelineMarkers, stepMoment, seekTargetFor, groupByScenes, MIN_MARKER_PX } from "./moments";
 import type { Activity, Scene } from "../analyzer/types";

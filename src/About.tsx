@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // About, as a native <dialog>.
 //
 // Not a route: a route would unmount the player, and with it the analysis — you would lose a

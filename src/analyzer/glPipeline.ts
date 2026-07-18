@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // GPU port of the per-pixel half of pipeline.ts (toGray, diffMask, dilate).
 //
 // Why: profiling a real analysis run put 0% of the wall time in decode (Mediabunny

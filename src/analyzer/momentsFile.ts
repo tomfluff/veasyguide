@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The moments file: one analysis, serialized. Three consumers share this format —
 // the IndexedDB cache (reopen the same video, skip re-analysis), the exportable
 // .veasyguide.json sidecar (an instructor analyzes once and posts the file next to the

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Regression suite for the moment set and the highlight selection. Both were untested; the
 // selection rules are a port of the study player and must not drift.
 import { describe, it, expect } from "vitest";

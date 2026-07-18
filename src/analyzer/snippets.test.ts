@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // thumbRect feeds the sidebar thumbnails: every crop must stay inside the frame (the
 // snippet worker draws exactly this rect), contain the activity, and never be a sliver.
 import { describe, it, expect } from "vitest";

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The Mantine theme, from DESIGN.md.
 //
 // Without this, every Mantine control (sliders, buttons, switches) renders in the framework's

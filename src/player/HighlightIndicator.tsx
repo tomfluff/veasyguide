@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Ported from VeasyGuide HighlightIndicator (component name typo "Higghlight..."
 // at the import site fixed; logic unchanged). Consumes PlayerActivity (native
 // video px), scaled to the container by scaleRatio like the original.

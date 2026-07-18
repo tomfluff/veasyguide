@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Bookkeeping for which parts of the video have been analyzed. Segments are
 // independent (a seek starts a fresh one), so coverage is a set of ranges, not a
 // single frontier.

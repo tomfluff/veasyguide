@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The Appearance sheet: preset tiles up front, everything else behind a drill-in.
 //
 // Two decisions shape this file.

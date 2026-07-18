@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Ported from VeasyGuide MagnificationOverlay. Fixes vs original:
 // 1. The canvas render loop ran drawImage(video) on EVERY animation frame forever,
 //    even with the overlay invisible — a constant per-frame readback tax on all

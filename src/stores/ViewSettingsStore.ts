@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // How the moments list is arranged.
 //
 // Deliberately NOT part of HighlightSettingsStore. That store is the look of the highlight on

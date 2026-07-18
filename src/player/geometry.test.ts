@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Regression suite. This is the geometry the highlight and the magnifier position through;
 // before this file it had zero coverage and lived inside a useMemo where it could not be
 // tested at all.

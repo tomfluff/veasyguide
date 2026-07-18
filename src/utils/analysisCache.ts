@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // IndexedDB cache of finished analyses, keyed by videoKey (size|duration|WxH).
 //
 // Why: three of five personas hit the same wall — every reopen re-analyzes from zero

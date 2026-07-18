@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The four appearance presets, plus the derived "Custom".
 //
 // A preset is a COMPLETE snapshot of both stores — all 17 fields, including the defaults it

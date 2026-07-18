@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The app's chrome: title bar and footer. Modelled on the chart-accessibility demo's shell so
 // the two read as one body of work — plum hairline, slim white bar, italic qualifier beside the
 // name, muted nav with one accent link, a human byline at the bottom.

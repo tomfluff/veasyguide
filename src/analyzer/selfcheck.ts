@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Runnable self-check for the pure pipeline + clusterer logic (no browser needed).
 // Run: node --experimental-strip-types src/analyzer/selfcheck.ts
 import { changedFrac, componentRegions, diffMask, dilate, expandZoneToEdges, toGray, updateOccupancy, webcamZone, type Region } from "./pipeline.ts";

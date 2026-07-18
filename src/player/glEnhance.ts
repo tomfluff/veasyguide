@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // GPU enhance renderer. The enhance filters were SVG reference filters applied via
 // CSS `filter: url(#…)` — and reference filters (feConvolveMatrix especially) run in
 // Chromium's SOFTWARE filter path, re-executed every frame on the CPU. This class

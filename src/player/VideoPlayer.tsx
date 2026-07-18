@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Ported from VeasyGuide VideoPlayer, adapted for streaming analysis. Study-only
 // features stripped: prompt-to-click, action logging, ding audio, module wiring.
 //

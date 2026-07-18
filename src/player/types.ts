@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Player-space types. The analyzer works in downscaled analysis pixels; the player
 // and overlays work in native video pixels (then scaled to the container by
 // scaleRatio, as in the original VeasyGuide player).

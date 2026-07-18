@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Which activity should be highlighted at time t. Faithful port of the study
 // player's getSingleActivityAtTime (VeasyGuide VideoPlayer.tsx):
 // - activities match within [start - lead, end + linger] — the "pre-activity" cue

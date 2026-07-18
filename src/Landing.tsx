@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // First contact. Someone is about to hand a stranger's website their lecture, so the privacy
 // promise gets a real box, not a footnote — it is the reason they'd trust this at all.
 //

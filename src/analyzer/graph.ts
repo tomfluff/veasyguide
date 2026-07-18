@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Streaming activity clusterer with watermark finalization. Ports the graph logic
 // from roi.py: nodes connect when close in TIME (<= spanTh) and SPACE (<= distTh);
 // connected components are activities. Because edges are temporally local, a cluster

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // SVG filter definitions used by the highlight and magnification enhance layers.
 //
 // These are referenced with a regular CSS `filter: url(#…)`, NOT `backdrop-filter`.

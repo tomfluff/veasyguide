@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The feedback email, prefilled with what a bug report always needs and never includes.
 //
 // mailto:, not a form or a widget: no third-party script in an app that calls no external

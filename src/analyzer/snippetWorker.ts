@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// <reference lib="webworker" />
 // Generates activity snippet sequences: a few native-resolution crops per activity,
 // showing how it evolved (before → start → …every 0.5s… → end).

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, expect, it } from "vitest";
 import { momentPlace, momentSize, momentDescription } from "./describe";
 import type { Activity } from "../analyzer/types";

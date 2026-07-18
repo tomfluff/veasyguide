@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Activity-level feature vectors, aggregated from an activity's node log.
 // Always computed at finalization (cheap); intended for later ML — clustering
 // finalized activities to learn types (pointing/marking/sketching/...) instead of

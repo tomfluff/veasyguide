@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // "Use this moments file?" — the one gate between a dropped sidecar and the analysis it
 // replaces.
 //

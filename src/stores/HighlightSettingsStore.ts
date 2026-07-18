@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Ported from VeasyGuide. Changes vs original:
 // - localStorage instead of sessionStorage (settings should survive across visits)
 // - option arrays are `as const`, so T* types are real unions (they degraded to

@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Yotam Sechayk
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Research gallery (?research=1): one card per finalized activity with its feature
 // vector and, when snippets are enabled, a SEQUENCE of native-resolution crops showing
 // how the activity evolved (before → start → …every 0.5s… → end).
