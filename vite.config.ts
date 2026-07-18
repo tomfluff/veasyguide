@@ -11,6 +11,8 @@ try {
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Served from veasyguide.github.io/app/ — assets must resolve under that path.
+  base: '/app/',
   plugins: [react()],
   define: {
     __COMMIT__: JSON.stringify(commit),
