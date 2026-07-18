@@ -1,0 +1,11 @@
+# Core analysis dependencies. Versions match the study's requirements.full.txt,
+# minus easyocr (OCR removed) and the Flask/cloud server packages.
+opencv-python==4.10.0.84
+numpy==2.0.0
+scenedetect==0.6.4
+networkx==3.3
+tqdm==4.66.4
+
+# Optional: only for VideoAnalyzer.visualize(), which renders the detections onto a
+# copy of the video. Uncomment (and expect an ffmpeg dependency) if you need it.
+# moviepy==1.0.3

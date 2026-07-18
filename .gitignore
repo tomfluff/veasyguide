@@ -26,3 +26,12 @@ dist-ssr
 
 # dev-only synthetic test media
 public/_test/
+
+# Python analyzer artifacts
+__pycache__/
+*.pyc
+.venv/
+
+# Deploy keys — never commit these
+app_deploy_key
+app_deploy_key.pub
