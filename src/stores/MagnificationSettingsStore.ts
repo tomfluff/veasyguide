@@ -11,9 +11,18 @@ import { filterStyleOptions, type TFilterStyle } from "./HighlightSettingsStore"
 export { filterStyleOptions };
 export type { TFilterStyle };
 
+export type TZoomMotion = "smooth" | "snappy";
+
 const initialState = {
   zoom_strength: 0.5,
   zoom_speed: 1,
+  // Whether the magnifier animates to its target (smooth) or lands instantly (snappy).
+  // The OS reduce-motion preference picks the DEFAULT; the setting, once touched,
+  // outranks it — same contract as the highlight pulse (see the Motion screen's hint).
+  zoom_motion: (typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "snappy"
+    : "smooth") as TZoomMotion,
   pause_on_zoom: false,
   // Was `sharpness`, but it drives CSS contrast() — it never sharpened anything, and
   // its label printed `sharpness - 1` (so "1x" meant contrast 2). Renamed to what it

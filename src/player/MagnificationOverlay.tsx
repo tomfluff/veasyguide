@@ -179,14 +179,17 @@ const MagnificationOverlay = (props: Props) => {
 
   // Only `transform` animates — see setZoom(). Animating transform-origin alongside it
   // (as the original did, at a different duration) is what made the motion jump.
-  // The transform IS motion (the frame slides and scales), so it is the one transition
-  // prefers-reduced-motion must kill — the zoom then lands as a static jump, per
-  // DESIGN.md's "static stronger state" fallback. The opacity crossfade above stays: a
-  // fade is not vestibular motion. Read per render, like the CSS media query it mirrors.
+  // Smooth vs snappy is the viewer's zoom_motion setting, not prefers-reduced-motion
+  // directly: the OS preference only picks the setting's default. The animated zoom
+  // carries information (it shows WHERE the magnifier went; a jump-cut discards that),
+  // so the viewer gets to choose — and an explicit choice outranks the OS default, the
+  // same contract as the highlight pulse. The opacity crossfade above is never gated:
+  // a fade is not vestibular motion.
   const zoomTransitionPosition = {
-    transition: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ? "none"
-      : `transform ${animationSpeeds.transform}ms ease-in-out`,
+    transition:
+      settings.zoom_motion === "snappy"
+        ? "none"
+        : `transform ${animationSpeeds.transform}ms ease-in-out`,
   };
 
   return (

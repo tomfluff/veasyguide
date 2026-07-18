@@ -419,6 +419,19 @@ export default function AppearanceSheet() {
                 onChange={(zoom_strength) => setMagnificationSettings({ zoom_strength })}
               />
             </Row>
+            {/* Smooth animates the magnifier to its target; snappy lands instantly. The
+                system reduce-motion preference only sets the default — choosing here wins,
+                same as the pulse on the Motion screen. Speed only means anything while the
+                move is animated, so snappy dims it. */}
+            <Row label="Motion">
+              <Choice
+                label="Zoom motion"
+                options={["smooth", "snappy"] as const}
+                value={mag.zoom_motion}
+                onChange={(zoom_motion) => setMagnificationSettings({ zoom_motion })}
+                labels={{ smooth: "Smooth", snappy: "Snappy" }}
+              />
+            </Row>
             <Row label="Speed" value={`${mag.zoom_speed}×`}>
               <Range
                 label="Zoom speed"
@@ -426,6 +439,7 @@ export default function AppearanceSheet() {
                 max={3}
                 step={0.1}
                 value={mag.zoom_speed}
+                disabled={mag.zoom_motion === "snappy"}
                 onChange={(zoom_speed) => setMagnificationSettings({ zoom_speed })}
               />
             </Row>

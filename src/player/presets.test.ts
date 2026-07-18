@@ -8,25 +8,39 @@ import type { TMagnificationSettings } from "../stores/MagnificationSettingsStor
 
 const standard = PRESETS[0];
 
+// What the store actually holds: a preset's magnification plus the store-only zoom_motion
+// field, which lives outside preset scope (see the Preset type).
+const inStore = (
+  m: (typeof standard)["magnification"],
+  zoom_motion: TMagnificationSettings["zoom_motion"] = "smooth"
+): TMagnificationSettings => ({ ...m, zoom_motion });
+
 describe("presets", () => {
   it("recognises each preset exactly", () => {
     // The bug this guards: if a preset were a PARTIAL set of fields, deep-equalling it against
     // the full store would never match, so no card would ever show as selected and the whole
     // feature would look broken on first open.
     for (const p of PRESETS) {
-      expect(matchPreset(p.highlight, p.magnification)?.name).toBe(p.name);
+      expect(matchPreset(p.highlight, inStore(p.magnification))?.name).toBe(p.name);
     }
+  });
+
+  it("ignores zoom_motion when recognising a preset", () => {
+    // zoom_motion is a vestibular-safety preference, not part of any look: a viewer who
+    // chose snappy must still see their preset selected, not Custom.
+    expect(matchPreset(standard.highlight, inStore(standard.magnification, "snappy"))?.name)
+      .toBe(standard.name);
   });
 
   it("falls back to Custom when a single field differs", () => {
     const nudged: THighlightSettings = { ...standard.highlight, border_width: 5 };
-    expect(matchPreset(nudged, standard.magnification)).toBeNull();
+    expect(matchPreset(nudged, inStore(standard.magnification))).toBeNull();
   });
 
   it("falls back to Custom when only the MAGNIFICATION store differs", () => {
     // A preset spans both stores. Comparing only the highlight store would call this
     // "Standard" while the zoom is set to something else entirely.
-    const nudged: TMagnificationSettings = { ...standard.magnification, zoom_strength: 0.95 };
+    const nudged: TMagnificationSettings = { ...inStore(standard.magnification), zoom_strength: 0.95 };
     expect(matchPreset(standard.highlight, nudged)).toBeNull();
   });
 
@@ -40,7 +54,7 @@ describe("presets", () => {
       filter_style: ["invert", "sharpen"],
     };
     // Same set, different order: these must not read as two different configurations.
-    expect(matchPreset(a, standard.magnification)).toBe(matchPreset(b, standard.magnification));
+    expect(matchPreset(a, inStore(standard.magnification))).toBe(matchPreset(b, inStore(standard.magnification)));
   });
 
   it("ships no motion and no enhance filters in any preset", () => {

@@ -3,8 +3,9 @@
 
 // The four appearance presets, plus the derived "Custom".
 //
-// A preset is a COMPLETE snapshot of both stores — all 17 fields, including the defaults it
-// does not change. That is deliberate. If a preset named only the 8 fields it cares about,
+// A preset is a COMPLETE snapshot of both stores (all fields but zoom_motion — see the
+// Preset type), including the defaults it does not change. That is deliberate. If a preset
+// named only the 8 fields it cares about,
 // then recognising the active one (by comparing the store to each preset) would never match,
 // because the store carries 17. Every user, always, would see Custom selected and no preset
 // highlighted, and the feature would look broken on first open.
@@ -25,7 +26,11 @@ export type Preset = {
   name: string;
   hint: string;
   highlight: THighlightSettings;
-  magnification: TMagnificationSettings;
+  // zoom_motion is the one field outside preset scope: its default comes from the OS
+  // reduce-motion preference, and a preset describes a LOOK — applying one must not undo
+  // a vestibular-safety choice. equal() iterates the preset's keys, so recognition
+  // ignores it too and a snappy viewer still matches the preset they picked.
+  magnification: Omit<TMagnificationSettings, "zoom_motion">;
 };
 
 // Shared across every preset. No preset turns on motion, and no preset turns on an enhance
