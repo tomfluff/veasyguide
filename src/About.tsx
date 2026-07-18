@@ -136,7 +136,7 @@ export default function About({
           Yotam Sechayk
         </a>
         . The source is{" "}
-        <a href="https://github.com/tomfluff" target="_blank" rel="noreferrer">
+        <a href="https://github.com/tomfluff/veasyguide" target="_blank" rel="noreferrer">
           on GitHub
         </a>
         .

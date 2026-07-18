@@ -14,6 +14,8 @@ import avatar from "./assets/avatar.webp";
 import icon from "./assets/icon.png";
 
 const PROFILE = "https://tomfluff.github.io/";
+const PROJECT = "https://veasyguide.github.io/";
+const REPO = "https://github.com/tomfluff/veasyguide";
 
 export function TopBar({
   file,
@@ -81,10 +83,10 @@ export function TopBar({
           {scheme === "dark" ? <IconSun size={18} /> : <IconMoon size={18} />}
         </button>
         <button type="button" onClick={onAbout}>About</button>
-        <a className="acc" href={PROFILE} target="_blank" rel="noreferrer">
+        <a className="acc" href={PROJECT} target="_blank" rel="noreferrer">
           <IconExternalLink size={16} /> Project Page
         </a>
-        <a href="https://github.com/tomfluff" target="_blank" rel="noreferrer">
+        <a href={REPO} target="_blank" rel="noreferrer">
           <IconBrandGithub size={16} /> Code on GitHub
         </a>
       </nav>
