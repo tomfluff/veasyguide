@@ -1,16 +1,29 @@
-# veasyguide-app
+# VeasyGuide
 
-A fully client-side web app that makes slide-based lecture videos more accessible:
-drop a video, and it detects instructor activity (pointing, writing, sketching regions)
-**in your browser** — no upload, no account, no server ever touches the video — then plays
-it back with a highlight overlay and content-following magnification.
+**[Try it → veasyguide.github.io/app](https://veasyguide.github.io/app/)**
 
-Successor to the [VeasyGuide](../VeasyGuide) research study rig: same detection idea and
-accessibility player, rebuilt as a standalone tool.
+Lecture videos are hard to follow when you can't see where the instructor is pointing.
+VeasyGuide watches the video for you: it finds every moment the instructor writes, points, or
+sketches, then highlights that spot and magnifies it as you watch. Built for low-vision
+learners; useful to anyone who has lost the thread of a lecture.
 
-## Documentation
+Everything runs **in your browser** — drop in a video and it's analysed on your own machine.
+No upload, no account, no server ever sees the video.
 
-**[`docs/`](docs/README.md)** — why this exists, how it works, and why it's built this way.
+VeasyGuide is the successor to a [research study](https://veasyguide.github.io/) on
+lecture-video accessibility for low-vision learners: the detection pipeline and player were
+validated in that study, then rebuilt here as a standalone tool anyone can open and use.
+
+## How it works
+
+On a slide, whatever changes is whatever matters. A pen stroke, a cursor, a sketch — they're
+the only things moving against a static slide. So VeasyGuide decodes sampled frames with
+WebCodecs, diffs them, groups the changed regions into events, and that is the detection — no
+machine-learning model, nothing to download. Because there's no model, the whole thing runs
+client-side, which is why your video never leaves your device. Analysis streams ahead of
+playback, so a long lecture doesn't mean a long wait.
+
+Deeper dives live in [`docs/`](docs/README.md):
 
 | | |
 |---|---|
@@ -21,28 +34,15 @@ accessibility player, rebuilt as a standalone tool.
 | [debug-tools.md](docs/debug-tools.md) | `?debug` / `?research` / `?snippets`, and honest benchmarking |
 | [porting-notes.md](docs/porting-notes.md) | Bugs found in the original study code |
 
-## Status: Phase 0 (throughput spike) — PASS on dev hardware
+## Requirements
 
-The spike proves the risky part of the design: that the whole pipeline runs fast enough
-in a browser to start playback almost immediately while analysis races ahead.
-
-- **Decode:** WebCodecs (hardware) via [Mediabunny](https://github.com/Vanilagy/mediabunny), sequential sampled-frame decode in a Web Worker.
-- **Pipeline (pure TypeScript, no OpenCV.js):** grayscale → frame absdiff → threshold → dilate → connected-component boxes, at ~480p analysis resolution. `src/analyzer/pipeline.ts`.
-- **Streaming clusterer with watermark finalization:** activities finalize and stream to the UI as the analysis frontier advances, so playback starts on a short lead instead of waiting for the whole video. `src/analyzer/graph.ts`.
-- **Measured:** ~20× realtime on a dev laptop (1280×720 → 480×270). The gating benchmark on **low-end hardware** (Chromebook-class) is still to be run — see `docs/design.md` §Phase 0 decision bands (≥4× pass / 2–<4× mitigate / <2× analyze-first).
-
-What the spike does NOT yet do (later phases in `docs/design.md`): golden-file validation
-against the Python outputs, scene detection, seek-into-unanalyzed segments, IndexedDB cache,
-the settings suites, and the polished player. This is a measurement harness wearing the demo's clothes.
+A Chromium browser (Chrome, Edge or Arc) is what it's built and tested against. Firefox has
+shipped WebCodecs since 2024 and works too, unbenchmarked. Your video needs a codec your
+machine can decode — H.264, VP9 and AV1 work; HEVC/H.265 often doesn't.
 
 ## Develop
 
-Requires Node 22+ and a browser with WebCodecs. Chromium (Chrome/Edge/Arc) is what this is
-developed and benchmarked against; Firefox has shipped WebCodecs since 2024 and works too
-(confirmed by hand — not yet covered by an automated check, so treat non-Chromium as
-"works, unbenchmarked"). `docs/design.md` still says "Chromium-only, enforced by a capability
-check" — that constraint predates Firefox's WebCodecs support and no such check was ever
-built. Left as written: it is an approved design record, not a description of today.
+Requires Node 22+.
 
 ```bash
 npm install
@@ -58,7 +58,7 @@ Run the pipeline/clusterer self-check (no browser needed):
 node --experimental-strip-types src/analyzer/selfcheck.ts
 ```
 
-## Build
+## Build & deploy
 
 ```bash
 npm run typecheck  # tsc -b
@@ -66,10 +66,16 @@ npm run build      # tsc + vite build → dist/ (static site)
 npm run preview
 ```
 
-Typecheck with `npm run typecheck`, never `tsc --noEmit`. The root `tsconfig.json` is
-solution-style (`"files": []` + references), so `--noEmit` there checks **nothing**: it
-finds no files, exits 0, and looks just like a pass. Only build mode (`tsc -b`) follows the
-references to the projects that hold the code. See D25 — that silent pass hid 11 errors and
-a research feature that had stopped working.
+Typecheck with `npm run typecheck`, never `tsc --noEmit`: the root `tsconfig.json` is
+solution-style (`"files": []` + references), so `--noEmit` there checks **nothing** — it finds
+no files, exits 0, and looks just like a pass. Only build mode (`tsc -b`) follows the
+references to the projects that hold the code.
 
-Deploy target is static hosting on Google Cloud (Firebase Hosting) — wired up in a later phase.
+Pushing to `main` builds and publishes to
+[veasyguide.github.io/app](https://veasyguide.github.io/app/) via GitHub Pages
+(`.github/workflows/deploy.yml`).
+
+## License
+
+[AGPL-3.0](LICENSE). Because it's network-served software, the app links back to this source
+from its About panel — which is what the AGPL asks of a hosted app.
