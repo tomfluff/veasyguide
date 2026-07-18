@@ -72,6 +72,7 @@ import AppearanceSheet from "./AppearanceSheet";
 import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
+import { stopPlayerHotkeys } from "./hotkeys";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
 import {
   useViewSettingsStore, setPlaybackRate,
@@ -521,16 +522,6 @@ const VideoPlayer = (props: Props) => {
       video.currentTime = preAppearanceTimeRef.current;
       preAppearanceTimeRef.current = null;
       setPreviewJumped(false);
-    }
-  };
-
-  // Mantine's useHotkeys ignores events from inputs and textareas — NOT from buttons. So
-  // without this, Space on a focused control both activates it AND toggles play/pause, and
-  // arrow keys on a moment mark both move focus AND seek/zoom. The headline "usable by
-  // keyboard alone" criterion fails on contact.
-  const stopPlayerHotkeys = (e: React.KeyboardEvent) => {
-    if ([" ", "Spacebar", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
-      e.stopPropagation();
     }
   };
 

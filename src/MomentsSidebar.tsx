@@ -16,6 +16,7 @@ import type { Activity, Scene } from "./analyzer/types";
 import { convertSecondsToTimecode } from "./utils/misc";
 import { seekTargetFor, groupByScenes } from "./player/moments";
 import { momentDescription, momentPlace } from "./player/describe";
+import { stopPlayerHotkeys } from "./player/hotkeys";
 import { useViewSettingsStore, setGroupByScene } from "./stores/ViewSettingsStore";
 
 type Props = {
@@ -133,16 +134,18 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
   };
 
   return (
-    // Keys pressed while focus is in the sidebar belong to the sidebar. Without this,
-    // Space on a row also reaches the player's document-level hotkeys and toggles play
-    // on top of the row's own seek.
+    // Only the keys a focused row actually uses are kept from the player: Space/Enter (which
+    // seek to the row) would otherwise ALSO reach the document-level hotkeys and toggle play.
+    // Everything else — F, M, Z, P, the [ / ] steppers — is left to bubble, so the shortcuts
+    // still work while focus is in the list. (This used to be a blanket stopPropagation on
+    // every key, which silently disabled every shortcut whenever the sidebar held focus.)
     <aside
       className={className ? `moments-side ${className}` : "moments-side"}
       style={style}
       aria-label="Moments"
       onKeyDown={(e) => {
         if (e.key === "Escape") onEscape?.();
-        e.stopPropagation();
+        stopPlayerHotkeys(e);
       }}
     >
       <div className="side-head">

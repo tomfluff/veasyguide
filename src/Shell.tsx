@@ -12,6 +12,7 @@ import { IconBrandGithub, IconExternalLink, IconMoon, IconSun } from "@tabler/ic
 // a small thing that makes a large promise false.
 import avatar from "./assets/avatar.webp";
 import icon from "./assets/icon.png";
+import { stopPlayerHotkeys } from "./player/hotkeys";
 
 const PROFILE = "https://tomfluff.github.io/";
 const PROJECT = "https://veasyguide.github.io/";
@@ -77,12 +78,13 @@ export function TopBar({
         <button
           type="button"
           onClick={() => setColorScheme(scheme === "dark" ? "light" : "dark")}
+          onKeyDown={stopPlayerHotkeys}
           aria-label={scheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
           title={scheme === "dark" ? "Light theme" : "Dark theme"}
         >
           {scheme === "dark" ? <IconSun size={18} /> : <IconMoon size={18} />}
         </button>
-        <button type="button" onClick={onAbout}>About</button>
+        <button type="button" onClick={onAbout} onKeyDown={stopPlayerHotkeys}>About</button>
         <a className="acc" href={PROJECT} target="_blank" rel="noreferrer">
           <IconExternalLink size={16} /> Project Page
         </a>
