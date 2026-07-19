@@ -44,15 +44,22 @@ export function TopBar({
       {/* The project mark is a finished tile — it brings its own colours and its own rounded
           corners, so it gets no background plate behind it. */}
       <img className="mark" src={icon} alt="" aria-hidden="true" />
+      {/* The tagline is branding, and branding matters on the landing screen — not while a
+          lecture is open, when the filename is the context and the bar needs the width. */}
       <h1 className="ttl">
-        VeasyGuide <em>Lecture video, enhanced</em>
+        VeasyGuide {!file && <em>Lecture video, enhanced</em>}
       </h1>
       {file && <span className="filechip" title={file}>{file}</span>}
       {/* The only way to open a different video used to be F5: the drop zone unmounts for
           good once a video loads. Lives beside the filename it replaces. */}
       {file && onChangeVideo && (
-        <button type="button" className="filechip-change" onClick={onChangeVideo}>
-          Change video
+        <button
+          type="button"
+          className="filechip-change"
+          onClick={onChangeVideo}
+          aria-label="Change video"
+        >
+          Change
         </button>
       )}
       {/* Loading a moments file was possible but invisible: you had to already know you could
@@ -65,9 +72,10 @@ export function TopBar({
           type="button"
           className="filechip-change"
           onClick={onLoadMoments}
+          aria-label="Load moments file"
           title="Load a .veasyguide.json for this video and skip the analysis"
         >
-          Load moments file
+          Moments file
         </button>
       )}
       <span className="grow" />
@@ -85,11 +93,27 @@ export function TopBar({
           {scheme === "dark" ? <IconSun size={18} /> : <IconMoon size={18} />}
         </button>
         <button type="button" onClick={onAbout} onKeyDown={stopPlayerHotkeys}>About</button>
-        <a className="acc" href={PROJECT} target="_blank" rel="noreferrer">
-          <IconExternalLink size={16} /> Project Page
+        {/* Icon-only: both destinations also live in the About panel, so a label here pays
+            ~250px of bar for links a viewer rarely follows mid-lecture. 44px targets come
+            from the .nav rules; title + aria-label carry the names. */}
+        <a
+          className="acc"
+          href={PROJECT}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Project page"
+          title="Project page"
+        >
+          <IconExternalLink size={18} />
         </a>
-        <a href={REPO} target="_blank" rel="noreferrer">
-          <IconBrandGithub size={16} /> Code on GitHub
+        <a
+          href={REPO}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Code on GitHub"
+          title="Code on GitHub"
+        >
+          <IconBrandGithub size={18} />
         </a>
       </nav>
       <a className="avatar-link" href={PROFILE} target="_blank" rel="noreferrer">
