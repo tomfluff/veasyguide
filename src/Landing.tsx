@@ -13,6 +13,27 @@ import { IconLock, IconUpload } from "@tabler/icons-react";
 export default function Landing({ onFiles, error }: { onFiles: (fs: File[]) => void; error?: string | null }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [sampleErr, setSampleErr] = useState<string | null>(null);
+
+  // Nobody arrives at a drop zone holding a lecture video. The sample is the only way to see
+  // what the app does before deciding to trust it with your own file. It goes down the exact
+  // same path as a dropped file — fetched to a File, then handed to onFiles — so what you try
+  // is what you'd get.
+  const trySample = () => {
+    setFetching(true);
+    setSampleErr(null);
+    fetch(`${import.meta.env.BASE_URL}sample-lecture.mp4`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.blob();
+      })
+      .then((b) => onFiles([new File([b], "sample-lecture.mp4", { type: "video/mp4" })]))
+      .catch(() => {
+        setFetching(false);
+        setSampleErr("The sample video couldn't be downloaded. Check your connection and try again.");
+      });
+  };
 
   // The zone said "Drop a lecture video here" and only ever handled a click — dropping one did
   // nothing except make the browser navigate away to the file. These handlers are what make the
@@ -29,9 +50,9 @@ export default function Landing({ onFiles, error }: { onFiles: (fs: File[]) => v
         the place they're pointing at. Built for low-vision learners.
       </p>
 
-      {error && (
+      {(error || sampleErr) && (
         <div className="landing-error" role="alert">
-          <b>That didn't work.</b> {error}
+          <b>That didn't work.</b> {error || sampleErr}
         </div>
       )}
 
@@ -64,6 +85,14 @@ export default function Landing({ onFiles, error }: { onFiles: (fs: File[]) => v
         hidden
         onChange={(e) => take(e.target.files)}
       />
+
+      <p className="sample">
+        No video handy?{" "}
+        <button type="button" className="sample-btn" onClick={trySample} disabled={fetching}>
+          {fetching ? "Loading sample…" : "Try a sample lecture"}
+        </button>
+        {!fetching && <span className="sample-size"> (23 MB download)</span>}
+      </p>
 
       <div className="privacy">
         <IconLock size={20} />

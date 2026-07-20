@@ -606,6 +606,31 @@
 .drop svg { color: var(--muted); margin-bottom: 2px; }
 .drop-h { font-size: 1.125rem; font-weight: 650; }
 .drop small { color: var(--muted); font-size: 0.9375rem; }
+/* A text link, not a second filled button: the sample is the fallback for people who came
+   empty-handed, and it must not compete with "Choose a file" for the eye. */
+.sample {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+.sample-btn {
+  background: none;
+  border: 0;
+  padding: 4px;
+  font: inherit;
+  color: var(--brand-700);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sample-btn:hover:not(:disabled) { text-decoration: none; }
+.sample-btn:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+.sample-btn:disabled { color: var(--muted); text-decoration: none; cursor: default; }
+/* The one page that promises nothing is uploaded should not spring a 23 MB download on a
+   metered connection either. */
+.sample-size { font-size: 0.875rem; }
+
 .drop-btn {
   margin-top: 10px;
   /* 44px tall (16px text x 1.5 + 2x10px) — the WCAG 2.5.5 floor, which is the one thing in
