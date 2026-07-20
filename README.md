@@ -3,11 +3,13 @@
 **[Try it → veasyguide.github.io/app](https://veasyguide.github.io/app/)**
 
 [![The VeasyGuide web app: a lecture slide with the instructor's handwriting highlighted, and a
-Moments sidebar listing each detected action with its timestamp](docs/media/web_app_demo_poster.png)](docs/media/web_app_demo.mp4)
+Moments sidebar listing each detected action with its timestamp](docs/media/web_app_demo_poster.png)](https://veasyguide.github.io/static/videos/web_app_demo.mp4)
 
-*↑ [Watch the 80-second demo](docs/media/web_app_demo.mp4).* A lecture is dropped onto the page;
-analysis starts at once and playback begins within seconds. Each thing the instructor writes is
-highlighted in place and listed in the Moments sidebar with its timestamp and screen position.
+*↑ [Watch the 80-second demo](https://veasyguide.github.io/static/videos/web_app_demo.mp4).* A
+lecture is dropped onto the page; analysis starts at once and playback begins within seconds.
+Each thing the instructor writes is highlighted in place and listed in the Moments sidebar with
+its timestamp and screen position. (The clip is also in
+[`docs/media/`](docs/media/web_app_demo.mp4), so a clone has it offline.)
 
 Lecture videos are hard to follow when you can't see where the instructor is pointing.
 VeasyGuide watches the video for you: it finds every moment the instructor writes, points, or
