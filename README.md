@@ -2,6 +2,13 @@
 
 **[Try it → veasyguide.github.io/app](https://veasyguide.github.io/app/)**
 
+<video src="https://github.com/tomfluff/veasyguide/raw/main/docs/media/web_app_demo.mp4" controls muted width="100%"></video>
+
+A lecture is dropped onto the page; analysis starts at once and playback begins within seconds.
+Each thing the instructor writes is highlighted in place and listed in the Moments sidebar with
+its timestamp and screen position. ([download the clip](docs/media/web_app_demo.mp4) if it
+doesn't play inline.)
+
 Lecture videos are hard to follow when you can't see where the instructor is pointing.
 VeasyGuide watches the video for you: it finds every moment the instructor writes, points, or
 sketches, then highlights that spot and magnifies it as you watch. Built for low-vision
