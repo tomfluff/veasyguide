@@ -1008,3 +1008,40 @@ The lesson worth keeping: `getBoundingClientRect()` inside a `requestAnimationFr
 reported the destination for those two frames in BOTH paths, including the CSS one where the
 browser never painted it. It cannot tell a committed style from a painted pixel. The screencast
 could, and that is what caught this.
+
+---
+
+## D28 — The scene-change notice is the viewer's to switch off
+
+**Decision.** "Possible scene change" — the pill that appears at the top of the video when
+playback crosses a cut — is now a setting, `sceneNotice` in `ViewSettingsStore`, defaulting to
+on. The control is a Notify/Quiet pair in the moments sidebar, next to the arrangement switch.
+
+**Why it is in ViewSettingsStore and not HighlightSettingsStore.** A preset is a COMPLETE
+snapshot of the highlight and magnification stores (D-note in presets.ts), applied wholesale.
+A notice preference kept there would be switched back on the first time the viewer tried a
+preset — by a control that says nothing about notices, and with no way to tell that is what
+happened. The same reasoning already keeps `groupByScene` out of that store.
+
+**Why the default is on.** It is a cue some viewers rely on to know the slide changed under
+them, and turning it off by default would remove that from everyone to spare the people who
+find it noisy. A feature that never appears is also one nobody discovers well enough to want
+off.
+
+**Why it is labelled when its neighbour is not.** "List / By scene" is read against the list
+directly beneath it, which is what it rearranges. "Notify / Quiet" names no subject, and a
+control a viewer has to operate in order to find out what it does is precisely the thing this
+app exists not to make them do. It carries a visible "Scene changes" label, and the segmented
+group keeps its own `aria-label`.
+
+**Gated in two places.** The trigger reads the store through `getState()` — it runs from the
+frame loop, which outruns re-render — and the render gates the pill as well. Only doing the
+first would leave a notice already on screen there for the rest of its 2500ms after the viewer
+asked for quiet.
+
+**Only when there is more than one scene**, matching the arrangement switch: with a single
+scene there is no cut to cross, so the notice can never fire and the control would be a switch
+for nothing.
+
+**Not covered.** The "Analyzing this part…" cue is a different thing — it reports that the app
+is not ready yet, rather than commenting on the lecture — and it stays unconditional.

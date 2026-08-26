@@ -423,6 +423,17 @@
 .side-export button:focus-visible { outline: 3px solid var(--ring); outline-offset: -3px; }
 .moments-side.overlay .side-export { display: none; }
 
+/* Names the segmented control under it. DESIGN.md's dense-panel floor is 0.75rem and this is
+   rem-based, so browser zoom — the magnification path — grows it with everything else. */
+.side-view-label {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+.moments-side.overlay .side-view-label { color: var(--d-muted); }
+
 .side-view {
   display: flex;
   margin-top: 6px;

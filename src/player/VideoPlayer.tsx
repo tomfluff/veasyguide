@@ -162,7 +162,7 @@ const VideoPlayer = (props: Props) => {
   const [collapsed, handleCollapsed] = useDisclosure(false);
   // Fullscreen-only: the moments list summoned as an overlay inside the player.
   const [momentsOpen, handleMomentsOpen] = useDisclosure(false);
-  const [sceneNotice, setSceneNotice] = useState(false);
+  const [sceneNoticeVisible, setSceneNoticeVisible] = useState(false);
   const currSceneStartRef = useRef<number | null>(null);
   const prevTimeRef = useRef(0);
   const lastReportedActivityRef = useRef<number | null>(null);
@@ -173,6 +173,9 @@ const VideoPlayer = (props: Props) => {
   const zoomStrength = useMagnificationSettingsStore((s) => s.zoom_strength);
   // Study pace: persisted playback rate + what happens at a moment's end (tempo engine).
   const playbackRate = useViewSettingsStore((s) => s.playbackRate);
+  // Gates the pill at RENDER as well as at the trigger, so switching it off takes one
+  // already-showing notice off the screen instead of leaving it for its 2.5 seconds.
+  const sceneNotice = useViewSettingsStore((s) => s.sceneNotice);
   const pinSize = useViewSettingsStore((s) => s.pinSize);
   const pinCorner = useViewSettingsStore((s) => s.pinCorner);
   const insideMomentRef = useRef<Activity | null>(null); // raw in-moment tracking (no lead/linger)
@@ -219,7 +222,7 @@ const VideoPlayer = (props: Props) => {
       handleHideControls.open();
     }, 2000);
   const { start: startSceneNoticeTimeout, clear: clearSceneNoticeTimeout } = useTimeout(
-    () => setSceneNotice(false),
+    () => setSceneNoticeVisible(false),
     SCENE_NOTICE_MS
   );
   // A key reveals the bar only when THE CONTROL IT OPERATED LIVES IN THE BAR. That is the whole
@@ -443,8 +446,11 @@ const VideoPlayer = (props: Props) => {
     if (scene && scene.start !== currSceneStartRef.current) {
       const isFirst = currSceneStartRef.current === null;
       currSceneStartRef.current = scene.start;
-      if (!isFirst && !jumped) {
-        setSceneNotice(true);
+      // Read from the store rather than a render closure: this runs from the frame loop,
+      // which outruns re-render, and a viewer who just switched the cue off should not get
+      // one more of them.
+      if (!isFirst && !jumped && useViewSettingsStore.getState().sceneNotice) {
+        setSceneNoticeVisible(true);
         clearSceneNoticeTimeout();
         startSceneNoticeTimeout();
       }
@@ -598,7 +604,7 @@ const VideoPlayer = (props: Props) => {
     handleIsEnded.close();
     currSceneStartRef.current = null;
     prevTimeRef.current = 0;
-    setSceneNotice(false);
+    setSceneNoticeVisible(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.src]);
 
@@ -1126,7 +1132,7 @@ const VideoPlayer = (props: Props) => {
           {previewJumped ? "Jumped to a moment so you can see your changes · returns when you close" : null}
         </Box>
         <Box className={classNames("overlay-scene", { stacked: atUnanalyzed })} role="status">
-          {sceneNotice ? (
+          {sceneNoticeVisible && sceneNotice ? (
             <>
               <IconSwitchHorizontal size={16} />
               Possible scene change
