@@ -10,10 +10,13 @@
 import type { Preset } from "./presets";
 import IndicatorPointer from "./IndicatorPointer";
 
-// Border width does NOT scale linearly into the tile. A 4px border on a ~900px-wide video is
-// 0.4px in a 90px tile — invisible, and all four presets would look identical. This maps the
-// 0-12px range onto 0-6px, which preserves the ORDER (Minimal < Standard < Bold) at a size
-// the eye can actually resolve. It is a caricature, deliberately.
+// The tile is a caricature, and the border is where that shows.
+//
+// The player draws the border at exactly the configured number of CSS pixels — 10px is 10px,
+// whatever the lecture's resolution (indicatorMetrics.ts). Drawn true-to-life on a ~90px tile
+// standing in for a ~900px video, a 10px border would swallow the miniature slide whole. So
+// the 0-12px range is mapped onto 0-6px: too thin to be literal, but it preserves the ORDER
+// (Minimal < Standard < Bold) at a size the eye can resolve, which is what the tile is for.
 const miniBorder = (px: number) => (px === 0 ? 0 : Math.max(1, Math.round(px / 2)));
 
 export default function PresetTile({

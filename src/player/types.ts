@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Player-space types. The analyzer works in downscaled analysis pixels; the player
-// and overlays work in native video pixels (then scaled to the container by
-// scaleRatio, as in the original VeasyGuide player).
+// and overlays work in native video pixels (then scaled to the container by scaleRatio,
+// as in the original VeasyGuide player).
+//
+// That applies to WHERE things are, not to how thick they are drawn. The highlight's
+// border, pointer and fixed-circle diameter are screen lengths the viewer chose and never
+// pass through scaleRatio — see player/indicatorMetrics.ts and D26.
 
 import type { Activity, AnalysisMeta } from "../analyzer/types";
 

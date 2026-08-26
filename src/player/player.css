@@ -428,10 +428,22 @@
   z-index: 10;
 }
 
+/* The ring is an inset box-shadow (see indicatorMetrics.ts / D26), and forced-colors mode
+   sets `box-shadow: none` — so in Windows High Contrast the highlight would lose its outline
+   entirely, for exactly the viewers most likely to be running it. Opting out is the same
+   contract the pulse has with prefers-reduced-motion: the OS-wide preference is a default,
+   and this viewer went into the Appearance sheet and chose these colours for their own
+   vision. DESIGN.md is explicit that the overlay's colours are content the user tuned, not
+   chrome. Scoped to the mark itself; every other surface still honours the OS. */
+.highlight-indicator {
+  forced-color-adjust: none;
+}
+
 /* Enhance layer: a canvas copy of the video region under the highlight, filtered.
    Sits beneath the indicator's fill/border so those still read on top.
-   It is LARGER than the wrapper — sized to the scaled indicator box, with its source rect
-   expanded to match — so it is centred here rather than inset:0.
+   Sized to the indicator box (which the Size setting can make larger OR smaller than the
+   wrapper, and which does not depend on the wrapper at all in fixed-circle mode), with its
+   source rect derived to match — so it is centred here rather than inset:0.
 
    It is never SCALED. The canvas holds a copy of the video's own pixels, so scaling it would
    stretch a picture of the lecture and the words under the highlight would grow and shrink. */
@@ -443,21 +455,33 @@
   pointer-events: none;
 }
 
+/* The throb grows the BOX, not a transform.
+   `transform: scale()` would have been cheaper — it runs on the compositor — but it scales
+   everything the element paints, and the border is a width the viewer typed into the
+   Appearance sheet. Scaled, a 10px border breathes between 10px and 12.5px three times per
+   moment, and counter-scaling the declared width cannot fix it either: Blink floors a used
+   `border-width` to a whole CSS pixel, so asking for 9.52px paints 9px. Animating the box's
+   own width/height leaves the border untouched by construction (docs/decisions.md D26).
+   The cost is layout on one absolutely-positioned element, whose parent cannot resize — and
+   only while a viewer who went and switched the pulse on is watching it. */
 @keyframes pulse {
   0% {
-    transform: scale(var(--indicator-scale));
+    width: var(--box-w);
+    height: var(--box-h);
   }
   50% {
-    transform: scale(calc(var(--indicator-scale) * 1.25));
+    width: var(--box-w-peak);
+    height: var(--box-h-peak);
   }
   100% {
-    transform: scale(var(--indicator-scale));
+    width: var(--box-w);
+    height: var(--box-h);
   }
 }
 
 /* Making the ink breathe WITHOUT magnifying it.
    When the pulse is on, the canvas is rendered at the throb's widest extent (PULSE_PEAK in
-   HighlightIndicator.tsx — keep the 1.25 above and there in step), still sampled 1:1 from the
+   indicatorMetrics.ts — keep the 1.25 above and there in step), still sampled 1:1 from the
    video. This clip then reveals more or less of that canvas, in time with the border. So the
    inked REGION spreads and contracts — more of the slide gets enhanced — while every pixel
    inside it stays exactly where it is.
@@ -478,6 +502,46 @@
 
 .highlight-enhance.spreading {
   animation: ink-spread var(--pulse-duration, 1s) ease-in-out forwards 3;
+}
+
+/* The fixed circle's ink, clipped to the shape the viewer can actually see.
+   The canvas is a square (the circle's box), so a rectangular clip left the four corners
+   enhanced with nothing marking them — bolder ink outside the ring, which is worse than no
+   enhancement at all when the whole point of the mark is "look here". `round 50%` on a square
+   inset box is a circle, so the same 10%-to-0% inset that drives the square's spread drives
+   this one, and the revealed circle tracks the ring's diameter to within the half-pixel the
+   canvas loses rounding its backing store to whole pixels (52.8px revealed against a 52.5px
+   ring at rest; 53px against 52.5px with the pulse off).
+
+   The static rule is for the pulse being off, when nothing animates the clip at all. */
+.highlight-enhance.round {
+  clip-path: circle(50%);
+}
+
+@keyframes ink-spread-round {
+  0% {
+    clip-path: inset(10% round 50%);
+  }
+  50% {
+    clip-path: inset(0% round 50%);
+  }
+  100% {
+    clip-path: inset(10% round 50%);
+  }
+}
+
+.highlight-enhance.round.spreading {
+  animation: ink-spread-round var(--pulse-duration, 1s) ease-in-out forwards 3;
+}
+
+/* The pointer artwork is a viewBox-only SVG, so an <img> with no size of its own would fall
+   back to the default replaced-element size instead of the size the viewer asked for. Width
+   is the dimension `pointer_scale` controls; the height follows the drawing's own
+   proportions rather than being squared off, so the hand still looks like a hand. */
+.highlight-pointer img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* Deliberately NO prefers-reduced-motion override here: the pulse is off by default and is
