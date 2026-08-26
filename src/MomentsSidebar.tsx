@@ -17,7 +17,11 @@ import { convertSecondsToTimecode } from "./utils/misc";
 import { seekTargetFor, groupByScenes } from "./player/moments";
 import { momentDescription, momentPlace } from "./player/describe";
 import { stopPlayerHotkeys } from "./player/hotkeys";
-import { useViewSettingsStore, setGroupByScene } from "./stores/ViewSettingsStore";
+import {
+  useViewSettingsStore,
+  setGroupByScene,
+  setSceneNotice,
+} from "./stores/ViewSettingsStore";
 
 type Props = {
   activities: Activity[];
@@ -50,6 +54,7 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
   const listRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
   const groupByScene = useViewSettingsStore((s) => s.groupByScene);
+  const sceneNotice = useViewSettingsStore((s) => s.sceneNotice);
   const currIndex = current ? activities.indexOf(current) : -1;
   // Both halves matter: a still-running analysis has no file to serialize yet, and a
   // finished one with nothing in it has nothing worth saving.
@@ -215,6 +220,41 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
+        )}
+        {/* Gated on there being more than one scene, for the same reason the arrangement
+            switch is: with a single scene there is no cut to cross, so the notice this turns
+            off can never fire and the control would be a switch for nothing. */}
+        {groups.length > 0 && (
+          <>
+            {/* Labelled, unlike the arrangement switch below it. That one is read against the
+                list it rearranges, sitting directly underneath; "Notify / Quiet" on its own
+                names no subject at all, and a control a viewer has to operate to find out what
+                it does is the thing this app exists not to make them do. */}
+            <label className="side-view-label" htmlFor="scene-notice-on">
+              Scene changes
+            </label>
+            <div className="side-view" role="group" aria-label="Scene-change notice">
+            <button
+              id="scene-notice-on"
+              type="button"
+              className={sceneNotice ? "on" : ""}
+              aria-pressed={sceneNotice}
+              onClick={() => setSceneNotice(true)}
+              title="Show a notice on the video when the slide or camera cuts"
+            >
+              Notify
+            </button>
+            <button
+              type="button"
+              className={sceneNotice ? "" : "on"}
+              aria-pressed={!sceneNotice}
+              onClick={() => setSceneNotice(false)}
+              title="Do not show a notice when the scene changes"
+            >
+              Quiet
+            </button>
+            </div>
+          </>
         )}
         {groups.length > 0 && (
           <div className="side-view" role="group" aria-label="Arrange moments">

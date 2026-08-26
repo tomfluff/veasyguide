@@ -88,6 +88,16 @@ void main() {
 export type EnhanceOps = {
   filters: TFilterStyle[];
   contrast?: number;
+  /**
+   * How many backing-store pixels make up one CSS pixel on this canvas — the
+   * devicePixelRatio it was sized for, or 1 for a canvas whose bitmap is CSS-sized.
+   *
+   * The bold and sharpen kernels step one TEXEL, so on a HiDPI-backed canvas they would
+   * quietly shrink to a third of the stroke they thicken on a 1x screen. Scaling the step by
+   * this keeps "one pixel" meaning the same width of ink on every display, which is the only
+   * reading of it that helps someone who cannot see the thin version.
+   */
+  pixelRatio?: number;
   /** Source crop in native video pixels; whole frame when omitted. */
   source?: { x: number; y: number; width: number; height: number };
 };
@@ -139,6 +149,8 @@ export class GLEnhancer {
     const W = gl.canvas.width;
     const H = gl.canvas.height;
     if (!W || !H || !video.videoWidth) return;
+    // One CSS pixel, in texels. See EnhanceOps.pixelRatio.
+    const texel = ops.pixelRatio ?? 1;
 
     // Upload the current frame (GPU-side copy for <video> sources).
     gl.activeTexture(gl.TEXTURE0);
@@ -171,8 +183,8 @@ export class GLEnhancer {
       gl.uniform1i(gl.getUniformLocation(this.morphProg, "uTex"), 0);
       gl.uniform2f(
         gl.getUniformLocation(this.morphProg, "uTexel"),
-        1 / W,
-        1 / H
+        texel / W,
+        texel / H
       );
       gl.uniform2f(gl.getUniformLocation(this.morphProg, "uSrcOff"), ...srcOff);
       gl.uniform2f(gl.getUniformLocation(this.morphProg, "uSrcScale"), ...srcScale);
@@ -187,7 +199,7 @@ export class GLEnhancer {
     gl.useProgram(this.finishProg);
     gl.bindTexture(gl.TEXTURE_2D, src);
     gl.uniform1i(gl.getUniformLocation(this.finishProg, "uTex"), 0);
-    gl.uniform2f(gl.getUniformLocation(this.finishProg, "uTexel"), 1 / W, 1 / H);
+    gl.uniform2f(gl.getUniformLocation(this.finishProg, "uTexel"), texel / W, texel / H);
     gl.uniform2f(
       gl.getUniformLocation(this.finishProg, "uSrcOff"),
       ...(fromVideo ? srcOff : ([0, 0] as [number, number]))

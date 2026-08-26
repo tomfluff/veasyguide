@@ -22,6 +22,16 @@ export type TViewSettings = {
   playbackRate: number;
   pinSize: PinSize;
   pinCorner: PinCorner;
+  // Whether the "Possible scene change" pill appears when playback crosses a cut.
+  //
+  // Here rather than in HighlightSettingsStore on purpose: that store is what the Appearance
+  // sheet's presets overwrite wholesale, so a viewer who switched this off would have it
+  // switched back on the next time they tried a preset — by a control that says nothing about
+  // notices. This is a view preference, like groupByScene, and presets do not touch it.
+  //
+  // Defaults to on. It is a cue some viewers rely on to know the slide changed under them,
+  // and a feature that never appears is a feature nobody discovers well enough to want off.
+  sceneNotice: boolean;
 };
 
 export const useViewSettingsStore = create<TViewSettings>()(
@@ -34,6 +44,7 @@ export const useViewSettingsStore = create<TViewSettings>()(
       playbackRate: 1,
       pinSize: "m",
       pinCorner: "tr",
+      sceneNotice: true,
     }),
     {
       name: "view-settings",
@@ -47,6 +58,9 @@ export const setGroupByScene = (groupByScene: boolean) =>
 
 export const setPlaybackRate = (playbackRate: number) =>
   useViewSettingsStore.setState({ playbackRate });
+
+export const setSceneNotice = (sceneNotice: boolean) =>
+  useViewSettingsStore.setState({ sceneNotice });
 
 // Both controls are cycles, not pickers: one button each, no menu to open over the very
 // video the panel is already covering.

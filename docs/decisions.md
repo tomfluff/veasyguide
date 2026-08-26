@@ -788,3 +788,260 @@ as the literal `true`, so the persist initializer never type-checked against
 
 **Result.** `tsc -b` reports 0 errors and `npm run build` exits 0, for the first time on
 this branch. Use `tsc -b`, never `tsc --noEmit`, in this repo.
+
+---
+
+## D26 — The highlight's border is measured on the screen, not in the video
+
+**What was wrong.** `border_width` — the number the Appearance sheet displays as "10px" —
+was multiplied by `scaleRatio`, the video-pixels-to-CSS-pixels conversion, and the whole
+border-bearing element was then scaled again by the Size setting's `transform`. Measured in
+a headless browser at `deviceScaleFactor: 1`, a configured 10px border was painted:
+
+| Lecture, in a 960px-wide player | `scaleRatio` | Painted border |
+|---|---:|---:|
+| 1920×1080 | 0.5 | 5.25px |
+| 1280×720 | 0.75 | 7.35px |
+| 640×360 | 1.5 | 15.75px |
+| 640×480 in a 320px player | 0.375 | 3.15px |
+
+Same setting, same monitor, same window; five times the thickness, decided by which file
+the viewer happened to open. The optional pulse swung it a further 25% three times per
+moment. The pointer had the same defect, and the fixed circle's diameter came out quadratic
+in the Size setting (`base_scale` was multiplied in *and* carried by the transform), so 50%
+drew 13.75px, 100% drew 52.5px and 200% drew 205px.
+
+**Decision.** Two coordinate spaces, named and kept apart in `player/indicatorMetrics.ts`.
+The **box** is video-space: where the highlight sits and how much ink it covers must track
+the lecture, or it stops sitting on the instructor's pen. The **decoration** — border,
+pointer, fixed-circle diameter — is screen-space: it is not a property of the lecture, it is
+what this viewer told us their eyes need. Ten means ten.
+
+**Why no `transform: scale()` may sit between the border and the viewport.** Dropping
+`* scaleRatio` is only half of it: a CSS transform scales everything the element paints,
+borders included. Counter-scaling the declared width — asking for `10 / 1.05` so it lands at
+10 — was tried and **measured to fail**: Blink floors a used `border-width` to a whole CSS
+pixel, so `9.52px` is painted as `9px` and lands at 9.45. Only the structural rule holds. The
+box is therefore centred with `translate: -50% -50%` (a translation, which moves the box
+without touching what it paints) and sized with width/height, and `@keyframes pulse` grows
+those lengths instead of a transform.
+
+**And the ring is an inset `box-shadow`, not a `border`.** A border is part of the box, and
+this is not. Under the global `box-sizing: border-box` a border eats the interior, and when
+the box is narrower than two borders CSS refuses to go negative and grows the BOX instead —
+measured: with a 12px setting, a 20.1px annotation and a 5.0px one both rendered as a 24px
+square, losing the distinction between them and drifting off the ink while the enhance canvas
+stayed where it was. An inset shadow is painted, not laid out: the box stays exactly the size
+the activity says, a ring too thick for it simply fills it, and it follows `border-radius` so
+the fixed circle still gets a round ring. Re-measured after the change: 20.14px and 5.03px,
+with a 12px ring on both.
+
+The one thing a `border` did that a shadow does not: survive forced-colors mode. Windows
+High Contrast sets `box-shadow: none`, so the highlight would have lost its outline entirely
+for the viewers most likely to be running it — measured, and then measured again with
+`forced-color-adjust: none` on `.highlight-indicator`, which keeps the ring at 10px in both
+modes. Opting out is the same contract the pulse has with `prefers-reduced-motion`: the
+OS-wide preference sets the default, and this viewer went into the Appearance sheet and chose
+these colours for their own vision. It is scoped to the mark; every other surface still
+honours the OS.
+
+Clamping the ring to fit a small box was rejected. It is the original bug wearing a different
+hat: it makes 10 mean something else again, and it does so by way of the activity's size,
+which is a video-space quantity.
+
+**Cost.** The pulse is a layout animation now, not a compositor one. It is one absolutely
+positioned element whose parent cannot resize, and it only runs when a viewer has gone and
+switched the pulse on — which is off by default (see the Motion section of DESIGN.md).
+
+**Why CSS pixels and not physical device pixels.** "Pixel-perfect with the monitor" has a
+second reading that is a trap. Dividing by `devicePixelRatio` to reach hardware pixels would
+make the border *thinner* on exactly the high-density screens where it is hardest to see, and
+would shrink it when a low-vision viewer zooms in — the one action they take to make things
+bigger. DESIGN.md commits to browser zoom as the magnification path for the same reason.
+
+**The dynamic square's size stays a percentage of the wrapper**, not a baked pixel value:
+the wrapper tweens its own width and height over 350ms when the highlight moves to the next
+moment, and a percentage re-resolves against it every frame of that tween. Pixels computed at
+render time would snap while the wrapper was still gliding, tearing the border off the box.
+
+**Consequences.** Existing persisted settings keep their names and ranges but change meaning
+— a stored `border_width: 10` now paints 10px where it used to paint 5. That is the point,
+so there is no migration. The four presets were **not** retuned: their numbers are now honest,
+and on a typical downscaled 1080p lecture every preset's border roughly doubles in apparent
+thickness. `enhanceSource()` also derives the enhanced crop from the box's CSS extent rather
+than from the analyzer rectangle, which fixes fixed-circle mode enhancing an activity-sized
+rectangle underneath a 52px circle. Verified by `player/indicatorMetrics.test.ts` and by
+measuring the real components in a headless browser at five video/player combinations, three
+Size settings and four points on the pulse timeline: 10.0px in every one.
+
+**Four bugs found while verifying this, since fixed.** Three predate D26; the fourth was
+introduced while fixing the first, and is here because of how it was caught. All four surfaced
+because measuring the pulse properly meant driving it in a browser.
+
+*The pulse only ever ran once.* `animation: pulse ... forwards 3` reads as three throbs per
+moment, and that is what the first moment got. But `selectActivity` hands one moment straight
+to the next whenever they fall within lead+linger of each other — most of them, on a real
+lecture — so the wrapper never unmounts, React reuses the element, and a finished CSS
+animation does not restart because the styles around it changed. Measured: `pulse` sat
+`finished` at t=3000ms and every subsequent moment was silent. The feature quietly stopped for
+exactly the viewer who went and switched it on.
+
+The fix rewinds rather than remounts, in an effect keyed on the moment: `key={currActivity.id}`
+would restart the animations, but it would also tear down and rebuild `EnhanceCanvas` — a
+fresh WebGL context per moment (`GLEnhancer.create`/`dispose`) on the weak hardware this app
+is built for. Re-measured: `running` at t=117ms after a handover.
+
+It rewinds in a `useLayoutEffect`. The hazard is a frame where the box has already moved to
+the new moment while the throb is still at the old one's phase: hand over near the top of a
+throb and that is a 25%-oversized box, on the one element whose job is to be the calm thing a
+viewer can find. React explicitly permits the browser to paint before a passive effect runs,
+so that frame is an allowed scheduling path.
+
+Measuring it properly — box width sampled per frame, handover timed to land at the peak — did
+**not** reproduce it: React flushed the passive version before paint in every run. (An earlier
+phase-only measurement appeared to show the stale frame and did not; it was sampling before
+React had committed, so the box was still the old one too, and D26 briefly claimed a flicker
+on that basis. It is recorded here because "measured" and "measured the right thing" are not
+the same claim.) A layout effect is the one that promises, and the promise costs one
+`getAnimations` call.
+
+The dependency list is deliberately narrow: the moment, an entry counter, whether the ink
+canvas exists, and the ink's shape. Those are the edges that MOUNT a fresh animation at phase
+zero against a border already mid-cycle. `animation_speed` is not one — both durations change
+together and stay in phase on their own, while rewinding on it would snap the box back to rest
+on every tick of a slider the viewer is dragging. The entry counter exists because the id
+alone is not enough: leaving a moment and scrubbing back into it inside the 350ms fade-out
+never unmounts the wrapper and never changes the id, so the returning highlight would arrive
+with its throbs already spent.
+
+*`getAnimations()` returns more than CSSAnimations.* The first version of that effect read
+`.animationName` off everything the call returned. It also returns the wrapper's
+`CSSTransitions` — the 350ms glide of left/top/width/height, which is running at precisely
+that instant, because the highlight just moved. Transitions have no `animationName`, so this
+threw inside an effect and took the player down on **every moment handover**. It never reached
+a commit, but nothing in the unit suite could have seen it: it needed a real browser driving a
+real handover. What the unit suite covers instead is `isThrobAnimation`, which is where the
+decision now lives — fed a transition, an unnamed scripted animation, the wrapper's own fade,
+and a same-family impostor.
+
+*The ink and the border drifted apart.* `pulse` and `ink-spread` are two animations describing
+one throb, and the clip only lines up with the ring if they share a phase. Switching an enhance
+filter on mid-throb mounted a fresh canvas at phase zero against a border already 1117ms into
+its cycle. Whether the ink canvas exists at all is a dependency of the rewind effect for that
+reason — the canvas appearing, and the ink swapping between its square and round clips, are
+the two edges that mount an animation at phase zero. Measured after: 83ms and 83ms.
+
+*The pointer stood in the middle of the circle.* For the square the pointer's tip anchors to
+the box's bottom-left corner and the hand hangs down and away. A circle has no corner there,
+so anchoring to its bounding box's would have left the pointer floating in the empty quadrant
+outside the disc — and the code compensated by translating it up by its own height, which on a
+52.5px circle is 35px. That put the tip in the MIDDLE of the disc, with the hand covering the
+one thing the circle had been drawn around. The honest analogue of a corner on a circle is the
+point of its circumference facing the same way: 225 degrees, down and to the left. The tip
+walks out from the centre by the radius less the usual overlap, along that diagonal, and the
+`translate` is gone.
+
+*The round mark had a square patch under it.* In fixed-circle mode the enhanced region was
+the right size but clipped with `inset()`, so the four corners got bolder ink with nothing
+pointing at them — worse than no enhancement, when the whole job of the mark is "look here".
+`round 50%` on a square inset box is a circle, so the same 10%-to-0% inset drives it:
+`inset(10% round 50%)` reveals a 52.8px circle against the ring's 52.5px at rest, and the full
+66px against 65.625px at the peak. `clip-path: circle(50%)` covers the pulse being off, at 53px
+against 52.5px. Those sub-pixel gaps are the enhance canvas rounding its backing store to whole
+pixels (EnhanceCanvas.tsx) and are left alone: closing them would mean giving the canvas a CSS
+size different from its bitmap size, which resamples a picture of the lecture to save a third
+of a pixel.
+
+---
+
+## D27 — The enhance canvas is measured in device pixels, and the highlight moves under it
+
+Three bugs the author found testing D26's work in the running app.
+
+**The ink was not sitting 1:1 on the frame.** `EnhanceCanvas` set its bitmap to
+`Math.round(width)` and gave it no CSS size, so the browser displayed it at the rounded width.
+The crop is drawn to fill the whole canvas, which means every copied pixel was stretched by
+`round(width) / width` — 0.57% on a 65.625px circle. Under half a pixel at the centre, but it
+accumulates outward, so the edges of the enhanced patch slid off the writing they were copied
+from. The same rounding left the ink clip revealing 52.8px inside a 52.5px ring.
+
+The canvas is now sized twice, deliberately: its CSS box is the exact unrounded extent, and
+its backing store is that box in **device** pixels. Measured before: 0.4px and 0.3px of
+clip-versus-ring mismatch. After: 0.00px, at devicePixelRatio 1, 1.25, 1.5 and 2.
+
+The backing-store half also fixes a HiDPI defect nobody had reported: a CSS-sized bitmap on a
+150% or 200% display is upscaled by the compositor, so the enhanced patch was a *blurred* copy
+of the lecture laid over the sharp original — the opposite of what an enhance filter is for.
+The bold and sharpen kernels step one texel, so they now take a `pixelRatio` and scale that
+step, or "one pixel of thickening" would have quietly become a third of a pixel on the
+displays where it was already hardest to see.
+
+**With a filter on, the highlight teleported.** The geometry transition was disabled whenever
+an enhance canvas was showing, because the canvas holds a copy of the video from one position
+and a CSS tween would slide that copy across the frame showing pixels borrowed from where the
+box used to be. That traded a smear for a flinch, and a viewer tracking the mark across a
+slide is exactly who loses it when it jumps.
+
+It now tweens the **activity rectangle** instead of the CSS (`player/activityTween.ts`). The
+wrapper's geometry, the box's size, the canvas's size and the canvas's source crop are all
+derived from one rectangle, so interpolating that rectangle keeps all four in agreement by
+construction — the copy is re-cut from the video every frame at wherever the box has got to.
+Measured through a move: the crop stays locked to the box within 0.016 video px. The curve is
+`cubic-bezier(0.42, 0, 0.58, 1)` solved by Newton, not approximated, so the mark travels
+identically whether CSS or this is driving it — measured, the two agree to 0.1px per frame.
+It costs a re-render per frame for 350ms, which is why it is only used when a filter is on.
+
+**And then it jittered.** The first version started the journey in a passive effect. That left
+one render — the render in which the moment changed — with no journey yet, so the geometry
+fell through to the destination and the browser painted it there. Captured off a screencast of
+actually-painted frames: `167 - 365 - 365 - 167 - 168 - 170 - 176 ...`. The mark appeared at
+the far end for two frames, jumped back, and only then travelled.
+
+Seeding progress 0 inside a `useLayoutEffect` fixes it, because the resulting re-render is
+flushed before paint. Re-measured on painted frames: `167 - 167 - 170 - 176 - 181 - 190 ...`,
+strictly monotonic, zero backward steps, in all three of square-with-ink, circle-with-ink and
+the CSS path without. The journey also resumes from where the mark *is* rather than from the
+moment it was heading for, so stepping quickly through moments does not send it back to
+collect one it never reached.
+
+The lesson worth keeping: `getBoundingClientRect()` inside a `requestAnimationFrame` callback
+reported the destination for those two frames in BOTH paths, including the CSS one where the
+browser never painted it. It cannot tell a committed style from a painted pixel. The screencast
+could, and that is what caught this.
+
+---
+
+## D28 — The scene-change notice is the viewer's to switch off
+
+**Decision.** "Possible scene change" — the pill that appears at the top of the video when
+playback crosses a cut — is now a setting, `sceneNotice` in `ViewSettingsStore`, defaulting to
+on. The control is a Notify/Quiet pair in the moments sidebar, next to the arrangement switch.
+
+**Why it is in ViewSettingsStore and not HighlightSettingsStore.** A preset is a COMPLETE
+snapshot of the highlight and magnification stores (D-note in presets.ts), applied wholesale.
+A notice preference kept there would be switched back on the first time the viewer tried a
+preset — by a control that says nothing about notices, and with no way to tell that is what
+happened. The same reasoning already keeps `groupByScene` out of that store.
+
+**Why the default is on.** It is a cue some viewers rely on to know the slide changed under
+them, and turning it off by default would remove that from everyone to spare the people who
+find it noisy. A feature that never appears is also one nobody discovers well enough to want
+off.
+
+**Why it is labelled when its neighbour is not.** "List / By scene" is read against the list
+directly beneath it, which is what it rearranges. "Notify / Quiet" names no subject, and a
+control a viewer has to operate in order to find out what it does is precisely the thing this
+app exists not to make them do. It carries a visible "Scene changes" label, and the segmented
+group keeps its own `aria-label`.
+
+**Gated in two places.** The trigger reads the store through `getState()` — it runs from the
+frame loop, which outruns re-render — and the render gates the pill as well. Only doing the
+first would leave a notice already on screen there for the rest of its 2500ms after the viewer
+asked for quiet.
+
+**Only when there is more than one scene**, matching the arrangement switch: with a single
+scene there is no cut to cross, so the notice can never fire and the control would be a switch
+for nothing.
+
+**Not covered.** The "Analyzing this part…" cue is a different thing — it reports that the app
+is not ready yet, rather than commenting on the lecture — and it stays unconditional.
