@@ -1028,11 +1028,25 @@ them, and turning it off by default would remove that from everyone to spare the
 find it noisy. A feature that never appears is also one nobody discovers well enough to want
 off.
 
-**Why it is labelled when its neighbour is not.** "List / By scene" is read against the list
-directly beneath it, which is what it rearranges. "Notify / Quiet" names no subject, and a
-control a viewer has to operate in order to find out what it does is precisely the thing this
-app exists not to make them do. It carries a visible "Scene changes" label, and the segmented
-group keeps its own `aria-label`.
+**It is a switch in the footer, not a segmented pair in the header.** It shipped first as a
+Notify/Quiet pair beside the arrangement switch. On/off is what this is, though, and a
+segmented control renders both states as buttons — so a viewer has to read two words to work
+out which one is current, where a switch says it by position. It also is not a control over
+the rows above it; it is a standing preference about the video, which is why it sits under the
+list rather than in a header already carrying the heading, the position readout, Export and
+the arrangement switch. Mantine's `Switch` gives it `role="switch"` and wires the label to the
+input, so pressing the words works.
+
+**No description line under it.** There was one — "A pill at the top of the video when the
+slide or camera cuts". Under 900px the sidebar is capped at 40vh, and three wrapped lines
+pushed the footer past that cap, where the panel's `overflow: hidden` cut the switch off
+entirely. Measured. The sentence moved to the `title`, which is a hint rather than the only
+way to understand a control that already says what it does.
+
+That cap also grew a floor: `max(40vh, 15rem)`. 40vh is a share of the WINDOW, and on a short
+one it drops below what the panel's own fixed chrome needs — at 320x320 the switch vanished
+outright. The floor is in rem so it grows with the reader's font size, and the page scrolls
+normally around a taller panel, which is what an ordinary scrolling document is for.
 
 **Gated in two places.** The trigger reads the store through `getState()` — it runs from the
 frame loop, which outruns re-render — and the render gates the pill as well. Only doing the

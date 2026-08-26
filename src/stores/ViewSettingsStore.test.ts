@@ -43,6 +43,27 @@ describe("the scene-change notice setting", () => {
     expect(presets).not.toMatch(/sceneNotice/);
   });
 
+  it("is a switch in the sidebar's footer, not a pair of buttons in its header", () => {
+    // on/off is what this is. A segmented pair renders both states as buttons, so a viewer
+    // has to read two words to work out which one is current; a switch says it by position.
+    const side = read("../MomentsSidebar.tsx");
+    expect(side).toMatch(/<Switch/);
+    expect(side).toMatch(/label="Notify scene changes"/);
+    // In the footer, under the list — it is a standing preference about the video, not a
+    // control over the rows above it.
+    expect(side.indexOf("side-foot")).toBeGreaterThan(side.indexOf("side-list"));
+    // And no description line: it pushed the footer past the 40vh cap on a short window,
+    // where the panel's overflow:hidden cut the switch off entirely.
+    const foot = side.slice(side.indexOf("side-foot"));
+    expect(foot.slice(0, foot.indexOf("</Switch>") + 400)).not.toMatch(/description=/);
+  });
+
+  it("keeps the panel's height cap above what its own chrome needs", () => {
+    // 40vh is a share of the WINDOW; on a short one it fell below the heading plus the
+    // footer, and the panel clipped its own controls.
+    expect(read("../App.css")).toMatch(/max-height:\s*max\(40vh,\s*15rem\)/);
+  });
+
   it("gates the pill at the trigger AND at the render", () => {
     // Only gating the trigger would leave an already-showing notice on screen for the rest
     // of its 2.5 seconds after the viewer asked for quiet.
