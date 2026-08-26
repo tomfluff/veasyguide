@@ -10,7 +10,7 @@
 // happened in, so the list collapses to a handful of slides you can open. The analyzer has been
 // emitting scenes all along; this is the first thing that reads them.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Menu } from "@mantine/core";
+import { Menu, Switch } from "@mantine/core";
 import { IconChevronDown, IconDownload } from "@tabler/icons-react";
 import type { Activity, Scene } from "./analyzer/types";
 import { convertSecondsToTimecode } from "./utils/misc";
@@ -225,38 +225,6 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
             switch is: with a single scene there is no cut to cross, so the notice this turns
             off can never fire and the control would be a switch for nothing. */}
         {groups.length > 0 && (
-          <>
-            {/* Labelled, unlike the arrangement switch below it. That one is read against the
-                list it rearranges, sitting directly underneath; "Notify / Quiet" on its own
-                names no subject at all, and a control a viewer has to operate to find out what
-                it does is the thing this app exists not to make them do. */}
-            <label className="side-view-label" htmlFor="scene-notice-on">
-              Scene changes
-            </label>
-            <div className="side-view" role="group" aria-label="Scene-change notice">
-            <button
-              id="scene-notice-on"
-              type="button"
-              className={sceneNotice ? "on" : ""}
-              aria-pressed={sceneNotice}
-              onClick={() => setSceneNotice(true)}
-              title="Show a notice on the video when the slide or camera cuts"
-            >
-              Notify
-            </button>
-            <button
-              type="button"
-              className={sceneNotice ? "" : "on"}
-              aria-pressed={!sceneNotice}
-              onClick={() => setSceneNotice(false)}
-              title="Do not show a notice when the scene changes"
-            >
-              Quiet
-            </button>
-            </div>
-          </>
-        )}
-        {groups.length > 0 && (
           <div className="side-view" role="group" aria-label="Arrange moments">
             <button
               type="button"
@@ -308,6 +276,33 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
             ))
           : activities.map(row)}
       </div>
+      {/* Below the list, not in the header. It is a standing preference about the video, not a
+          control over the rows above it — and the header is already carrying the heading, the
+          position readout, Export and the arrangement switch.
+
+          A switch rather than the Notify/Quiet pair it replaces: on/off is what this is, and a
+          segmented control that renders both states as buttons makes a viewer read two words to
+          find out which one is current. The switch says it in its position, and Mantine gives it
+          `role="switch"` with the label wired to the input, so pressing the words works too.
+
+          Gated on more than one scene for the same reason the arrangement switch is: with a
+          single scene there is no cut to cross and the notice can never fire. */}
+      {groups.length > 0 && (
+        <div className="side-foot">
+          {/* Label only, no description line. On a window under 900px the sidebar is capped at
+              40vh, and a three-line description pushed the footer past that cap — where the
+              panel's `overflow: hidden` cut the switch off entirely, in exactly the reflow case
+              DESIGN.md commits to supporting. The label says what it does; the sentence went to
+              the title, which is a hint rather than the only way to understand the control. */}
+          <Switch
+            size="md"
+            checked={sceneNotice}
+            onChange={(e) => setSceneNotice(e.currentTarget.checked)}
+            label="Notify scene changes"
+            title="Shows a pill at the top of the video when the slide or camera cuts"
+          />
+        </div>
+      )}
     </aside>
   );
 }

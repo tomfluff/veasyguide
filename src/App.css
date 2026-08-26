@@ -310,7 +310,18 @@
 /* Sidebar under the player on narrow windows — beside it there'd be no room for the video. */
 @media (max-width: 900px) {
   .stage-row .stage { margin-right: 0; }
-  .moments-side { width: 100%; position: static; max-height: 40vh; margin-top: 12px; }
+  .moments-side {
+    width: 100%;
+    position: static;
+    /* 40vh keeps the list from swallowing the page, but it is a share of the WINDOW, and on a
+       short one it drops below what the panel's own chrome needs: the heading, the arrangement
+       switch and the footer are all fixed height, so under about 15rem the panel starts cutting
+       its own controls off — measured, the scene-notice switch vanished entirely at 320x320.
+       The floor is in rem so it grows with the reader's font size, and the page scrolls
+       normally around a taller panel, which is what the layout is for. */
+    max-height: max(40vh, 15rem);
+    margin-top: 12px;
+  }
 }
 
 /* The fullscreen mount: same list, floated inside the player above the control bar
@@ -423,16 +434,19 @@
 .side-export button:focus-visible { outline: 3px solid var(--ring); outline-offset: -3px; }
 .moments-side.overlay .side-export { display: none; }
 
-/* Names the segmented control under it. DESIGN.md's dense-panel floor is 0.75rem and this is
-   rem-based, so browser zoom — the magnification path — grows it with everything else. */
-.side-view-label {
-  display: block;
-  margin-top: 8px;
-  font-size: 0.8125rem;
-  font-weight: 650;
-  color: var(--muted);
+/* The sidebar's footer: standing preferences about the video, under the list rather than in
+   the header. A sibling of .side-list, which is the flex:1 scroller — so this pins to the
+   bottom and the rows scroll behind it instead of pushing it off. */
+.moments-side .side-foot {
+  flex: none;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
 }
-.moments-side.overlay .side-view-label { color: var(--d-muted); }
+.moments-side.overlay .side-foot { border-top-color: var(--d-line); }
+
+/* The overlay mount is dark whatever the page theme is (see .moments-side.overlay), so on a
+   light-theme page Mantine's label would otherwise arrive as near-black on near-black. */
+.moments-side.overlay .side-foot .mantine-Switch-label { color: var(--d-text); }
 
 .side-view {
   display: flex;
