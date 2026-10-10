@@ -2024,7 +2024,8 @@ announcements, on entering and on re-entering, both "Moment 8 of 36…". Playing
 gave exactly 6 updates for 6 moment starts, windowed and in fullscreen, at least 480ms apart. The
 magnifier's region is a second `role="status"`: Z gave "Magnifier on, 1.5 times.", ↑ gave
 "Magnifier on, 1.6 times.", and Z again "Magnifier off.", with no change at all to the moment
-region throughout. Re-entry while playing, measured later: playing from 83s, "Moment 8" at 84.7s; ← to 83.5s gives
+region throughout. Re-entry while playing, measured later: playing from 83s, "Moment 8" at
+84.7s; ← to 83.5s gives
 "Moment 7"; playing on re-enters 8 and announces it again. A backfill renumbering staying quiet
 could not be exercised as intended (Still open has why). Strength changes while the magnifier is
 off do not exist as a path: ↑ and ↓ always turn the magnifier on (↑ also steps the strength),
