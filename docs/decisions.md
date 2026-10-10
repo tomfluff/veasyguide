@@ -1694,6 +1694,30 @@ with the now-line itself (482f7eb). The two-row controls on short windows, where
 to choose between a pillarboxed video and accepting two rows, no longer happen: the slimmer bar
 fits one row down to a 486px player, and every desktop size measured is one row (1605098).
 
+**Loading fades instead of cutting** (892763f, 6e8c3cd, cd8cea0). Two hard cuts when a lecture
+opened predate this round, and both are on main; video-lead measured the first.
+- For about 100ms (3 frames) the `<video>` had no frame and the container's black background
+  showed through before the slide, usually white, arrived. Until `loadeddata` the picture layer,
+  the video and everything drawn on it, is now transparent, and on the first frame it eases in
+  over 200ms. The resume card fades with the picture it sits on. Opacity changes no layout, so
+  every measurement of the video box above is unchanged; measured per frame at 1366x650, the
+  stage stays at one rect throughout. It cannot stick hidden: an `error` event or a 1.5s
+  fallback shows the picture anyway, so the "Finding the moments…" panel still appears when the
+  video cannot be decoded. No reduced-motion gate: a fade is not vestibular motion, the same
+  reasoning as the magnifier's crossfade.
+- When playback unlocked, the dark "Finding the moments…" panel was unmounted in one frame: luma
+  41 to 224 from one frame to the next. It now stays mounted and lifts, a 250ms ease-out to
+  transparent, then `visibility: hidden`, which also takes it out of clicks and the
+  accessibility tree. A video that opens ready (a cache hit or a moments file) starts lifted,
+  so nothing flashes there.
+
+*Correction, same round:* the first fix made the not-yet-framed container transparent as well,
+so the page showed through. On the light theme that swapped the black blink for a white flash
+between two dark states, luma 22 (placeholder) to 246 (page) to 40 (panel), a bigger swing than
+the blink it replaced; verify-lead measured it. The container now holds the loading
+placeholder's own `#12161d` until the first frame, so the sequence is placeholder, the same
+dark, then the picture and the panel fading in. The dark theme was already fine (cd8cea0).
+
 **Still open.**
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
