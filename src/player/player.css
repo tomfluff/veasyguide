@@ -839,17 +839,21 @@
 
 .now-line.empty { color: var(--d-muted); }
 
-/* One line at every width (see the now-line comment in VideoPlayer.tsx): the sentence yields,
-   with an ellipsis, rather than wrapping and growing the bar. The DOM keeps the whole text, so
-   the status region announces it in full. The magnifier chip and "Next at" keep their size. */
-.now-line { white-space: nowrap; }
-.now-line .now-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* A constant height without cutting a word (see the now-line comment in VideoPlayer.tsx). The
+   live line and its invisible sizers share one grid cell, so the cell — and the bar — is as
+   tall as the longest thing the line could ever say at this width, from the first frame. The
+   live line stretches to fill it and wraps freely inside. */
+.now-slot {
+  display: grid;
+  margin-top: 8px;
 }
-.now-line .now-next { flex: none; }
+.now-slot > .now-line {
+  grid-area: 1 / 1;
+  margin-top: 0;
+  flex-wrap: wrap;
+  align-content: center;
+}
+.now-sizer { visibility: hidden; }
 
 .now-dot {
   width: 9px;
@@ -874,7 +878,7 @@
    play/pause, timecode, scrubber, then speed, zoom, pin, Appearance, fullscreen, expand.
    The moment marks, the now-line, volume and the moment steppers belong to the expanded
    bar. The [ / ] keys still work while collapsed. */
-.video-container.collapsed .now-line,
+.video-container.collapsed .now-slot,
 .video-container.collapsed .moment-lane,
 .video-container.collapsed .volume-container,
 .video-container.collapsed .collapse-hide {

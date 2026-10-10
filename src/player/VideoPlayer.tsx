@@ -929,17 +929,19 @@ const VideoPlayer = (props: Props) => {
         {/* The label is TEXT, in a live region — not a hover tooltip. The lane is a map; a row
             of identical rectangles tells a viewer nothing, and hover is invisible to a keyboard
             user, a screen reader, and anyone driving a magnifier.
-            One line, always present, whatever the analysis has found — the same reason as the
-            lane above: a row that appears, or wraps to a second line when its text grows, is a
-            player that resizes mid-lecture (measured at 400px: 259px of bar, then 234px as the
-            text changed). Truncated by CSS only, so the status region still holds — and
-            announces — the whole sentence. Wide enough windows never truncate at all. */}
+            Always present, whatever the analysis has found — the same reason as the lane above:
+            a row that appears, or wraps to another line when its text grows, is a player that
+            resizes mid-lecture (measured at 400px: 259px of bar, then 234px as the text
+            changed). The text is never cut to stop that: a 400px window IS a reader at high
+            zoom, and WCAG 1.4.10 forbids losing content on reflow. Instead the row RESERVES the
+            room its longest possible sentence needs at this width — see .now-slot. */}
+        <Box className="now-slot">
         <Box className={classNames("now-line", { empty: props.done && props.activities.length === 0 })} role="status">
             <span className={classNames("now-dot", { on: currIndex >= 0 })} />
             <Text className="now-text">
               {props.activities.length === 0 ? (
                 props.done
-                  ? "No annotation moments found in this video — the highlight and magnifier have nothing to follow."
+                  ? "No moments found — nothing for the highlight to follow."
                   : "Looking for moments…"
               ) : currIndex >= 0 ? (
                 <>
@@ -976,6 +978,32 @@ const VideoPlayer = (props: Props) => {
                 Next at <b>{convertSecondsToTimecode(upcoming.start)}</b>
               </Text>
             )}
+        </Box>
+        {/* The sizers: invisible copies of the longest things the line can say, stacked in the
+            same grid cell, so the cell is as tall as the worst case at the current width from
+            the first frame on — one line where it fits, two or three where it does not. The
+            timecodes use this video's own duration, so an hour-long lecture reserves for its
+            longer timecodes. aria-hidden: they are layout, not content. The empty-video sentence
+            was cut down to fit inside the moment sentence's reservation: at 96 characters it was
+            the worst case, and reserved two extra lines at 400px for a state most videos never
+            reach. */}
+        <Box className="now-line now-sizer" aria-hidden>
+          <span className="now-dot" />
+          <Text className="now-text">
+            Moment <b>888</b> of <b>888</b> · most of the slide ·{" "}
+            <b>{convertSecondsToTimecode(totalTime)}</b>, 88.8s
+          </Text>
+          <Text className="now-zoom">Magnifier on · 8.8×</Text>
+          <Text className="now-next">
+            Next at <b>{convertSecondsToTimecode(totalTime)}</b>
+          </Text>
+        </Box>
+        <Box className="now-line now-sizer" aria-hidden>
+          <span className="now-dot" />
+          <Text className="now-text">
+            No moments found — nothing for the highlight to follow.
+          </Text>
+        </Box>
         </Box>
 
         <Group className="controls" gap={3} align="center" mt={4}>
