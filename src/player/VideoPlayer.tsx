@@ -65,6 +65,7 @@ import { isAnalyzed } from "../analyzer/ranges";
 import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
+import { placeSample, type Rect } from "./sample";
 import { timelineMarkers, stepMoment, seekTargetFor } from "./moments";
 import { momentDescription, momentPlace } from "./describe";
 import { cropRect } from "../analyzer/snippets";
@@ -223,6 +224,8 @@ const VideoPlayer = (props: Props) => {
   const chromeTimeRef = useRef(-1);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
+  // Where the sample highlight sits (stage px), or null when it is not shown.
+  const [sampleRect, setSampleRect] = useState<Rect | null>(null);
   // Tracked only so the resume card knows to wait while it is open (see .resume-slot).
   const [speedOpen, setSpeedOpen] = useState(false);
   const [previewJumped, setPreviewJumped] = useState(false);
@@ -238,6 +241,7 @@ const VideoPlayer = (props: Props) => {
   // WCAG 2.1.4: every single-character shortcut can be switched off (the sidebar's footer).
   // A speech-input user saying an ordinary word otherwise fires a dozen player actions.
   const letterShortcuts = useViewSettingsStore((s) => s.letterShortcuts);
+  const tuningPreview = useViewSettingsStore((s) => s.tuningPreview);
   const insideMomentRef = useRef<Activity | null>(null); // raw in-moment tracking (no lead/linger)
   // Pinned snapshot: a full-res crop of a moment's final ink, captured from the live video
   // element the instant playback crosses the moment's end (the end frame is what's on screen
@@ -727,7 +731,14 @@ const VideoPlayer = (props: Props) => {
     if (!video) return;
 
     if (open) {
-      if (!isPlaying && !currActivity && props.activities.length > 0) {
+      // Only in "jump" mode (Appearance → Preview on → The nearest moment). The default draws a
+      // sample highlight instead and leaves the playhead alone (see sampleRect below).
+      if (
+        useViewSettingsStore.getState().tuningPreview === "jump" &&
+        !isPlaying &&
+        !currActivity &&
+        props.activities.length > 0
+      ) {
         const target =
           stepMoment(props.activities, video.currentTime, props.selectOpts.lead, 1) ??
           stepMoment(props.activities, video.currentTime, props.selectOpts.lead, -1);
@@ -805,6 +816,60 @@ const VideoPlayer = (props: Props) => {
     ];
     rows.find((r) => r && r.getClientRects().length > 0)?.focus();
   };
+
+  // Place the sample highlight while the Appearance sheet is open in "sample" mode: a square a
+  // fifth of the picture's height, where the sheet (and, in fullscreen, the bar over the picture)
+  // covers it least. Re-placed whenever any of those move or resize — the window, fullscreen,
+  // the sheet switching tabs (each tab is a different height).
+  useEffect(() => {
+    if (!appearanceOpen || tuningPreview !== "sample") {
+      setSampleRect(null);
+      return;
+    }
+    const container = containerRef.current;
+    const video = videoRef.current;
+    if (!container || !video) return;
+    const place = () => {
+      const vr = video.getBoundingClientRect();
+      const picture: Rect = {
+        x: leftShift,
+        y: topShift,
+        w: vr.width - 2 * leftShift,
+        h: vr.height - 2 * topShift,
+      };
+      if (picture.w <= 0 || picture.h <= 0) return;
+      const rel = (el: Element | null): Rect[] => {
+        if (!el) return [];
+        const r = el.getBoundingClientRect();
+        return [{ x: r.left - vr.left, y: r.top - vr.top, w: r.width, h: r.height }];
+      };
+      const obstacles = [
+        ...rel(container.querySelector(".ap-pop")),
+        ...(isFullscreen ? rel(barSizeRef.current) : []),
+      ];
+      setSampleRect(placeSample(picture, obstacles, Math.round(picture.h * 0.2)));
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(video);
+    // The dropdown mounts with its open transition, a frame or two after the state flips.
+    let raf = 0;
+    const watchSheet = () => {
+      const pop = container.querySelector(".ap-pop");
+      if (pop) {
+        ro.observe(pop);
+        place();
+      } else raf = requestAnimationFrame(watchSheet);
+    };
+    watchSheet();
+    window.addEventListener("resize", place);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("resize", place);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appearanceOpen, tuningPreview, leftShift, topShift, isFullscreen, barHeight]);
 
   // The one-row bar's height, for the page's width cap (--video-cap, index.css). Published only
   // while the controls ARE one row: that height depends on the font size (the timecode's line
@@ -946,7 +1011,21 @@ const VideoPlayer = (props: Props) => {
     ? (timelineX / (timelineContainerRef.current.clientWidth || 1)) * totalTime
     : 0;
 
-  const playerActivity = currActivity ? toPlayerActivity(currActivity, props.meta) : null;
+  const realActivity = currActivity ? toPlayerActivity(currActivity, props.meta) : null;
+  // The sample highlight (player/sample.ts), in video px for HighlightIndicator: drawn through
+  // the REAL indicator, so every setting shows exactly as it will on a moment. Only while the
+  // sheet is open in "sample" mode and no moment is current — a real moment always wins.
+  const sampleActivity =
+    sampleRect && !realActivity && scaleRatio > 0
+      ? {
+          id: -1,
+          start: 0,
+          end: 0,
+          pos: { x: (sampleRect.x - leftShift) / scaleRatio, y: (sampleRect.y - topShift) / scaleRatio },
+          dim: { width: sampleRect.w / scaleRatio, height: sampleRect.h / scaleRatio },
+        }
+      : null;
+  const playerActivity = realActivity ?? sampleActivity;
   const zoomActivity = currActivity ?? stableActivity;
 
   // The gate's bar fills toward the UNLOCK (the first PLAYBACK_LEAD seconds), not toward the
@@ -1504,6 +1583,20 @@ const VideoPlayer = (props: Props) => {
           videoRef={videoRef}
         />
       </Box>
+      {/* Says that the box is a stand-in, not something the analysis found. Decoration for
+          sighted viewers (aria-hidden); the sheet's own choice says what the preview is on. */}
+      {sampleActivity && sampleRect && (
+        <div
+          className="sample-tag"
+          aria-hidden="true"
+          style={{
+            left: sampleRect.x,
+            top: sampleRect.y >= 28 ? sampleRect.y - 26 : sampleRect.y + sampleRect.h + 4,
+          }}
+        >
+          Sample
+        </div>
+      )}
       <Box className="video-magnification">
         <MagnificationOverlay
           videoRef={videoRef}

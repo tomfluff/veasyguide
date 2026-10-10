@@ -36,6 +36,7 @@ import {
 } from "../stores/MagnificationSettingsStore";
 import { PRESETS, applyPreset, matchPreset } from "./presets";
 import PresetTile from "./PresetTile";
+import { useViewSettingsStore, setTuningPreview } from "../stores/ViewSettingsStore";
 import "./appearance.css";
 
 type Screen = "root" | "box" | "pointer" | "zoom" | "motion" | "ink";
@@ -245,6 +246,7 @@ export default function AppearanceSheet() {
   const mag = useMagnificationSettingsStore();
   const active = matchPreset(hl, mag);
   const [screen, setScreen] = useState<Screen>("root");
+  const tuningPreview = useViewSettingsStore((s) => s.tuningPreview);
 
   const inkCount = hl.filter_style.length + mag.filter_style.length;
 
@@ -268,7 +270,19 @@ export default function AppearanceSheet() {
     return (
       <div className="ap-sheet">
         <p className="ap-title">Pick what you can see best</p>
-        <p className="ap-hint">The video above is the preview — it changes as you choose.</p>
+        {/* What the changes show on. It replaced the hint line that sat here ("The video above
+            is the preview…"): one row, so the first screen stays no taller than the drill-down
+            screens. The choice's own words say what each does. */}
+        <div className="ap-preview">
+          <span className="ap-preview-label">Preview on</span>
+          <Choice
+            label="Preview while tuning"
+            options={["sample", "jump"] as const}
+            value={tuningPreview}
+            onChange={setTuningPreview}
+            labels={{ sample: "A sample highlight", jump: "The nearest moment" }}
+          />
+        </div>
 
         <div className="ap-tiles" role="radiogroup" aria-label="Appearance preset">
           {PRESETS.map((p) => (

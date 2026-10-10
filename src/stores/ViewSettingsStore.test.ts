@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Yotam Sechayk
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
@@ -9,6 +9,7 @@ import {
   setSceneNotice,
   setGroupByScene,
   setLetterShortcuts,
+  setTuningPreview,
 } from "./ViewSettingsStore";
 
 const read = (rel: string) =>
@@ -137,5 +138,48 @@ describe("the single-key shortcuts setting", () => {
     expect(foot.indexOf("Single-key shortcuts")).toBeGreaterThan(0);
     // The footer itself is no longer behind the scenes gate.
     expect(side).not.toMatch(/groups\.length > 0 && \(\s*<div className="side-foot"/);
+  });
+});
+
+describe("the preview-while-tuning setting", () => {
+  it("defaults to the sample highlight", () => {
+    // The sample leaves the viewer's place in the lecture alone; jumping to a moment is the
+    // opt-in (Yotam: keep the old behaviour, make a new default).
+    expect(useViewSettingsStore.getInitialState().tuningPreview).toBe("sample");
+  });
+
+  it("switches, persists, and leaves the other settings alone", () => {
+    setTuningPreview("jump");
+    expect(useViewSettingsStore.getState().tuningPreview).toBe("jump");
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(true);
+    setTuningPreview("sample");
+  });
+
+  it("lives outside the stores the Appearance presets overwrite", () => {
+    expect(read("./HighlightSettingsStore.ts")).not.toMatch(/tuningPreview/);
+    expect(read("../player/presets.ts")).not.toMatch(/tuningPreview/);
+  });
+});
+
+describe("persisting the preview-while-tuning setting", () => {
+  it("is written to and read back from localStorage", async () => {
+    // Vitest runs in node, without localStorage, and zustand's persist only attaches when a
+    // storage exists at creation — so stub one and load a fresh copy of the store.
+    const mem = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, v),
+      removeItem: (k: string) => void mem.delete(k),
+    });
+    vi.resetModules();
+    const fresh = await import("./ViewSettingsStore");
+    fresh.setTuningPreview("jump");
+    expect(JSON.parse(mem.get("view-settings")!).state.tuningPreview).toBe("jump");
+    // A reload: another fresh copy rehydrates from the same storage.
+    vi.resetModules();
+    const reloaded = await import("./ViewSettingsStore");
+    await reloaded.useViewSettingsStore.persist.rehydrate();
+    expect(reloaded.useViewSettingsStore.getState().tuningPreview).toBe("jump");
+    vi.unstubAllGlobals();
   });
 });

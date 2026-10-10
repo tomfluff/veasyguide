@@ -30,7 +30,12 @@
 
 .ap-title { font-size: 0.9375rem; font-weight: 650; }
 .ap-hint { font-size: 0.75rem; color: var(--ap-muted); line-height: 1.45; margin-bottom: 10px; }
-.ap-status { font-size: 0.75rem; color: var(--ap-muted); margin: 8px 0 10px; min-height: 17px; }
+.ap-status { font-size: 0.75rem; color: var(--ap-muted); margin: 6px 0 8px; min-height: 17px; }
+/* The root's "Preview on" row: one line, in the place of the old hint, so the root screen
+   stays within the drill screens' height (the fixed-band promise). */
+.ap-preview { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; }
+.ap-preview-label { flex: none; font-size: 0.75rem; color: var(--ap-muted); }
+.ap-preview .ap-seg-btn { height: 28px; padding: 0 8px; }
 /* No negative-margin bleed: it made the sheet a few px taller than the dropdown, so the
    dropdown grew its own scrollbar on top of .ap-body's — two nested scrollbars. */
 .ap-foot {
