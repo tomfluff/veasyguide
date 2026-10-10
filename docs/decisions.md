@@ -1643,6 +1643,15 @@ the sidebar's centring were not measured separately; both are consistent with th
 sidebar stacks below the player. That is page content arriving below, not overflow. The bar
 still wraps there (121px at 400px wide, 153px at 320px), taller than the 89px the cap assumes.
 
+**Fixed: the bar term did not follow the font size** (3c3dfe5). The cap's one-row bar was a
+fixed 89px. With a 20px root font the bar is 96px, and at 1707x880 at DPR 1.5 the page scrolled
+by 7px: the only desktop case found, and it fell on the reader who had enlarged the text. The
+term is now `--bar-one-row`, which the player publishes only while its controls fit on one row.
+This measures the bar again, which eaceeb5's lesson warns about, so the condition matters: the
+one-row height depends on the font size but not on the player's width, and a wrapped bar
+publishes nothing, so the player's width cannot feed back into it. At a 20px root it is 96px
+and the page no longer scrolls.
+
 **Closed by D35.** The horizontal page scroll at 320px and 800px wide, which predates this entry
 and came from the top bar rather than the player, is fixed there (cb3c512).
 
@@ -1653,14 +1662,9 @@ to choose between a pillarboxed video and accepting two rows, no longer happen: 
 fits one row down to a 486px player, and every desktop size measured is one row (1605098).
 
 **Still open.**
-- The cap's one-row bar is a fixed 89px, and it does not follow the reader's font size. With
-  a 20px root font the bar is 96px, and at 1707x880 at DPR 1.5 the page scrolls by 7px. The
-  only desktop case found, but it is the reader who enlarged the text who gets it.
-
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
-
 
 ---
 
@@ -1834,24 +1838,36 @@ case: 89px at 1400 and 560px wide and at every desktop size, 121px at 400px wide
 zoom cases (683x384 at DPR 2, 341x192 at DPR 4), 153px at 320px. The narrowest player confirmed
 as one row is 504px, at a 560px window; the exact 486px threshold was not searched for.
 - The hidden status is `role="status"` (polite by role), 1x1px, with no hidden ancestor. At 4x
-  it announced 5 updates in 9s windowed, and 4 in fullscreen with the bar collapsed.
+  it announced 5 updates in 9s windowed, and 4 in fullscreen with the bar collapsed. Those
+  counts include the end-of-moment updates later removed (below).
 - Every bar and pin button is 28x28px (speed 80x28), with no overlaps. No focus ring is clipped
   by an `overflow` ancestor or the viewport, at 1366px and 320px wide.
 - Volume: hover does not open the popover; Enter and Space do. Focus lands on the range, which
   is vertical with up as louder (its top gives 1.0, its bottom 0).
 
+**Fixed after the second Codex review** (3c3dfe5).
+- The volume tip never showed on hover, and on focus it was drawn at (46, 65) for a button at
+  (152, 678). It wrapped the `Popover` component, which renders no element of its own, so it had
+  nothing to anchor to. It now wraps `Popover.Target`, the rule D31 recorded for `PlayerTip`
+  and that this one missed.
+- The vertical range had no fallback. Engines from before about 2024 (Chromium before 124)
+  draw a `writing-mode` range horizontally. A one-time probe measures an unstyled vertical range,
+  and if it is not taller than wide, the popover lays the slider out flat and
+  `aria-orientation` says horizontal. Rejected: `CSS.supports`, because `writing-mode` is
+  supported everywhere; only the form control's rendering differs.
+- The hidden status spoke at each moment's start and again at its end, so at speed two updates
+  landed about 100ms apart and a screen reader could cut the first off. It now speaks once, at
+  each moment's start. The "Next at" moment is taken from the list, because the playhead sits a
+  little before the start and would otherwise name the current moment as next. The magnifier
+  state is its own text node. Measured: 6 updates for 6 moments over 77s at 4x.
+
+**The moment marks stay under 24px, on purpose.** The lane's marks are 8-23px wide by 14px tall,
+under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent exception: every
+moment is also reachable by [ and ], by Previous and Next, and by the sidebar's rows.
+
 **Still open.**
-- Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32 has
-  the unmeasured question of whether that makes the page scroll.
-- The volume button's tip never shows on hover, and it is drawn at (46, 65) for a button at
-  (152, 678). Found by the second Codex review, confirmed; with code-lead.
-- The vertical range has no fallback for browsers without vertical range support. Raised by
-  the second Codex review; plausible, not measurable here.
-- The hidden status updates at both a moment's start and its end, and two updates can land
-  100ms apart (seen at 1.8s and 1.9s). A screen reader may cut the first off. Low; with
-  code-lead.
-- The moment lane's marks are 8-23px wide by 14px tall, under 2.5.8's 24px. That predates this
-  round, and whether 2.5.8's spacing exception covers them was not checked.
+- Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32
+  measured the result: the page scrolls on narrow windows, as page content, not overflow.
 - 2.5.5 AAA is given up, as above. If testing with motor-impaired or high-zoom users shows the
   28px targets are a problem, that is the decision to revisit.
 
@@ -1917,7 +1933,12 @@ desktop bar is unchanged". It is not: at 1366px wide, 6131 of the header's 61470
 The file-name chip is now a fixed pill about 240px wide, where it used to hug the file name, so
 Change and Moments file sit about 150px further right.
 
-**Still open.** From the second Codex review, both confirmed and with code-lead:
-- About opened from the Menu loses focus to `<body>` when it closes, instead of returning it.
-- Opening the Menu and then pressing F leaves the menu open but invisible outside the
-  fullscreen element. It is not a focus trap.
+That regression came from cb3c512 and was reverted to the old behaviour in 3c3dfe5: the chip
+hugs the file name again.
+
+**Fixed after the second Codex review** (3c3dfe5).
+- About opened from the Menu lost focus to `<body>` on close. A modal dialog returns focus to
+  whatever had it at `showModal()`, which was the menu item, unmounted by then. The item now
+  focuses the Menu button before opening About.
+- Opening the Menu and pressing F entered fullscreen and left the menu open but invisible,
+  outside the fullscreen element. The compact menu now closes on `fullscreenchange`.
