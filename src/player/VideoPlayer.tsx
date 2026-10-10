@@ -886,8 +886,17 @@ const VideoPlayer = (props: Props) => {
             can click and Tab to, and scrubbing never competes with jumping. Drawing the marks
             INSIDE the track (YouTube-chapter style) is cheaper in space but a mark under the
             playhead becomes invisible and there is nothing separate to focus. */}
-        {markers.length > 0 && (
-          <Box className="moment-lane" role="group" aria-label="Moments in this lecture">
+        {/* Rendered from the first frame, empty until the first moment arrives — like the
+            now-line below. Both used to mount when the analysis found something, which grew
+            the bar by ~59px mid-analysis; windowed the bar is in flow and the player's width
+            cap subtracts its height, so the whole player shrank under the viewer (D32). An empty
+            lane is hidden from AT: a group of nothing is noise. */}
+        <Box
+          className="moment-lane"
+          role={markers.length > 0 ? "group" : undefined}
+          aria-label={markers.length > 0 ? "Moments in this lecture" : undefined}
+          aria-hidden={markers.length > 0 ? undefined : true}
+        >
             {markers.map((m) => {
               const isNow = currIndex >= 0 && m.activities.some((a) => a === currActivity);
               const label =
@@ -915,17 +924,24 @@ const VideoPlayer = (props: Props) => {
                 />
               );
             })}
-          </Box>
-        )}
+        </Box>
 
         {/* The label is TEXT, in a live region — not a hover tooltip. The lane is a map; a row
             of identical rectangles tells a viewer nothing, and hover is invisible to a keyboard
-            user, a screen reader, and anyone driving a magnifier. */}
-        {props.activities.length > 0 && (
-          <Box className="now-line" role="status">
+            user, a screen reader, and anyone driving a magnifier.
+            One line, always present, whatever the analysis has found — the same reason as the
+            lane above: a row that appears, or wraps to a second line when its text grows, is a
+            player that resizes mid-lecture (measured at 400px: 259px of bar, then 234px as the
+            text changed). Truncated by CSS only, so the status region still holds — and
+            announces — the whole sentence. Wide enough windows never truncate at all. */}
+        <Box className={classNames("now-line", { empty: props.done && props.activities.length === 0 })} role="status">
             <span className={classNames("now-dot", { on: currIndex >= 0 })} />
-            <Text>
-              {currIndex >= 0 ? (
+            <Text className="now-text">
+              {props.activities.length === 0 ? (
+                props.done
+                  ? "No annotation moments found in this video — the highlight and magnifier have nothing to follow."
+                  : "Looking for moments…"
+              ) : currIndex >= 0 ? (
                 <>
                   Moment <b>{currIndex + 1}</b>
                   {props.done ? <> of <b>{props.activities.length}</b></> : null}
@@ -943,7 +959,7 @@ const VideoPlayer = (props: Props) => {
                 </>
               ) : (
                 <>
-                  <b>{props.activities.length}</b> moments so far — still looking…
+                  <b>{props.activities.length}</b> moment{props.activities.length === 1 ? "" : "s"} so far — still looking…
                 </>
               )}
             </Text>
@@ -960,17 +976,7 @@ const VideoPlayer = (props: Props) => {
                 Next at <b>{convertSecondsToTimecode(upcoming.start)}</b>
               </Text>
             )}
-          </Box>
-        )}
-
-        {props.done && props.activities.length === 0 && (
-          <Box className="now-line empty" role="status">
-            <Text>
-              No annotation moments found in this video — the highlight and magnifier have
-              nothing to follow.
-            </Text>
-          </Box>
-        )}
+        </Box>
 
         <Group className="controls" gap={3} align="center" mt={4}>
           {/* aria-disabled, not disabled: the click is already a guarded no-op while gated,
@@ -985,30 +991,29 @@ const VideoPlayer = (props: Props) => {
           >
             {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
           </UnstyledButton>
-          {props.activities.length > 0 && (
-            <>
-              <UnstyledButton
-                className="collapse-hide"
-                onClick={() => { showControls(); handleStepMoment(-1); }}
-                onKeyDown={stopPlayerHotkeys}
-                disabled={!props.canPlay}
-                aria-label="Previous moment"
-                title="Previous moment ( [ )"
-              >
-                <IconPlayerTrackPrevFilled />
-              </UnstyledButton>
-              <UnstyledButton
-                className="collapse-hide"
-                onClick={() => { showControls(); handleStepMoment(1); }}
-                onKeyDown={stopPlayerHotkeys}
-                disabled={!props.canPlay}
-                aria-label="Next moment"
-                title="Next moment ( ] )"
-              >
-                <IconPlayerTrackNextFilled />
-              </UnstyledButton>
-            </>
-          )}
+          {/* Always rendered, dimmed until there is a moment to step to: two 44px buttons
+              appearing mid-analysis could push the row to wrap on a narrow window, which is the
+              same resize the lane and now-line above no longer cause. */}
+          <UnstyledButton
+            className="collapse-hide"
+            onClick={() => { showControls(); handleStepMoment(-1); }}
+            onKeyDown={stopPlayerHotkeys}
+            disabled={!props.canPlay || props.activities.length === 0}
+            aria-label="Previous moment"
+            title="Previous moment ( [ )"
+          >
+            <IconPlayerTrackPrevFilled />
+          </UnstyledButton>
+          <UnstyledButton
+            className="collapse-hide"
+            onClick={() => { showControls(); handleStepMoment(1); }}
+            onKeyDown={stopPlayerHotkeys}
+            disabled={!props.canPlay || props.activities.length === 0}
+            aria-label="Next moment"
+            title="Next moment ( ] )"
+          >
+            <IconPlayerTrackNextFilled />
+          </UnstyledButton>
           <Box className="volume-container">
             {/* Label + pressed state both flip: an icon swap alone is invisible to AT, and
                 "Mute" on a muted player reads as the current state instead of the action. */}

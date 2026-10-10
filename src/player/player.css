@@ -839,6 +839,18 @@
 
 .now-line.empty { color: var(--d-muted); }
 
+/* One line at every width (see the now-line comment in VideoPlayer.tsx): the sentence yields,
+   with an ellipsis, rather than wrapping and growing the bar. The DOM keeps the whole text, so
+   the status region announces it in full. The magnifier chip and "Next at" keep their size. */
+.now-line { white-space: nowrap; }
+.now-line .now-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.now-line .now-next { flex: none; }
+
 .now-dot {
   width: 9px;
   height: 9px;
