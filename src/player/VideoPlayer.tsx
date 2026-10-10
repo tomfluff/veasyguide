@@ -112,6 +112,9 @@ type Props = {
   // is the viewer answering the resume offer by doing something else, and pause is a moment
   // worth saving where they are.
   onPlayingChange?: (playing: boolean) => void;
+  // "Resume at 12:34?" (D33). App owns the saved position and decides when to offer it; the
+  // player only draws it, on the video, so offering it moves nothing on the page.
+  resumeOffer?: { at: number; onResume: () => void; onRestart: () => void } | null;
   // Fires only when the highlighted moment CHANGES — not per frame. The moments sidebar
   // needs to know which card is current, and only the player derives that (it runs
   // selectActivity on the rVFC loop; App sees time at a 0.2s throttle). Re-deriving it in
@@ -1539,6 +1542,41 @@ const VideoPlayer = (props: Props) => {
           style={{ bottom: barHeight + 24, maxHeight: `calc(100% - ${barHeight + 48}px)` }}
         />
       )}
+      {/* The resume offer, ON the video. It was a strip above the player, which pushed the whole
+          player down the moment it appeared — the page moving under the viewer, the very thing
+          this round removed everywhere else (Yotam). Centred: clear of the top-centre notices
+          and of every corner the pinned snapshot can take, and over the picture the viewer has
+          not started yet.
+          Still a question the viewer may ignore, not a dialog: nothing takes focus, play or a
+          seek answers it as surely as either button, and both buttons are in the tab order
+          (after the bar's controls, Resume first). The live region stays mounted and the card
+          appears INSIDE it, because a region inserted together with its content is not
+          announced. Space and Enter press its buttons, never the player; and its clicks stop
+          here, so pressing it cannot reach the click-to-pause surface underneath. */}
+      <Box className="resume-slot" role="status">
+        {props.resumeOffer && (
+          <div
+            className="resume-card"
+            role="group"
+            aria-label="Resume where you left off"
+            onKeyDown={stopPlayerHotkeys}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            <p className="resume-q">
+              Resume at <b>{convertSecondsToTimecode(props.resumeOffer.at)}</b>?
+            </p>
+            <div className="resume-actions">
+              <button type="button" className="resume-yes" onClick={props.resumeOffer.onResume}>
+                Resume
+              </button>
+              <button type="button" className="resume-no" onClick={props.resumeOffer.onRestart}>
+                Start from the beginning
+              </button>
+            </div>
+          </div>
+        )}
+      </Box>
       </Box>
       <SVGFilters />
     </Box>

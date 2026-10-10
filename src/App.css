@@ -798,27 +798,7 @@
 }
 .strip button:hover { background: rgba(0, 0, 0, 0.08); }
 
-/* The resume offer: a .strip with two worded buttons instead of a dismiss glyph. Scoped under
-   .strip.resume to outrank the 44px-square `.strip button` above. Resume is the filled one —
-   it is the reason the strip exists — and "Start from the beginning" is outlined, not hidden:
-   both are real answers. */
-.strip.resume .resume-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
-.strip.resume .resume-actions button {
-  width: auto;
-  min-height: 44px;
-  margin: 0;
-  padding: 0 1rem;
-  font: inherit;
-  font-weight: 600;
-  border-radius: var(--r-md);
-}
-.strip.resume .resume-yes { background: var(--accent); color: var(--card); border: 1px solid transparent; }
-.strip.resume .resume-yes:hover { background: var(--accent); filter: brightness(1.08); }
-.strip.resume .resume-no { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
-.strip.resume .resume-no:hover { background: var(--hover); }
-.strip.resume .resume-actions button:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
-/* On a narrow window the question and its buttons stack rather than squeeze. */
-.strip.resume { flex-wrap: wrap; }
+
 
 .error {
   margin: 16px 0;

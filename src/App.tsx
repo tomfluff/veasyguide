@@ -961,50 +961,6 @@ export default function App() {
               </button>
             </div>
           )}
-          {/* The resume offer. A strip, not a dialog: it is a question the viewer may ignore,
-              and pressing play or seeking answers it as surely as either button. Nothing here
-              takes focus — someone who came back to start over should not have to dismiss
-              anything first — but both buttons are in the tab order, Resume first.
-              Shown only once playback is possible: on a fresh analysis that is when the first
-              seconds are ready, and an offer to jump somewhere you cannot yet play is a button
-              that does nothing.
-              The live region stays mounted and the strip appears INSIDE it: a region inserted
-              together with its content is not announced (the same rule as the player's
-              notices). D33. */}
-          <div className="resume-slot" role="status">
-            {resumeAt !== null && canPlay && (
-              // Space and Enter press THESE buttons, not the player: without the guard, Space on
-              // Resume started the video from 0:00 and dismissed the offer — the one key a
-              // keyboard user presses a button with skipped the very bookmark it offered.
-              <div className="strip resume" onKeyDown={stopPlayerHotkeys}>
-                <span>Resume at <b>{convertSecondsToTimecode(resumeAt)}</b>?</span>
-                <span className="resume-actions">
-                  <button
-                    type="button"
-                    className="resume-yes"
-                    onClick={() => {
-                      resumeTouchedRef.current = true;
-                      seekFnRef.current(resumeAt, true);
-                      setResumeAt(null);
-                      focusPlayer();
-                    }}
-                  >
-                    Resume
-                  </button>
-                  <button
-                    type="button"
-                    className="resume-no"
-                    onClick={() => {
-                      setResumeAt(null);
-                      focusPlayer();
-                    }}
-                  >
-                    Start from the beginning
-                  </button>
-                </span>
-              </div>
-            )}
-          </div>
           {meta ? (
             <VideoPlayer
               key={videoUrl}
@@ -1020,6 +976,26 @@ export default function App() {
               onSeeked={onSeeked}
               onTimeChange={onTimeChange}
               onPlayingChange={onPlayingChange}
+              // The resume offer (D33), drawn ON the video by the player. Only once playback is
+              // possible: on a fresh analysis that is when the first seconds are ready, and an
+              // offer to jump somewhere you cannot yet play is a button that does nothing.
+              resumeOffer={
+                resumeAt !== null && canPlay
+                  ? {
+                      at: resumeAt,
+                      onResume: () => {
+                        resumeTouchedRef.current = true;
+                        seekFnRef.current(resumeAt, true);
+                        setResumeAt(null);
+                        focusPlayer();
+                      },
+                      onRestart: () => {
+                        setResumeAt(null);
+                        focusPlayer();
+                      },
+                    }
+                  : null
+              }
               onPreviewJump={(returnTo) => { previewReturnRef.current = returnTo; }}
               onActivityChange={setCurrMoment}
               thumbs={thumbs}
