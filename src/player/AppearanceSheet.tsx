@@ -205,7 +205,7 @@ function InkScreen() {
           options={["highlight", "zoom"] as const}
           value={surface}
           onChange={setSurface}
-          labels={{ highlight: "The highlight", zoom: "The zoom" }}
+          labels={{ highlight: "The highlight", zoom: "The magnifier" }}
         />
       </Row>
       <div className="ap-chips">
@@ -249,7 +249,7 @@ export default function AppearanceSheet() {
   const TITLES: Record<Exclude<Screen, "root">, string> = {
     box: "The box",
     pointer: "The pointer",
-    zoom: "The zoom",
+    zoom: "The magnifier",
     motion: "Motion",
     ink: "Ink",
   };
@@ -257,7 +257,7 @@ export default function AppearanceSheet() {
   const TABS: Record<Exclude<Screen, "root">, string> = {
     box: "Box",
     pointer: "Pointer",
-    zoom: "Zoom",
+    zoom: "Magnifier",
     motion: "Motion",
     ink: "Ink",
   };
@@ -286,11 +286,22 @@ export default function AppearanceSheet() {
           {active ? active.hint : "Custom — your own settings."}
         </p>
 
-        <NavRow
-          label="Fine-tune"
-          value={active ? active.name : "Custom"}
-          onClick={() => setScreen("box")}
-        />
+        {/* Two ways in, one per surface. A single "Fine-tune" row led to the box, and the
+            magnifier's settings were a tab you only found once inside — viewers reported not
+            knowing the magnifier could be tuned at all. Same groups behind both rows; each
+            row just opens its own. */}
+        <div className="ap-navs">
+          <NavRow
+            label="Fine-tune the highlight"
+            value={active ? active.name : "Custom"}
+            onClick={() => setScreen("box")}
+          />
+          <NavRow
+            label="Fine-tune the magnifier"
+            value={`${(1 + mag.zoom_strength).toFixed(1)}×`}
+            onClick={() => setScreen("zoom")}
+          />
+        </div>
       </div>
     );
   }
@@ -306,7 +317,9 @@ export default function AppearanceSheet() {
       </div>
 
       <div className="ap-tabs" role="tablist" aria-label="Fine-tune group">
-        {(["box", "pointer", "zoom", "motion", "ink"] as const).map((s) => (
+        {/* The highlight's groups together, the magnifier last: Ink spans both surfaces and
+            sits between them. */}
+        {(["box", "pointer", "motion", "ink", "zoom"] as const).map((s) => (
           <button
             type="button"
             key={s}
@@ -341,7 +354,20 @@ export default function AppearanceSheet() {
                 onChange={(border_color) => setHighlightSettings({ border_color })}
               />
             </Row>
-            <Row label="Fill" value={`${Math.round(hl.fill_opacity * 100)}%`}>
+            {/* Colour first, then how strongly it shows. The slider was labelled "Fill" and
+                sat above "Fill colour", so a percentage beside the word "Fill" read as how
+                MUCH of the box is filled. "Opacity" directly under "Fill" reads as a pair;
+                "Fill opacity" would wrap in the 62px label column. The spoken names were
+                already right and stay as they are. */}
+            <Row label="Fill">
+              <Swatches
+                label="Fill colour"
+                colors={FILL_COLORS}
+                value={hl.fill_color}
+                onChange={(fill_color) => setHighlightSettings({ fill_color })}
+              />
+            </Row>
+            <Row label="Opacity" value={`${Math.round(hl.fill_opacity * 100)}%`}>
               <Range
                 label="Fill opacity"
                 min={0}
@@ -349,14 +375,6 @@ export default function AppearanceSheet() {
                 step={0.05}
                 value={hl.fill_opacity}
                 onChange={(fill_opacity) => setHighlightSettings({ fill_opacity })}
-              />
-            </Row>
-            <Row label="Fill colour">
-              <Swatches
-                label="Fill colour"
-                colors={FILL_COLORS}
-                value={hl.fill_color}
-                onChange={(fill_color) => setHighlightSettings({ fill_color })}
               />
             </Row>
             <Row label="Shape">
