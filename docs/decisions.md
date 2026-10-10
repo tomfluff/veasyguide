@@ -1375,7 +1375,9 @@ removed from the window (below). At 1400x900 the video stays 1062px wide,
 because there the available width limits it before the height cap does: the new cap works out
 to about 1067px there. The user chose the bar below the video; this is the price of that
 choice, recorded here so it is a known trade and not a surprise. As first shipped, collapsing
-the bar got most of the size back; that is no longer offered in the window.
+the bar got most of the size back; that is no longer offered in the window. Moving the
+now-line into the sidebar was weighed as another way back and rejected (below), so the cost is
+accepted, not pending.
 
 **Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
 bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
@@ -1397,6 +1399,10 @@ and the `.paused` force-visible rule is gone.
 - In fullscreen, shrink the video whenever the bar shows. Every reveal changes the video's box,
   so the highlight and magnifier recompute and jump under the viewer's eye each time the mouse
   moves.
+- Move the now-line (the status line) into the sidebar's header, to win back windowed picture
+  size. Considered after collapse left the window, as the way to shorten the bar without a
+  control that resizes the player. The owner kept the line in the bar. The smaller windowed
+  picture (832 against 1028px wide at 1366x768) is an accepted trade, not an open defect.
 - Move the bar after the video in the DOM. The bar stays first in the DOM, and CSS `order: 2`
   places it below. Moving it would change a tab order viewers already know, and would put the
   pin panel's buttons ahead of the bar.
@@ -1482,10 +1488,6 @@ leaving it, with no collapse control in the window.
   viewer was looking at, but it is a jump.
 - Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
   nav, not the player, and is in TODOS.md.
-- The windowed picture is smaller on short windows (above), and since c1785ae the viewer cannot
-  collapse the bar to win it back. If that proves to be the wrong trade for some viewers, the
-  measured option is a collapsed windowed bar (987px at 1366x768), which needs a way to collapse
-  that does not jump the layout. Not built.
 - The windowed bar's height can still change once by itself: when the moment lane and now-line
   first appear during analysis, and possibly when the now-line text wraps differently at narrow
   widths. Each change resizes the player through `--bar-h`. To be measured.
