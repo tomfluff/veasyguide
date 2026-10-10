@@ -2249,4 +2249,6 @@ ninth Codex review from the code; it now listens to the CSS's own query (2f9edd8
 
 **Still open.** A low, left by the stop rule:
 - Closing the Menu by widening the window leaves focus on `<body>`, not on a visible header
-  control.
+  control. The menu returns focus to its trigger, and at that width the trigger is
+  `display: none`. The right target is the matching control in the full bar, which needs a
+  mapping from menu items to bar controls, so it is not a trivial fix.
