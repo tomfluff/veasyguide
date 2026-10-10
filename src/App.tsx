@@ -449,6 +449,12 @@ export default function App() {
     setXRealtime(0); setFramesCount(0); setViewIdx(-1);
     setError(null); setErrorDismissed(false); setCurrMoment(null);
     hydrateFrom(f);
+    // A matched moments file is a finished analysis of this video like any other, so it is
+    // cached like one: the next open of the video restores it instead of starting from zero,
+    // and switching away from it is as safe (no confirm) as switching away from a run that
+    // finished here. Here and in the drop-both path, NOT in hydrateFrom — a cache hit also
+    // hydrates through that, and would rewrite its own entry on every reopen. (D29)
+    void cachePut(keyOf(f), f);
   }
 
   // .veasyguide.json moments sidecar (analyze once, share the file — see momentsFile.ts).
@@ -538,6 +544,8 @@ export default function App() {
       setFileName(video.name);
       setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(video); });
       hydrateFrom(sidecarFile);
+      // Cached for the same reason applySidecar caches it.
+      void cachePut(keyOf(sidecarFile), sidecarFile);
     });
   }
 
