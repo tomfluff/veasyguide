@@ -1766,7 +1766,8 @@ After a seek to 124s and a reload, the stored entry held 124 and the strip read 
 02:04?", and Enter on Resume landed at exactly 124.00s. The strip is 68px tall at 1366x768. A
 real screen reader was not run, so "announced" rests on the tree, not on hearing it.
 
-**Two defects found by the Codex review, fixed in the same round** (dda1bdb).
+**Two defects found by the Codex review, fixed in the same round** (dda1bdb; the bookmark
+half superseded by 2f9edd8, "Final design" below).
 - Space on Resume played from 0:00. The player's document-level Space hotkey took the key, and
   pressing play counts as an answer, so the strip went away with the saved place unused: a
   keyboard user who activates buttons with Space got the opposite of what they chose. Enter
@@ -1785,14 +1786,15 @@ there, and the stored entry stays `{t: 20}`. Leaving mid-preview without touchin
 `{t: 20}`. A viewer at 15s who leaves mid-preview saves 15; at 4s the entry is cleared, which is
 the 10s start edge working as designed.
 
-**Fixed after the third Codex review** (cba52ad). The preview fix above went one step too far.
-Pressing ] from inside the Appearance sheet was undone when the sheet closed, and leaving then
-saved the position from before the preview (`{t: 30}`) instead of the moment the viewer had
-stepped to (52.8s). A seek by the viewer during a preview now cancels the preview's restore, and
-the stored entry is `{t: 52.8}`. Re-measured independently: paused at 30s, the preview jumps to
-47.8s, ] goes to 52.8s, and leaving stores `{t: 52.8}`.
+**Fixed after the third Codex review** (cba52ad; superseded by 2f9edd8). The preview fix above
+went one step too far. Pressing ] from inside the Appearance sheet was undone when the sheet
+closed, and leaving then saved the position from before the preview (`{t: 30}`) instead of the
+moment the viewer had stepped to (52.8s). A seek by the viewer during a preview now cancels the
+preview's restore, and the stored entry is `{t: 52.8}`. Re-measured independently: paused at
+30s, the preview jumps to 47.8s, ] goes to 52.8s, and leaving stores `{t: 52.8}`.
 
-**Fixed after the fourth Codex review** (f2f2374). cba52ad's cancel was in the wrong place.
+**Fixed after the fourth Codex review** (f2f2374; superseded by 2f9edd8). cba52ad's cancel was
+in the wrong place.
 - It ran on `seeked`, which is too late. A click on the scrubber is also a click outside the
   Appearance sheet, and closing the sheet restored the pre-preview time before `seeked` arrived,
   undoing the viewer's own seek. ] followed by Escape raced the same way. Paused at 30s with the
@@ -1803,8 +1805,8 @@ the stored entry is `{t: 52.8}`. Re-measured independently: paused at 30s, the p
 - The preview's target (moment start plus the lead plus 0.2s) was not clamped. For a moment in
   the last fraction of a second it pointed past the end, the browser clamped the seek, the
   landing time fell outside the 0.05s match that marks a seek as the player's own, and the
-  player's own jump was taken for the viewer's, dismissing the resume offer. Found from the code,
-  not reproduced. The target is now clamped inside the moment and the video.
+  player's own jump was taken for the viewer's, dismissing the resume offer. Found from the
+  code, not reproduced. The target is now clamped inside the moment and the video.
 
 Measured (code-lead's): during the preview, a scrubber click at 100s lands at 100.0s and stores
 100.0; ] then Escape lands at 52.8s and stores 52.8; closing the sheet without seeking still
@@ -1876,7 +1878,7 @@ That is above 2.5.8's 24px, and below the 44px the strip had.
 - Start's border is now `#8a95a6`: 5.54:1 against the card on a white slide and 6.37:1 on
   black, where it was 2.97:1.
 
-**Fixed after the fifth Codex review** (37535ac).
+**Fixed after the fifth Codex review** (37535ac; the ownership half superseded by 2f9edd8).
 - `viewerSeek()` cancelled the preview but left the player's own-seek marker set. Ownership is
   matched by landing time, so a viewer seek landing within 0.05s of the pending preview target,
   before its `seeked`, would be taken for the player's own: the resume offer stayed up and the
@@ -1894,8 +1896,8 @@ That is above 2.5.8's 24px, and below the 44px the strip had.
   about 3.4s before the card. A click on the picture outside the card plays and dismisses it; the
   Space, Enter and click-on-card results are unchanged.
 
-**Fixed after the sixth Codex review** (7fc8c45; its z-order half is superseded by 3d8cdd4,
-"Final rule" below).
+**Fixed after the sixth Codex review** (7fc8c45; its z-order half superseded by 3d8cdd4 and
+its bookmark half by 2f9edd8, "Final rule" and "Final design" below).
 - In fullscreen the bar could cover the card. At 1280x720 at 400% zoom (a 320x180 screen) the
   expanded bar is 122px of the screen's 180, and it overlapped the card by 91.4px, so neither
   button could be clicked. In fullscreen the card now stacks above the bar (z 55). Rejected:
@@ -1961,12 +1963,34 @@ lands at 124.1s. **Correction:** the in-card scroll at the extreme was given as 
 320x180 at DPR 4 in fullscreen it measures 13px with the bar collapsed (card 57.6px tall) and
 29px with it expanded (card 42px tall).
 
+**Final design: the bookmark is a reducer, written by intent** (2f9edd8). The ninth Codex
+review found two more cases, both reproduced. Focus Resume, press A, then Escape, and focus fell
+to `<body>`, because the card had been hidden while Appearance was open; Space then played from
+0.56s and the offer went with its bookmark unused. And clicking Resume then leaving at once
+erased the stored entry (`{}` at 0 and 30ms; kept at 100ms and later).
+
+The second one was the third time the same class of bug had surfaced. The bookmark had been "the
+playhead, unless a flag says otherwise", with the flags set by events that arrive in no fixed
+order: a seek is only a request, and `seeked` and the next time report come later. The fourth,
+sixth and ninth reviews each found a window in which a save recorded the wrong place: the
+preview's time, the pre-preview time after the viewer had moved on, and 0:00 before a Resume
+landed, which deleted the bookmark. Each patch (dda1bdb, cba52ad, f2f2374, 37535ac, 7fc8c45)
+closed one window.
+
+`player/bookmark.ts` replaces them: a pure reducer holding one `place`, changed only by the
+viewer's intent (playing through, a viewer seek, Resume). Intent is written when it is
+requested, not when it lands. Time reports are ignored until one arrives near the pending seek,
+and ignored while the Appearance preview is parked. The preview's jump and its return never
+write it. `pagehide` and `visibilitychange` save it synchronously, so a save at any moment
+records the right place by construction, not by timing. 10 unit tests replay the fourth, sixth
+and ninth reviews' sequences.
+
+The focus half was a class too: closing a bar popover dropped focus on `<body>`. Appearance and
+speed now return focus to their trigger, as volume already did. Audited with them: the
+fullscreen list returns focus to its toggle, and the bar never auto-hides under keyboard focus.
+
 **Still open.**
-- Focus Resume, press A, then Escape: focus lands on `<body>`, because the card was hidden
-  while Appearance was open. Space then plays from 0.56s, and the card goes with its bookmark
-  unused. Found by the ninth Codex review, reproduced; with code-lead.
-- Click Resume and leave at once: the stored entry is erased (`{}` at 0 and 30ms; kept at 100ms
-  and later). Found by the ninth Codex review, reproduced; with code-lead.
+
 - Low, left by the stop rule: at 320x180 at DPR 4 in fullscreen with the bar expanded, the card is
   42px tall and scrolls 29px inside itself. Usable, since focus scrolls each button into view,
   but cramped.
@@ -2219,8 +2243,10 @@ window widens past its breakpoint.
 Re-measured independently: the Menu, open at 800px wide, closes when the window is widened to
 1300px.
 
-**Still open.** Two lows, left by the stop rule:
-- The Menu's breakpoint listener misses the case of a window exactly 1000px wide (`Shell.tsx`).
-  Found by the ninth Codex review from the code; not reproduced.
+The breakpoint listener missed a window exactly 1000px wide, because it used the `min-width`
+twin of the CSS's `max-width` query, which differs by one pixel at the breakpoint. Found by the
+ninth Codex review from the code; it now listens to the CSS's own query (2f9edd8).
+
+**Still open.** A low, left by the stop rule:
 - Closing the Menu by widening the window leaves focus on `<body>`, not on a visible header
   control.
