@@ -724,50 +724,66 @@ const VideoPlayer = (props: Props) => {
     });
   };
 
+  // The "nearest moment" preview (Appearance → Preview on): park the playhead on a moment so
+  // the settings have something to show on, and step back to where the viewer was. Both are
+  // the player's own moves — never the viewer's intent, so the bookmark ignores them.
+  // Only while paused with no moment on screen: never yank someone out of the lecture.
+  const startPreviewJump = (video: HTMLVideoElement) => {
+    if (preAppearanceTimeRef.current !== null || isPlaying || currActivity) return;
+    if (props.activities.length === 0) return;
+    const target =
+      stepMoment(props.activities, video.currentTime, props.selectOpts.lead, 1) ??
+      stepMoment(props.activities, video.currentTime, props.selectOpts.lead, -1);
+    if (!target) return;
+    preAppearanceTimeRef.current = video.currentTime;
+    // Clamped inside the moment and the video: a moment in the last fraction of a second
+    // would put the target past the end, the browser would clamp the seek, and the landing
+    // time would no longer match ownSeekRef — the player's own preview jump would then count
+    // as the viewer's, dismissing the resume offer.
+    const end = Math.min(target.end, (video.duration || totalTime) - 0.05);
+    const t = Math.max(
+      target.start,
+      Math.min(end, seekTargetFor(target, props.selectOpts.lead) + props.selectOpts.lead + 0.2)
+    );
+    ownSeekRef.current = t;
+    video.currentTime = t;
+    setPreviewJumped(true);
+    props.onPreviewStart?.();
+  };
+  const endPreviewJump = (video: HTMLVideoElement) => {
+    if (preAppearanceTimeRef.current === null) return;
+    const back = preAppearanceTimeRef.current;
+    ownSeekRef.current = back;
+    video.currentTime = back;
+    preAppearanceTimeRef.current = null;
+    setPreviewJumped(false);
+    props.onPreviewEnd?.(back);
+  };
+
   const handleAppearanceOpen = (open: boolean) => {
     const video = videoRef.current;
     setAppearanceOpen(open);
     if (!open) refocusIfLost('button[aria-label^="Appearance"]');
     if (!video) return;
-
-    if (open) {
-      // Only in "jump" mode (Appearance → Preview on → The nearest moment). The default draws a
-      // sample highlight instead and leaves the playhead alone (see sampleRect below).
-      if (
-        useViewSettingsStore.getState().tuningPreview === "jump" &&
-        !isPlaying &&
-        !currActivity &&
-        props.activities.length > 0
-      ) {
-        const target =
-          stepMoment(props.activities, video.currentTime, props.selectOpts.lead, 1) ??
-          stepMoment(props.activities, video.currentTime, props.selectOpts.lead, -1);
-        if (target) {
-          preAppearanceTimeRef.current = video.currentTime;
-          // Clamped inside the moment and the video: a moment in the last fraction of a second
-          // would put the target past the end, the browser would clamp the seek, and the
-          // landing time would no longer match ownSeekRef — the player's own preview jump
-          // would then count as the viewer's, dismissing the resume offer.
-          const end = Math.min(target.end, (video.duration || totalTime) - 0.05);
-          const t = Math.max(
-            target.start,
-            Math.min(end, seekTargetFor(target, props.selectOpts.lead) + props.selectOpts.lead + 0.2)
-          );
-          ownSeekRef.current = t;
-          video.currentTime = t;
-          setPreviewJumped(true);
-          props.onPreviewStart?.();
-        }
-      }
-    } else if (preAppearanceTimeRef.current !== null) {
-      const back = preAppearanceTimeRef.current;
-      ownSeekRef.current = back;
-      video.currentTime = back;
-      preAppearanceTimeRef.current = null;
-      setPreviewJumped(false);
-      props.onPreviewEnd?.(back);
-    }
+    // In "sample" mode (the default) nothing moves: the sample highlight shows the changes.
+    if (open && useViewSettingsStore.getState().tuningPreview === "jump") startPreviewJump(video);
+    else if (!open) endPreviewJump(video);
   };
+
+  // Switching "Preview on" while the sheet is open applies at once: to "The nearest moment",
+  // the jump happens now (same conditions as on opening); to "A sample highlight", a jump
+  // already made steps back now and the sample takes over. Preview moves both ways, so the
+  // bookmark is untouched however often it is flipped.
+  const prevTuningRef = useRef(tuningPreview);
+  useEffect(() => {
+    if (prevTuningRef.current === tuningPreview) return;
+    prevTuningRef.current = tuningPreview;
+    const video = videoRef.current;
+    if (!video || !appearanceOpen) return;
+    if (tuningPreview === "jump") startPreviewJump(video);
+    else endPreviewJump(video);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tuningPreview]);
 
   const handleFullscreen = () => {
     if (isFullscreen) {
@@ -1583,20 +1599,6 @@ const VideoPlayer = (props: Props) => {
           videoRef={videoRef}
         />
       </Box>
-      {/* Says that the box is a stand-in, not something the analysis found. Decoration for
-          sighted viewers (aria-hidden); the sheet's own choice says what the preview is on. */}
-      {sampleActivity && sampleRect && (
-        <div
-          className="sample-tag"
-          aria-hidden="true"
-          style={{
-            left: sampleRect.x,
-            top: sampleRect.y >= 28 ? sampleRect.y - 26 : sampleRect.y + sampleRect.h + 4,
-          }}
-        >
-          Sample
-        </div>
-      )}
       <Box className="video-magnification">
         <MagnificationOverlay
           videoRef={videoRef}

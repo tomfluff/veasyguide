@@ -449,6 +449,13 @@
 
 /* All of these are 100% of .video-stage, which is the video's box — never of the container,
    which also holds the bar (windowed). */
+/* Nothing drawn over the picture can be selected or dragged. The highlight's pointer is an <img>,
+   and a quick double click in the Appearance sheet (or a drag) could select it, tinting it the
+   browser's selection blue: Yotam saw a cyan hand on the sample highlight and took it for a
+   different style. */
+.video-stage { user-select: none; -webkit-user-select: none; }
+.video-stage img { -webkit-user-drag: none; }
+
 .video-highlights,
 .video-magnification {
   position: absolute;
@@ -1019,18 +1026,4 @@
   .resume-q { margin-bottom: 4px; font-size: 0.9375rem; }
   .resume-actions { gap: 4px; }
   .resume-actions button { min-height: 28px; padding: 0 10px; font-size: 0.875rem; }
-}
-
-/* The sample highlight's label (player/sample.ts): a small dark tag, high contrast on any
-   slide, above the highlight layer and below every control. */
-.sample-tag {
-  position: absolute;
-  z-index: 12;
-  padding: 2px 8px;
-  border-radius: var(--r-sm);
-  background: rgba(13, 15, 19, 0.9);
-  color: #ffc233;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  pointer-events: none;
 }
