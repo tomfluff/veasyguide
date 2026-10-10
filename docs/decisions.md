@@ -1346,11 +1346,11 @@ shows it, and a click followed by leaving still shows none.
 The close delay changes the timing reported above, which was "immediate close". The open delay
 is unchanged.
 
-**Fixed in the same round: Space was taken by the player.** Buttons outside the player that did
-not call `stopPlayerHotkeys` let Space bubble to the player's document-level hotkey, which
-played or paused the video instead of pressing the button. Space on D33's Resume played from
-0:00 and dismissed the offer; Space on D29's "Switch video" did nothing. Enter worked in both,
-which is why nobody had noticed. Now guarded: the resume strip, the strips' ✕ buttons, the
+**Fixed in the same round: Space was taken by the player** (dda1bdb). Buttons outside the player
+that did not call `stopPlayerHotkeys` let Space bubble to the player's document-level hotkey,
+which played or paused the video instead of pressing the button. Space on D33's Resume played
+from 0:00 and dismissed the offer; Space on D29's "Switch video" did nothing. Enter worked in
+both, which is why nobody had noticed. Now guarded: the resume strip, the strips' ✕ buttons, the
 header's Change and Moments file buttons, and all three modal dialogs (both confirms and About).
 The dialogs stop every key, because the player is inert behind a modal anyway (dda1bdb).
 Re-measured independently: Space on Resume lands at 124.00s from a stored 124, playing; Space on
@@ -1366,9 +1366,10 @@ Moments file buttons opens the picker and leaves the video paused.
 **Still open.**
 - Previous moment, Next moment, Playback speed, the Magnify toggle, the Pin toggle, the
   sidebar's Export, and both footer switches still use a native `title`. The Single-key
-  shortcuts switch's `title` is where the list of keys it covers lives. Fullscreen, Mute and
-  Collapse/Expand have only an `aria-label`, with no visible name at all. All of these are the
-  same defect this entry fixed for four buttons. TODOS.md has the plan.
+  shortcuts switch's `title` is where the list of keys it covers lives. Fullscreen and
+  Collapse/Expand have only an `aria-label`, with no visible name at all. (Mute became the
+  Volume popover in D34, which has a tip.) All of these are the same defect this entry fixed for
+  four buttons. TODOS.md has the plan.
 
 ---
 
@@ -1694,7 +1695,6 @@ to choose between a pillarboxed video and accepting two rows, no longer happen: 
 fits one row down to a 486px player, and every desktop size measured is one row (1605098).
 
 **Still open.**
-
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
@@ -2032,11 +2032,6 @@ Appearance with the card and `{t: 20}` kept. Resume then leaving at 0 or 30ms ke
 and a seek during playback at 3x saves the live place (116.37s).
 
 **Still open.**
-
-
-
-
-
 - Low, left by the stop rule: at 320x180 at DPR 4 in fullscreen with the bar expanded, the card is
   42px tall and scrolls 29px inside itself. A keyboard user is fine, since focus scrolls each
   button into view, but a mouse user does not see the buttons without scrolling the card.
@@ -2400,8 +2395,14 @@ placement tests.
   stays on, its button stays pressed, and it resumes when the sample goes. It is still not aimed
   at the sample.
 
-**Still open.**
+Re-measured independently, the final round (clean). Speed open, then A, then Tab puts focus on
+"A sample highlight", inside the sheet, which stays open. With the magnifier on at 26s, seeking
+to a gap at 2s and opening Appearance shows the sample (112px, at 62,113) with the
+magnification layer at opacity 0 and the Magnify button still pressed. After Escape the layer is
+back at opacity 1, as it is on returning to the moment at 26s. Every earlier check re-ran
+unchanged on 5e3938d.
 
+**Still open.**
 - Low: at 375px wide and below, the 398px sheet covers the whole picture, so the sample cannot
   be clear of it. By design.
 - Low: placement uses the moment's square, not the drawn extent, so at Size 200% the sample can
