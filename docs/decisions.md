@@ -1202,7 +1202,8 @@ and on keyboard `focus-visible`, and it replaces the native `title` those button
 nothing they had). New keys: A opens Appearance; L is the moments list; C and S move and resize
 the pinned snapshot. A "Single-key shortcuts" switch in the moments sidebar's footer turns off
 every printable-character key (`letterShortcuts` in `ViewSettingsStore`, default on). Space and
-the arrow keys stay on regardless. The other bar controls are deliberately left for later
+the arrow keys stay on regardless. The tip meets WCAG 1.4.13 since dda1bdb: it can be hovered,
+stays up while hovered, and Escape dismisses it. The other bar controls are deliberately left for later
 (TODOS.md, "Keyboard reach for every player control").
 
 **What was wrong.** A user on Windows saw no names and no shortcuts on these controls. Appearance
@@ -1373,8 +1374,10 @@ Moments file buttons opens the picker and leaves the video paused.
 never hides. In fullscreen it overlays the picture as before, but it now auto-hides even while
 paused, and it starts collapsed. Collapse exists only in fullscreen: the windowed bar is always
 expanded, and leaving fullscreen returns it to expanded. That last part was revised within the
-round (c1785ae); see "Revised: no collapse in the window" below. The bar's contents were then
-cut to one slim row (D34), which is what finally made its height stop depending on its width.
+round (c1785ae); see "Revised: no collapse in the window" below. The windowed video is sized
+to fit the window less the measured top bar, footer and a one-row bar (50ac023, 3c3dfe5), and
+the bar's contents were cut to one slim row (D34), which is what finally made its height stop
+depending on its width.
 
 **What was wrong.** A user reported that the bar covered the bottom of the video. On a lecture,
 that is where the instructor writes last, at the foot of the slide, so the bar masked the
@@ -2187,9 +2190,8 @@ moment is also reachable by [ and ], by Previous and Next, and by the sidebar's 
 **Decision** (cb3c512). Below a measured breakpoint the top bar keeps three things: the mark,
 the analysis status as a bare number, and one Menu button. The menu holds the full file name as
 a label that is not interactive, then Change video, Load moments file, Dark theme, About,
-Project page and Code on GitHub. Above the breakpoint the desktop bar keeps its contents, and
-the file-name chip now shrinks first, down to a 6rem floor. It is not pixel-identical to before,
-though (below). The avatar is dropped from the narrow bar, since the footer has it. Below 32em
+Project page and Code on GitHub. Above the breakpoint the desktop bar is pixel-identical to before; only the file-name chip
+gained the ability to shrink, down to a 6rem floor, before the row overflows. The avatar is dropped from the narrow bar, since the footer has it. Below 32em
 the tagline and the file-name chip go too; the `h1` stays, visually hidden, so headings
 navigation still finds it.
 
