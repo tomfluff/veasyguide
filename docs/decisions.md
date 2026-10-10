@@ -1356,9 +1356,9 @@ The dialogs stop every key, because the player is inert behind a modal anyway (d
 
 **Decision** (9e5fdbf). In the windowed player, the control bar is laid out under the video and
 never hides. In fullscreen it overlays the picture as before, but it now auto-hides even while
-paused, and it starts collapsed. Leaving fullscreen restores whatever collapsed state the viewer
-had chosen in the window. That state is kept in a ref, because the `fullscreenchange` listener is
-registered once and would otherwise read a stale value.
+paused, and it starts collapsed. Collapse exists only in fullscreen: the windowed bar is always
+expanded, and leaving fullscreen returns it to expanded. That last part was revised within the
+round (c1785ae); see "Revised: no collapse in the window" below.
 
 **What was wrong.** A user reported that the bar covered the bottom of the video. On a lecture,
 that is where the instructor writes last, at the foot of the slide, so the bar masked the
@@ -1370,11 +1370,12 @@ minus the video's bottom is 0.00px at 1366x768, 1920x1080, 1536x864 at DPR 1.25,
 **The cost: a smaller picture on short windows.** The bar's height now comes off the height
 available to the video, not off the video. At 1366x768 with moments, the expanded bar is 139.8px
 (scrubber, moment lane, now-line, controls), and the video drops from 1028px to 832px wide,
-19% narrower. With the bar collapsed it is 987px. At 1400x900 the video stays 1062px wide,
+19% narrower. With the bar collapsed it was 987px, until collapse was
+removed from the window (below). At 1400x900 the video stays 1062px wide,
 because there the available width limits it before the height cap does: the new cap works out
 to about 1067px there. The user chose the bar below the video; this is the price of that
-choice, recorded here so it is a known trade and not a surprise. Collapsing the bar gets most of
-the size back.
+choice, recorded here so it is a known trade and not a surprise. As first shipped, collapsing
+the bar got most of the size back; that is no longer offered in the window.
 
 **Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
 bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
@@ -1383,9 +1384,9 @@ starts collapsed (54px measured at 1400x900), and it hides after a short idle ev
 because a paused frame is one someone is reading. The idle delay is still 2000ms, and the bar
 still never hides while keyboard focus is inside it, or, since dda1bdb, while the pointer is
 over the bar or one of its tips (D31). Measured: opacity 0 by 2.6s idle while
-paused, the 2000ms delay plus the fade. Entering fullscreen always collapses the bar, and
-leaving restores the windowed state both ways, expanded to expanded and collapsed to collapsed,
-even when the viewer expanded it while in fullscreen. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
+paused, the 2000ms delay plus the fade. Entering fullscreen always collapses the bar. As
+first shipped, leaving restored the windowed state both ways, measured expanded to expanded and
+collapsed to collapsed; since c1785ae there is no windowed collapsed state to restore. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
 and the `.paused` force-visible rule is gone.
 
 **Rejected.**
@@ -1462,15 +1463,32 @@ nothing scrolls, and the player causes no horizontal overflow. At 320px wide the
 The old `@media (max-width: 520px)` block that already put the bar in flow (the WCAG 1.4.10
 reflow case) is now the default everywhere, and it is gone.
 
+**Revised: no collapse in the window** (c1785ae, the user's decision). As first shipped, the
+windowed bar kept its collapse button. With the bar in flow, the player's width cap subtracts
+the bar's measured height (`--bar-h`), so collapsing or expanding resized the whole player, and
+the interface jumped under the viewer.
+The collapse button now exists only in fullscreen, where the bar overlays the picture and its
+height moves nothing. Fullscreen still starts collapsed and the viewer can expand it. Leaving
+fullscreen always returns to the expanded bar. The refs that restored the windowed collapsed
+state on exit (`collapsedRef`, `windowedCollapsedRef`) are gone, and the `collapsed` class is
+also gated on `isFullscreen`, so a stray state cannot collapse a windowed bar. The state is
+never persisted. Opening the moments overlay still collapses the bar, which only ever happened
+in fullscreen. Measured at 1400x900: the windowed player is 1062x737 before fullscreen and after
+leaving it, with no collapse control in the window.
+
 **Still open.**
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
 - Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
   nav, not the player, and is in TODOS.md.
-- The windowed picture is smaller on short windows (above). If that proves to be the wrong
-  trade for some viewers, the measured options are the collapsed bar (987px at 1366x768) or a
-  setting; neither is built.
+- The windowed picture is smaller on short windows (above), and since c1785ae the viewer cannot
+  collapse the bar to win it back. If that proves to be the wrong trade for some viewers, the
+  measured option is a collapsed windowed bar (987px at 1366x768), which needs a way to collapse
+  that does not jump the layout. Not built.
+- The windowed bar's height can still change once by itself: when the moment lane and now-line
+  first appear during analysis, and possibly when the now-line text wraps differently at narrow
+  widths. Each change resizes the player through `--bar-h`. To be measured.
 
 ---
 
