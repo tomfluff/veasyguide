@@ -941,7 +941,7 @@ const VideoPlayer = (props: Props) => {
             <Text className="now-text">
               {props.activities.length === 0 ? (
                 props.done
-                  ? "No moments found — nothing for the highlight to follow."
+                  ? "No moments found"
                   : "Looking for moments…"
               ) : currIndex >= 0 ? (
                 <>
@@ -979,14 +979,17 @@ const VideoPlayer = (props: Props) => {
               </Text>
             )}
         </Box>
-        {/* The sizers: invisible copies of the longest things the line can say, stacked in the
-            same grid cell, so the cell is as tall as the worst case at the current width from
-            the first frame on — one line where it fits, two or three where it does not. The
-            timecodes use this video's own duration, so an hour-long lecture reserves for its
-            longer timecodes. aria-hidden: they are layout, not content. The empty-video sentence
-            was cut down to fit inside the moment sentence's reservation: at 96 characters it was
-            the worst case, and reserved two extra lines at 400px for a state most videos never
-            reach. */}
+        {/* The sizer: an invisible copy of the longest thing the line can say, in the same grid
+            cell, so the cell is as tall as the worst case at the current width from the first
+            frame on — one line where it fits, more where it does not. The timecodes use this
+            video's own duration, so an hour-long lecture reserves for its longer timecodes.
+            aria-hidden: it is layout, not content.
+            The moment sentence with both chips IS the longest state: "No moments found",
+            "Looking for moments…" and "888 moments so far — still looking…" (even with both
+            chips beside it) are all shorter. A new, longer state must grow this copy, or the
+            bar starts resizing again. (The empty-video sentence used to be 96 characters and
+            the worst case on its own — two extra reserved lines at 400px for a state most
+            videos never reach. It is now just "No moments found".) */}
         <Box className="now-line now-sizer" aria-hidden>
           <span className="now-dot" />
           <Text className="now-text">
@@ -996,12 +999,6 @@ const VideoPlayer = (props: Props) => {
           <Text className="now-zoom">Magnifier on · 8.8×</Text>
           <Text className="now-next">
             Next at <b>{convertSecondsToTimecode(totalTime)}</b>
-          </Text>
-        </Box>
-        <Box className="now-line now-sizer" aria-hidden>
-          <span className="now-dot" />
-          <Text className="now-text">
-            No moments found — nothing for the highlight to follow.
           </Text>
         </Box>
         </Box>
