@@ -989,6 +989,17 @@
 }
 .resume-yes { background: var(--brand-300); color: #12161d; border: 1px solid transparent; }
 .resume-yes:hover { filter: brightness(1.08); }
-.resume-no { background: transparent; color: var(--d-text); border: 1px solid #5c6879; }
+/* #8a95a6, not the bar's #5c6879: over a white slide, through the card's 94% dark, the darker
+   edge measured 2.97:1 — under the 3:1 a control's boundary wants (1.4.11). */
+.resume-no { background: transparent; color: var(--d-text); border: 1px solid #8a95a6; }
 .resume-no:hover { background: #21262f; }
 .resume-actions button:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
+/* A phone-width window gives the picture ~150px of height, and the full card was 11px taller
+   than that: it scrolled inside itself and hid half of its second button. Tighter here, it fits. */
+@media (max-width: 30em) {
+  .resume-slot { padding: 4px; }
+  .resume-card { padding: 8px 10px; }
+  .resume-q { margin-bottom: 6px; font-size: 1rem; }
+  .resume-actions { gap: 6px; }
+  .resume-actions button { min-height: 32px; padding: 0 12px; }
+}
