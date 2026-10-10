@@ -1949,7 +1949,27 @@ answered.
   review). Each needed its own patch, and every patch invited the next. Laying the card out
   around the bar removes the whole class of collision, where z-order only reorders it.
 
+Re-measured independently at six sizes (1366x768, 1366x650, 320x640, 375x667 and 667x375 at
+DPR 2, 320x180 at DPR 4), each windowed, in fullscreen with the bar collapsed and in fullscreen
+with it expanded. The card and the bar share no area in any case, and the slot is z 45. Both card
+buttons are what a click at their centre hits when focused, and no focused bar control is hidden
+by the card. None of the Appearance, volume or speed controls is covered. With the fullscreen
+list open (8 rows at 375x667) the card is `visibility: hidden` and covers no row, and it comes
+back when the list closes. It also hides while Appearance is open and comes back after Escape or
+an outside click, with no change to its live region through either. Resume afterwards still
+lands at 124.1s. **Correction:** the in-card scroll at the extreme was given as about 50px. At
+320x180 at DPR 4 in fullscreen it measures 13px with the bar collapsed (card 57.6px tall) and
+29px with it expanded (card 42px tall).
+
 **Still open.**
+- Focus Resume, press A, then Escape: focus lands on `<body>`, because the card was hidden
+  while Appearance was open. Space then plays from 0.56s, and the card goes with its bookmark
+  unused. Found by the ninth Codex review, reproduced; with code-lead.
+- Click Resume and leave at once: the stored entry is erased (`{}` at 0 and 30ms; kept at 100ms
+  and later). Found by the ninth Codex review, reproduced; with code-lead.
+- Low, left by the stop rule: at 320x180 at DPR 4 in fullscreen with the bar expanded, the card is
+  42px tall and scrolls 29px inside itself. Usable, since focus scrolls each button into view,
+  but cramped.
 
 
 
@@ -2195,3 +2215,12 @@ enters fullscreen with no menu rendered. The header matches d2e19c3 exactly at d
 compact Menu stayed open, with its focus trap, if the window was widened past 62.5em while it was
 open, which hid its trigger. A low, but trivial, so it was fixed: the menu now closes when the
 window widens past its breakpoint.
+
+Re-measured independently: the Menu, open at 800px wide, closes when the window is widened to
+1300px.
+
+**Still open.** Two lows, left by the stop rule:
+- The Menu's breakpoint listener misses the case of a window exactly 1000px wide (`Shell.tsx`).
+  Found by the ninth Codex review from the code; not reproduced.
+- Closing the Menu by widening the window leaves focus on `<body>`, not on a visible header
+  control.
