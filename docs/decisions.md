@@ -1525,7 +1525,7 @@ the current width from the first frame, with no JavaScript measuring anything.
 Bar height, constant through a whole session with zero clipped samples: 140px at 1400 and 800
 wide, 222px at 560, 312px at 400, 393px at 320. With the ellipsis it was 140, 140, 187 and 234.
 The cost is empty space under a short sentence at narrow widths, and a smaller picture there.
-Nothing is hidden and nothing moves.
+Nothing is hidden and nothing moves. Whether that cost is acceptable is not decided (Still open).
 
 **Still open.**
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
@@ -1534,8 +1534,9 @@ Nothing is hidden and nothing moves.
 - Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
   nav, not the player, and is in TODOS.md.
 - At narrow widths the bar reserves the now-line's worst case, so under a short sentence there
-  is empty space: the bar is 393px tall at 320px wide. That is the accepted price of the
-  reservation below, recorded so a later reader does not "fix" it by clipping again.
+  is empty space: the bar is 393px tall at 320px wide. Pending the owner's decision after trying
+  cd5a242. One option on the table is to drop the visible now-line altogether and keep only its
+  screen-reader announcement. Whatever is chosen, clipping the text again is ruled out (above).
 
 ---
 
