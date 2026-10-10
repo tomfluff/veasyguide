@@ -101,6 +101,10 @@ type Props = {
   selectOpts: SelectOpts;
   onSeeked?: (t: number) => void;
   onTimeChange?: (t: number) => void;
+  // Play/pause as the element reports it. App needs both edges for the resume position: play
+  // is the viewer answering the resume offer by doing something else, and pause is a moment
+  // worth saving where they are.
+  onPlayingChange?: (playing: boolean) => void;
   // Fires only when the highlighted moment CHANGES — not per frame. The moments sidebar
   // needs to know which card is current, and only the player derives that (it runs
   // selectActivity on the rVFC loop; App sees time at a 0.2s throttle). Re-deriving it in
@@ -1168,8 +1172,8 @@ const VideoPlayer = (props: Props) => {
           if (v) updateAtTimeRef.current(v.currentTime);
         }}
         onSeeked={() => props.onSeeked?.(videoRef.current?.currentTime ?? 0)}
-        onPlay={handleIsPlaying.open}
-        onPause={handleIsPlaying.close}
+        onPlay={() => { handleIsPlaying.open(); props.onPlayingChange?.(true); }}
+        onPause={() => { handleIsPlaying.close(); props.onPlayingChange?.(false); }}
         onEnded={handleVideoEnded}
         muted={isMuted}
       ></video>

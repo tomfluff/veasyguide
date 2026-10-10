@@ -1,12 +1,13 @@
 // Copyright (C) 2026 Yotam Sechayk
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Range, type Scene, type WorkerMsg } from "./analyzer/types";
 import { coverage, isAnalyzed } from "./analyzer/ranges";
 import { validActivities } from "./analyzer/select";
 import { buildMomentsFile, keyOf, momentsMarkdown, parseMomentsFile, sidecarMatchesFile, videoKey, type MomentsFile } from "./analyzer/momentsFile";
 import { cacheGet, cachePut } from "./utils/analysisCache";
+import { loadPosition, resumeStore, savePosition } from "./player/resume";
 import { thumbRect } from "./analyzer/snippets";
 import { convertSecondsToTimecode } from "./utils/misc";
 import type { SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
@@ -256,6 +257,18 @@ export default function App() {
   // landing (fatal) or mean a stopped analysis (partial) — this is neither.
   const [notice, setNotice] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  // Where the viewer left off last time (player/resume.ts), read once per opened video and
+  // OFFERED — never applied on its own. null once answered, or when there is nothing to offer.
+  const [resumeAt, setResumeAt] = useState<number | null>(null);
+  const resumeKeyRef = useRef<string | null>(null);
+  const resumeDurRef = useRef(0);
+  const resumeReadForRef = useRef<string | null>(null);
+  const playheadRef = useRef(0);
+  const lastResumeSaveRef = useRef(0);
+  // Nothing is saved for a video until the viewer has played or seeked in it. Opening a lecture
+  // and closing the tab again is not "I am now at 0:00" — saving that would erase the place
+  // they were actually at, which is the one thing this exists to keep.
+  const resumeTouchedRef = useRef(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   // A parsed, matched sidecar waiting for the viewer's yes. Held rather than applied because
   // applying throws away an analysis they may have been waiting on for twenty minutes.
@@ -429,6 +442,7 @@ export default function App() {
   }
 
   function loadFile(file: File) {
+    leaveVideoForResume();
     setCurrentTime(0);
     setFileName(file.name);
     setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
@@ -531,6 +545,7 @@ export default function App() {
         return;
       }
       // Same pre-run reset analyze() does, minus the worker — then hydrate from the file.
+      leaveVideoForResume();
       workerRef.current?.terminate();
       workerRef.current = null;
       fileRef.current = video;
@@ -574,6 +589,7 @@ export default function App() {
   // not just forgotten: it may still be grinding through a file we are done with, and the next
   // analyze() would leave two of them competing for the decoder.
   function reset() {
+    leaveVideoForResume();
     workerRef.current?.terminate();
     workerRef.current = null;
     snipRef.current?.terminate();
@@ -611,6 +627,9 @@ export default function App() {
   // Seeking somewhere unanalyzed: tell the worker to abandon what it's doing and
   // analyze from here, so the viewer's position always wins.
   function onSeeked(t: number) {
+    // A seek of the viewer's own answers the resume offer too, and is somewhere worth saving.
+    resumeTouchedRef.current = true;
+    setResumeAt(null);
     if (done || !workerRef.current) return;
     if (!isAnalyzed(ranges, t)) {
       workerRef.current.postMessage({ type: "seek", t });
@@ -621,9 +640,82 @@ export default function App() {
   // which only feed the HUD.
   const lastTimeRef = useRef(-1);
   function onTimeChange(t: number) {
+    playheadRef.current = t;
+    // Throttled to every ~5s of wall time: a write per presented frame would be pointless
+    // churn, and pause, pagehide and a switch all flush the exact position anyway.
+    if (resumeTouchedRef.current && performance.now() - lastResumeSaveRef.current > 5000) flushResume();
     if (Math.abs(t - lastTimeRef.current) < 0.2) return;
     lastTimeRef.current = t;
     setCurrentTime(t);
+  }
+
+  // Reads refs only, so the pagehide listener below can hold one copy for the app's lifetime.
+  const flushResume = useCallback(() => {
+    const store = resumeStore();
+    const key = resumeKeyRef.current;
+    if (!store || !key || !resumeTouchedRef.current) return;
+    lastResumeSaveRef.current = performance.now();
+    savePosition(store, key, playheadRef.current, resumeDurRef.current);
+  }, []);
+
+  // Before this video goes away: save where the viewer is, then forget the video, so nothing
+  // the next one does is written under this one's key.
+  function leaveVideoForResume() {
+    flushResume();
+    resumeKeyRef.current = null;
+    resumeReadForRef.current = null;
+    resumeTouchedRef.current = false;
+    playheadRef.current = 0;
+    setResumeAt(null);
+  }
+
+  // pagehide, not beforeunload: it is the one that fires on mobile and with the back-forward
+  // cache. visibilitychange as well, because a mobile tab that is backgrounded and then killed
+  // never gets a pagehide at all.
+  useEffect(() => {
+    const onHide = () => flushResume();
+    const onVis = () => { if (document.visibilityState === "hidden") flushResume(); };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [flushResume]);
+
+  // The video's identity is known once its meta is (size + duration + frame size — the cache's
+  // key). Read the saved position THEN, once per opened video, before anything the viewer does
+  // here can overwrite it. It is only SHOWN once playback is possible (see the strip).
+  const resumeKey = meta && fileRef.current
+    ? videoKey(fileRef.current.size, meta.duration, meta.videoWidth, meta.videoHeight)
+    : null;
+  useEffect(() => {
+    if (!resumeKey || !meta) return;
+    resumeKeyRef.current = resumeKey;
+    resumeDurRef.current = meta.duration;
+    if (resumeReadForRef.current === videoUrl) return;
+    resumeReadForRef.current = videoUrl;
+    const store = resumeStore();
+    setResumeAt(store ? loadPosition(store, resumeKey, meta.duration) : null);
+  }, [resumeKey, meta, videoUrl]);
+
+  // The strip's buttons unmount as they are pressed, which would drop keyboard focus on <body>.
+  // Hand it to the player's play button instead: that is where someone who just chose where
+  // to start goes next.
+  function focusPlayer() {
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>(".video-controls-container .controls > button")?.focus()
+    );
+  }
+
+  function onPlayingChange(playing: boolean) {
+    if (playing) {
+      // Pressing play IS an answer to the offer: they chose to watch from where they are.
+      resumeTouchedRef.current = true;
+      setResumeAt(null);
+    } else {
+      flushResume();
+    }
   }
 
   // The moments, filtered and sorted, computed ONCE and shared. This lives in App rather than
@@ -852,6 +944,47 @@ export default function App() {
               </button>
             </div>
           )}
+          {/* The resume offer. A strip, not a dialog: it is a question the viewer may ignore,
+              and pressing play or seeking answers it as surely as either button. Nothing here
+              takes focus — someone who came back to start over should not have to dismiss
+              anything first — but both buttons are in the tab order, Resume first.
+              Shown only once playback is possible: on a fresh analysis that is when the first
+              seconds are ready, and an offer to jump somewhere you cannot yet play is a button
+              that does nothing.
+              The live region stays mounted and the strip appears INSIDE it: a region inserted
+              together with its content is not announced (the same rule as the player's
+              notices). */}
+          <div className="resume-slot" role="status">
+            {resumeAt !== null && canPlay && (
+              <div className="strip resume">
+                <span>Resume at <b>{convertSecondsToTimecode(resumeAt)}</b>?</span>
+                <span className="resume-actions">
+                  <button
+                    type="button"
+                    className="resume-yes"
+                    onClick={() => {
+                      resumeTouchedRef.current = true;
+                      seekFnRef.current(resumeAt, true);
+                      setResumeAt(null);
+                      focusPlayer();
+                    }}
+                  >
+                    Resume
+                  </button>
+                  <button
+                    type="button"
+                    className="resume-no"
+                    onClick={() => {
+                      setResumeAt(null);
+                      focusPlayer();
+                    }}
+                  >
+                    Start from the beginning
+                  </button>
+                </span>
+              </div>
+            )}
+          </div>
           {meta ? (
             <VideoPlayer
               key={videoUrl}
@@ -866,6 +999,7 @@ export default function App() {
               selectOpts={selectOpts}
               onSeeked={onSeeked}
               onTimeChange={onTimeChange}
+              onPlayingChange={onPlayingChange}
               onActivityChange={setCurrMoment}
               thumbs={thumbs}
               seekFnRef={seekFnRef}
