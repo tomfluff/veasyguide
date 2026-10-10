@@ -1660,6 +1660,14 @@ per session (for example 983.1 to 970.7px, between 842 and 878ms after load), wh
 `readyState` is still 0, so it lands before the first frame is shown. After that, zero changes
 through analysis and playback.
 
+**Fixed after the third Codex review** (cba52ad). Leaving fullscreen with the bar expanded
+briefly published the fullscreen bar's height (90px), and the video went from 992 to 990.2px
+wide for 32ms. The bar's measured height (a `ResizeObserver`) and `isFullscreen` (an event)
+settle at different times, so for a frame the one did not match the other. Here it corrected
+itself; near the wrap threshold, a 1.8px narrowing could have tipped the bar into two rows and
+stuck. `--bar-one-row` is now read from the DOM at the one-row check itself, and never while in
+fullscreen.
+
 **Closed by D35.** The horizontal page scroll at 320px and 800px wide, which predates this entry
 and came from the top bar rather than the player, is fixed there (cb3c512).
 
@@ -1670,9 +1678,7 @@ to choose between a pillarboxed video and accepting two rows, no longer happen: 
 fits one row down to a 486px player, and every desktop size measured is one row (1605098).
 
 **Still open.**
-- Leaving fullscreen with the bar expanded briefly publishes the fullscreen bar's height (90px),
-  and the video goes from 992 to 990.2px wide for 32ms before correcting itself. Found by the
-  third Codex review, reproduced; with code-lead.
+
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
@@ -1767,11 +1773,14 @@ there, and the stored entry stays `{t: 20}`. Leaving mid-preview without touchin
 `{t: 20}`. A viewer at 15s who leaves mid-preview saves 15; at 4s the entry is cleared, which is
 the 10s start edge working as designed.
 
+**Fixed after the third Codex review** (cba52ad). The preview fix above went one step too far.
+Pressing ] from inside the Appearance sheet was undone when the sheet closed, and leaving then
+saved the position from before the preview (`{t: 30}`) instead of the moment the viewer had
+stepped to (52.8s). A seek by the viewer during a preview now cancels the preview's restore, and
+the stored entry is `{t: 52.8}`.
+
 **Still open.**
-- Pressing ] during Appearance's preview and then leaving saves the position from before the
-  preview (30s) rather than the moment the viewer stepped to (52.8s). The preview fix above
-  treats every seek during a preview as the player's own, including one the viewer made. Found
-  by the third Codex review, reproduced; with code-lead.
+
 - At 320x320 the strip wraps to 154px and stacks its buttons, which pushes the video's top to
   237px. The picture starts mostly below the fold until the viewer answers. Answering, or
   pressing play, removes it.
@@ -1883,16 +1892,22 @@ adds or removes a suffix. With the probe forced to fail, the popover shows a 120
 range with `aria-orientation="horizontal"`. Clicking its right end gives 1.0 and its left end 0,
 and the keys work.
 
+**Fixed after the third Codex review** (cba52ad).
+- Re-entering a moment was silent. Coming back into the same moment after a gap, paused or not,
+  produced identical text, and identical text is no change for a live region. The status now
+  speaks on entering a moment: it is keyed on the moment itself, so its text node remounts on
+  each entry. A backfill that renumbers moments stays quiet.
+- The magnifier has its own live region. `role="status"` is atomic, so the shared region
+  re-read the whole moment sentence on every Z, and turning the magnifier off said nothing about
+  it. It now says "Magnifier on, N times." or "Magnifier off.", and announces strength changes
+  only while it is on.
+
 **The moment marks stay under 24px, on purpose.** The lane's marks are 8-23px wide by 14px tall,
 under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent exception: every
 moment is also reachable by [ and ], by Previous and Next, and by the sidebar's rows.
 
 **Still open.**
-- Returning to a moment while paused is not announced again. Found by the third Codex review,
-  reproduced; with code-lead.
-- The status region is atomic, so toggling the magnifier re-reads the whole moment sentence, and
-  turning it off says nothing about the magnifier ("Magnifier off" is never spoken). Found by the
-  third Codex review, reproduced; with code-lead.
+
 - Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32
   measured the result: the page scrolls on narrow windows, as page content, not overflow.
 - 2.5.5 AAA is given up, as above. If testing with motor-impaired or high-zoom users shows the
