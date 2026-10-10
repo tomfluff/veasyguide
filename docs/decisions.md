@@ -1894,7 +1894,8 @@ That is above 2.5.8's 24px, and below the 44px the strip had.
   about 3.4s before the card. A click on the picture outside the card plays and dismisses it; the
   Space, Enter and click-on-card results are unchanged.
 
-**Fixed after the sixth Codex review** (7fc8c45).
+**Fixed after the sixth Codex review** (7fc8c45; its z-order half is superseded by 3d8cdd4,
+"Final rule" below).
 - In fullscreen the bar could cover the card. At 1280x720 at 400% zoom (a 320x180 screen) the
   expanded bar is 122px of the screen's 180, and it overlapped the card by 91.4px, so neither
   button could be clicked. In fullscreen the card now stacks above the bar (z 55). Rejected:
@@ -1913,7 +1914,7 @@ Leaving at 0, 50 and 300ms after closing Appearance stores `{t: 30}` every time.
 layout shift, every key, click and dismissal path, the tab order and the preview paths are
 unchanged from 37535ac.
 
-**Fixed after the seventh Codex review** (d3d32ca). 7fc8c45 put the card's slot at z 55 in
+**Fixed after the seventh Codex review** (d3d32ca; superseded by 3d8cdd4, "Final rule" below). 7fc8c45 put the card's slot at z 55 in
 every mode, above the bar (50), and the bar's popovers live in the bar's layer. At 320x640
 windowed the card covered the popovers that opened under it: 3 of the Appearance sheet's 6
 controls, the volume range, and 4 of the 7 speed items. Nothing was covered at 1366px wide. The
@@ -1928,13 +1929,27 @@ at z 55, and at 375x667 and 667x375 at DPR 2 the card does not meet the bar. In 
 the Appearance sheet, volume or speed open, the slot drops to z 45 and no popover control is
 covered; after Escape it returns to z 55 with the card's buttons reachable.
 
+**Final rule: the card never meets the bar** (3d8cdd4). The eighth Codex review found two more
+cases of the card covering something, both reproduced. In fullscreen it covered the moments list
+(z 40): 2 of 3 visible rows at 320x180 at DPR 4, and 2 of 8 at 375x667 at DPR 2. And at 320x180
+with the bar expanded, Play, Previous and Next moment and Volume took keyboard focus while hidden
+under the card, which fails WCAG 2.4.11 (Focus Not Obscured).
+
+The card now sits under the bar (z 45) and is laid out so the two never meet, the same way the
+pinned snapshot is. Its box is the picture minus the bar, with an 8px gap in fullscreen, where
+the bar overlays the picture. It compacts according to its own box's height (a container query),
+and scrolls inside itself only at the extreme: in fullscreen at 1280x720 at 400% zoom with the
+bar expanded, by about 50px. While the fullscreen moments list or any of the bar's popovers is
+open, the offer waits, hidden but still mounted, and comes back afterwards if it has not been
+answered.
+- Rejected: lifting the card above the bar (z 55), the approach of 7fc8c45 and d3d32ca above. It
+  fixed the tall-bar case, but it put the card over everything else that opens over the picture:
+  the bar's popovers (seventh review), then the fullscreen list and focused bar controls (eighth
+  review). Each needed its own patch, and every patch invited the next. Laying the card out
+  around the bar removes the whole class of collision, where z-order only reorders it.
+
 **Still open.**
-- In fullscreen the card (z 55) covers the moments list (z 40): 2 of 3 visible rows at 320x180
-  at DPR 4, and 2 of 8 at 375x667 at DPR 2. Nothing is covered at 667x375 or 1366x768. Found by
-  the eighth Codex review, reproduced; with code-lead.
-- In fullscreen at 320x180 at DPR 4 with the bar expanded, Play, Previous and Next moment and
-  Volume take keyboard focus while hidden under the card, which fails WCAG 2.4.11 (Focus Not
-  Obscured). Found by the eighth Codex review, reproduced; with code-lead.
+
 
 
 
@@ -2175,7 +2190,7 @@ Re-measured independently: Menu, About, then Escape returns focus to Menu. Menu 
 enters fullscreen with no menu rendered. The header matches d2e19c3 exactly at desktop sizes:
 0 of 61,470 pixels differ at 1366px wide and 0 of 86,400 at 1920px.
 
-**Still open.**
-- Low, left by the stop rule: the compact Menu stays open, with its focus trap, if the window is
-  widened past 62.5em while it is open, and that hides its trigger (`Shell.tsx`). Found by the
-  eighth Codex review from the code; not reproduced.
+**Fixed in the same round** (3d8cdd4). The eighth Codex review found, from the code, that the
+compact Menu stayed open, with its focus trap, if the window was widened past 62.5em while it was
+open, which hid its trigger. A low, but trivial, so it was fixed: the menu now closes when the
+window widens past its breakpoint.
