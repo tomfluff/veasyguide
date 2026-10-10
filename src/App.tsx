@@ -821,9 +821,17 @@ export default function App() {
   const chip = videoUrl && !fatal && (
     <span className={done ? "chip ready" : "chip"} role="status">
       <span className="chip-dot" />
-      {done
-        ? `${activities.length} moment${activities.length === 1 ? "" : "s"}`
-        : `Finding moments… ${progressPct.toFixed(0)}%`}
+      {/* Two wordings: the compact top bar shows only the number. The long one stays in the
+          accessibility tree in both layouts (visually hidden when compact), so the status
+          region announces a sentence, never a bare "87%". */}
+      <span className="chip-long">
+        {done
+          ? `${activities.length} moment${activities.length === 1 ? "" : "s"}`
+          : `Finding moments… ${progressPct.toFixed(0)}%`}
+      </span>
+      <span className="chip-short" aria-hidden="true">
+        {done ? activities.length : `${progressPct.toFixed(0)}%`}
+      </span>
     </span>
   );
 

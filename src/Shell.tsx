@@ -5,8 +5,17 @@
 // the two read as one body of work — plum hairline, slim white bar, italic qualifier beside the
 // name, muted nav with one accent link, a human byline at the bottom.
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import { useMantineColorScheme, useComputedColorScheme } from "@mantine/core";
-import { IconBrandGithub, IconExternalLink, IconMoon, IconSun } from "@tabler/icons-react";
+import { Menu, useMantineColorScheme, useComputedColorScheme } from "@mantine/core";
+import {
+  IconBrandGithub,
+  IconExternalLink,
+  IconFileImport,
+  IconInfoCircle,
+  IconMenu2,
+  IconMoon,
+  IconSun,
+  IconVideo,
+} from "@tabler/icons-react";
 // Both bundled, not hotlinked from tomfluff.github.io. The landing screen promises "no upload,
 // no account, no server" — a remote <img> would have the page phone out on every load, which is
 // a small thing that makes a large promise false.
@@ -68,8 +77,16 @@ export function TopBar({
   const scheme = useComputedColorScheme("light");
   const headerRef = useRef<HTMLElement>(null);
   useChromeVar(headerRef, "--chrome-top", "bottom");
+  const toggleScheme = () => setColorScheme(scheme === "dark" ? "light" : "dark");
   return (
-    <header className="top" ref={headerRef}>
+    // Two layouts in one bar, switched by CSS (App.css, "Narrow top bar"): the full row, and a
+    // compact one — mark, status, one Menu — for windows the full row does not fit. The row
+    // used to simply overflow: on a phone, or at 400% zoom, the whole PAGE scrolled sideways
+    // (860px of page in a 320px window) and the player's left edge was cut off. `with-file`
+    // because the bar is far wider with a lecture open, so the two states break at different
+    // widths. Elements marked wide-only / narrow-only are display:none in the other layout,
+    // which also takes them out of the accessibility tree, so nothing is announced twice.
+    <header className={file ? "top with-file" : "top"} ref={headerRef}>
       {/* The project mark is a finished tile — it brings its own colours and its own rounded
           corners, so it gets no background plate behind it. */}
       <img className="mark" src={icon} alt="" aria-hidden="true" />
@@ -84,7 +101,7 @@ export function TopBar({
       {file && onChangeVideo && (
         <button
           type="button"
-          className="filechip-change"
+          className="filechip-change wide-only"
           onClick={onChangeVideo}
           onKeyDown={stopPlayerHotkeys}
           aria-label="Change video"
@@ -100,7 +117,7 @@ export function TopBar({
       {file && onLoadMoments && (
         <button
           type="button"
-          className="filechip-change"
+          className="filechip-change wide-only"
           onClick={onLoadMoments}
           onKeyDown={stopPlayerHotkeys}
           aria-label="Load moments file"
@@ -111,12 +128,12 @@ export function TopBar({
       )}
       <span className="grow" />
       {status}
-      <nav className="nav">
+      <nav className="nav wide-only">
         {/* A button, not an anchor: it opens a dialog, it does not navigate anywhere. An <a
             href="#about"> would put a dead fragment in the URL and lie to a screen reader. */}
         <button
           type="button"
-          onClick={() => setColorScheme(scheme === "dark" ? "light" : "dark")}
+          onClick={toggleScheme}
           onKeyDown={stopPlayerHotkeys}
           aria-label={scheme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
           title={scheme === "dark" ? "Light theme" : "Dark theme"}
@@ -147,7 +164,70 @@ export function TopBar({
           <IconBrandGithub size={18} />
         </a>
       </nav>
-      <a className="avatar-link" href={PROFILE} target="_blank" rel="noreferrer">
+      {/* The compact layout's one control. Everything the full row offers, in the same order,
+          behind one 44px button. Mantine's Menu brings the roles, arrow keys, Escape and focus
+          return; portalled to <body>, which is fine here — the top bar is never inside the
+          fullscreened player. The keys a menu uses are kept from the player's document-level
+          hotkeys, as on every other button in this bar. */}
+      {/* returnFocus: choosing an item, or Escape, hands focus back to this button rather than
+          dropping it on <body> — a keyboard user stays where they were. */}
+      <Menu position="bottom-end" width={260} classNames={{ dropdown: "top-menu" }} returnFocus>
+        <Menu.Target>
+          <button
+            type="button"
+            className="top-menu-btn narrow-only"
+            aria-label="Menu"
+            onKeyDown={stopPlayerHotkeys}
+          >
+            <IconMenu2 size={22} />
+          </button>
+        </Menu.Target>
+        <Menu.Dropdown onKeyDown={stopPlayerHotkeys}>
+          {/* The full filename, which the compact bar truncates or drops. A label, not an
+              item: it is information, and an item would be a stop that does nothing. */}
+          {file && <Menu.Label className="top-menu-file">{file}</Menu.Label>}
+          {file && onChangeVideo && (
+            <Menu.Item leftSection={<IconVideo size={18} />} onClick={onChangeVideo}>
+              Change video
+            </Menu.Item>
+          )}
+          {file && onLoadMoments && (
+            <Menu.Item leftSection={<IconFileImport size={18} />} onClick={onLoadMoments}>
+              Load moments file
+            </Menu.Item>
+          )}
+          {file && <Menu.Divider />}
+          <Menu.Item
+            leftSection={scheme === "dark" ? <IconSun size={18} /> : <IconMoon size={18} />}
+            onClick={toggleScheme}
+          >
+            {scheme === "dark" ? "Light theme" : "Dark theme"}
+          </Menu.Item>
+          <Menu.Item leftSection={<IconInfoCircle size={18} />} onClick={onAbout}>
+            About
+          </Menu.Item>
+          <Menu.Item
+            component="a"
+            href={PROJECT}
+            target="_blank"
+            rel="noreferrer"
+            leftSection={<IconExternalLink size={18} />}
+          >
+            Project page
+          </Menu.Item>
+          <Menu.Item
+            component="a"
+            href={REPO}
+            target="_blank"
+            rel="noreferrer"
+            leftSection={<IconBrandGithub size={18} />}
+          >
+            Code on GitHub
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+      {/* Not in the compact bar: the same profile link is in the footer. */}
+      <a className="avatar-link wide-only" href={PROFILE} target="_blank" rel="noreferrer">
         <img className="avatar" src={avatar} alt="Yotam Sechayk" />
       </a>
     </header>
