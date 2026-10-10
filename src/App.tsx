@@ -588,8 +588,13 @@ export default function App() {
     if (!import.meta.env.DEV) return;
     const name = new URLSearchParams(location.search).get("test");
     if (!name) return;
-    fetch(`/_test/${name}`)
-      .then((r) => r.blob())
+    // BASE_URL, not "/": the app is served under /app/, so a root-relative path 404s and the
+    // 404 page's body arrives here as an "unsupported format" video.
+    fetch(`${import.meta.env.BASE_URL}_test/${name}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`?test=${name}: ${r.status}`);
+        return r.blob();
+      })
       .then((b) => loadFile(new File([b], name, { type: b.type || "video/mp4" })))
       .catch((e) => setError(String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
