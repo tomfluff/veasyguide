@@ -106,7 +106,10 @@ type Props = {
   // While the Appearance preview has moved the playhead, where the viewer actually is — the
   // place it will step back to. null once it has. App saves THIS as the resume position if the
   // page goes away mid-preview, never the moment it was parked on to show the changes.
-  onPreviewJump?: (returnTo: number | null) => void;
+  // When it lets go (returnTo null), `nowAt` is where the playhead is going — the restore, or
+  // the viewer's own seek — so App's bookmark has the right place even in the moment before
+  // the seek lands and the time callback catches up (a save there used to record the preview).
+  onPreviewJump?: (returnTo: number | null, nowAt?: number) => void;
   onTimeChange?: (t: number) => void;
   // Play/pause as the element reports it. App needs both edges for the resume position: play
   // is the viewer answering the resume offer by doing something else, and pause is a moment
@@ -659,14 +662,14 @@ const VideoPlayer = (props: Props) => {
   // click on the scrubber is also an outside-click that closes the sheet, the close restored
   // the pre-preview time before `seeked` arrived, and the viewer's seek was undone (and the
   // bookmark kept the old place). Same race for ] followed quickly by Escape.
-  const cancelPreview = () => {
+  const cancelPreview = (nowAt?: number) => {
     if (preAppearanceTimeRef.current === null) return;
     preAppearanceTimeRef.current = null;
     setPreviewJumped(false);
-    props.onPreviewJump?.(null);
+    props.onPreviewJump?.(null, nowAt);
   };
   const viewerSeek = (video: HTMLVideoElement, t: number) => {
-    cancelPreview();
+    cancelPreview(t);
     // And forget a preview jump still in flight: ownership is matched by landing time, so a
     // viewer seek landing within 0.05s of that target before its `seeked` would otherwise be
     // taken for the player's own and leave the resume offer and the bookmark untouched.
@@ -702,11 +705,12 @@ const VideoPlayer = (props: Props) => {
         }
       }
     } else if (preAppearanceTimeRef.current !== null) {
-      ownSeekRef.current = preAppearanceTimeRef.current;
-      video.currentTime = preAppearanceTimeRef.current;
+      const back = preAppearanceTimeRef.current;
+      ownSeekRef.current = back;
+      video.currentTime = back;
       preAppearanceTimeRef.current = null;
       setPreviewJumped(false);
-      props.onPreviewJump?.(null);
+      props.onPreviewJump?.(null, back);
     }
   };
 
@@ -948,6 +952,12 @@ const VideoPlayer = (props: Props) => {
       <Box
         className="resume-slot"
         role="status"
+        // Fullscreen: the whole picture, and the card stacks ABOVE the bar (player.css). Under it,
+        // a tall expanded bar (1280x720 at 400%: 122px of a 180px screen) covered both buttons;
+        // stopping the card's area above the bar instead left 53px, too little for the card at
+        // all. Over the bar, the offer is always answerable; at any ordinary size the centred
+        // card does not reach the bar, and at the extreme it covers part of it only until it
+        // is answered — and Space, a seek or a click on the picture answer it too.
         style={{ bottom: isFullscreen ? 0 : barHeight }}
       >
         {props.resumeOffer && (
@@ -1403,7 +1413,7 @@ const VideoPlayer = (props: Props) => {
           // (A backstop only: every viewer seek path already let go of the preview, synchronously,
           // in viewerSeek. This catches a seek from somewhere that does not — the browser's own
           // media keys, say.)
-          if (!own) cancelPreview();
+          if (!own) cancelPreview(t);
           props.onSeeked?.(t, !own);
         }}
         onPlay={() => { handleIsPlaying.open(); props.onPlayingChange?.(true); }}

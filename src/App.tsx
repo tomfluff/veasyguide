@@ -996,7 +996,12 @@ export default function App() {
                     }
                   : null
               }
-              onPreviewJump={(returnTo) => { previewReturnRef.current = returnTo; }}
+              onPreviewJump={(returnTo, nowAt) => {
+                previewReturnRef.current = returnTo;
+                // Letting go: the playhead is on its way to `nowAt`, and the time callback will
+                // only say so once the seek lands. A save in between used to record the preview.
+                if (returnTo === null && nowAt !== undefined) playheadRef.current = nowAt;
+              }}
               onActivityChange={setCurrMoment}
               thumbs={thumbs}
               seekFnRef={seekFnRef}
