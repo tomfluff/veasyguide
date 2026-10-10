@@ -1788,6 +1788,17 @@ the stored entry is `{t: 52.8}`. Re-measured independently: paused at 30s, the p
 47.8s, ] goes to 52.8s, and leaving stores `{t: 52.8}`.
 
 **Still open.**
+- **The cba52ad fix does not cover a scrubber click or Escape.** Paused at 30s with the
+  Appearance preview at 47.8s, one click on the scrubber at 100s ends at 30s with the sheet
+  closed and `{t: 30}` stored; ] followed at once by Escape does the same. A jump from a sidebar
+  row survives (120.88s stored). The cancel runs on `seeked`, which arrives after the
+  outside-click and Escape restore has already run. Found by the fourth Codex review, confirmed
+  in the browser; with code-lead.
+- The preview's target (moment start plus the lead plus 0.2s) is not clamped to the video's
+  duration. For a moment in the last 0.2s or so, the browser clamps the seek, the landing time
+  falls outside the 0.05s match that marks a seek as the player's own, and the player's seek is
+  taken for the viewer's. Found by the fourth Codex review, confirmed from the code, not
+  reproduced; with code-lead.
 
 - At 320x320 the strip wraps to 154px and stacks its buttons, which pushes the video's top to
   237px. The picture starts mostly below the fold until the viewer answers. Answering, or
