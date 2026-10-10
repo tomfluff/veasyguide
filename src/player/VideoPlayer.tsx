@@ -610,6 +610,15 @@ const VideoPlayer = (props: Props) => {
   const updateAtTimeRef = useRef(updateAtTime);
   updateAtTimeRef.current = updateAtTime;
 
+  // Selection only re-runs when the time moves (rVFC, timeupdate). A moment the analysis finds
+  // UNDER a paused playhead — the viewer seeked ahead and waited — was therefore never selected:
+  // no highlight, nothing announced, until they nudged the time. Re-run it when the list grows
+  // while paused. (Playing, the frame loop picks it up within a frame anyway.)
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v && v.paused) updateAtTimeRef.current(v.currentTime);
+  }, [props.activities]);
+
   // The persisted rate survives reloads and new videos; the element resets to 1 whenever
   // src changes, so re-apply on both.
   useEffect(() => {
@@ -808,8 +817,10 @@ const VideoPlayer = (props: Props) => {
   }, []);
 
   const handleZoomShift = (shift: number) => {
+    // ↑ with the magnifier off turns it on — "more zoom" from none. ↓ with it off does nothing:
+    // it used to turn it ON too, so "zoom out" zoomed in.
     if (!isZoomIn) {
-      handleZoom();
+      if (shift > 0) handleZoom();
       return;
     }
     useMagnificationSettingsStore.setState((state) => ({
