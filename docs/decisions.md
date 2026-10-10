@@ -1989,11 +1989,32 @@ The focus half was a class too: closing a bar popover dropped focus on `<body>`.
 speed now return focus to their trigger, as volume already did. Audited with them: the
 fullscreen list returns focus to its toggle, and the bar never auto-hides under keyboard focus.
 
+Re-measured independently. Resume then leaving stores `{t: 20}` at 0ms and 30ms (it was `{}`
+before), `{t: 20.05}` at 100ms and `{t: 20.43}` at 500ms. Resume, A, Escape puts focus back on
+the visible Resume, and Space then resumes at 20.34s. Every earlier sequence still holds: a
+scrubber click at 100s during the preview stores 99.95; ] then Escape stores 52.8; leaving 0, 50
+or 300ms after closing the preview stores 30, as does a plain close; a sidebar row stores
+120.84; Start goes to 0, paused, and removes the card; an untouched `{t: 20}` is kept; leaving
+mid-preview from 15s saves 15, and from 4s saves nothing (the start edge); playing from 40s to
+52s saves 52.03. Focus returns to the opening button for Appearance (on Escape and an outside
+click), speed (Escape and picking a rate) and volume (Escape).
+
 **Still open.**
+- Playback started during the Appearance preview, for example by a media key, is not taken as
+  the viewer's. Played on to 62.1s, then Escape jumps back to 30s, and 30s is saved. Found by the
+  tenth Codex review, reproduced; with code-lead.
+- Closing a popover by clicking a sidebar row returns focus to the popover's button rather than
+  the row, so Space then reopens the popover. Found by the tenth Codex review, reproduced; with
+  code-lead.
+- After a seek whose frame reports arrive late, the bookmark could stay frozen, because the
+  reducer ignores time reports until one lands near the pending seek. Found by the tenth Codex
+  review from the code; plausible, did not reproduce in a foreground tab; with code-lead.
+- Low, left by the stop rule: focus returned to a bar control that collapsing the fullscreen
+  bar has hidden. Found by the tenth Codex review; not reproduced.
 
 - Low, left by the stop rule: at 320x180 at DPR 4 in fullscreen with the bar expanded, the card is
-  42px tall and scrolls 29px inside itself. Usable, since focus scrolls each button into view,
-  but cramped.
+  42px tall and scrolls 29px inside itself. A keyboard user is fine, since focus scrolls each
+  button into view, but a mouse user does not see the buttons without scrolling the card.
 
 
 
@@ -2245,7 +2266,9 @@ Re-measured independently: the Menu, open at 800px wide, closes when the window 
 
 The breakpoint listener missed a window exactly 1000px wide, because it used the `min-width`
 twin of the CSS's `max-width` query, which differs by one pixel at the breakpoint. Found by the
-ninth Codex review from the code; it now listens to the CSS's own query (2f9edd8).
+ninth Codex review from the code; it now listens to the CSS's own query (2f9edd8). Re-measured
+independently: opened at exactly 1000px and widened to 1001px, it closes, and from 999px to
+1001px too.
 
 **Still open.** A low, left by the stop rule:
 - Closing the Menu by widening the window leaves focus on `<body>`, not on a visible header
