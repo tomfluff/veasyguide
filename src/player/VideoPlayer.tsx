@@ -138,9 +138,10 @@ const VideoPlayer = (props: Props) => {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   // Fullscreen is requested on the container; the overlay geometry measures the <video>
-  // element. They are the same rectangle today (the video is the container's only in-flow
-  // child), but only by accident — anything else placed in that flow would break the
-  // container measurement while the video measurement stays correct.
+  // element. They are NOT the same rectangle: windowed, the control bar sits in flow below the
+  // video, inside the container. That is safe because nothing measures the container — the
+  // highlight math reads the <video> box, and every layer drawn over the picture lives in
+  // .video-stage, which is exactly the video's box.
   const containerRef = useRef<HTMLDivElement>(null);
   // The same element again, as STATE, for the tooltips to portal into (tipRoot.ts). A ref
   // would not do: the tips render before the container has mounted, and only a re-render
@@ -156,6 +157,10 @@ const VideoPlayer = (props: Props) => {
   // The moments overlay anchors just above the control bar, whose height depends on
   // collapsed state and which rows (lane, now-line) are present — so it is measured.
   const { ref: barSizeRef, height: barHeight } = useElementSize<HTMLDivElement>();
+  // Remembers the windowed bar's collapsed state across a fullscreen visit, which always
+  // starts collapsed. A ref, because the fullscreenchange listener is registered once.
+  const collapsedRef = useRef(false);
+  const windowedCollapsedRef = useRef(false);
 
   // State
   const [volume, setVolume] = useState(1);
@@ -171,6 +176,7 @@ const VideoPlayer = (props: Props) => {
   const [isFullscreen, handleIsFullscreen] = useDisclosure(false);
   const [hideControls, handleHideControls] = useDisclosure(false);
   const [collapsed, handleCollapsed] = useDisclosure(false);
+  collapsedRef.current = collapsed;
   // Fullscreen-only: the moments list summoned as an overlay inside the player.
   const [momentsOpen, handleMomentsOpen] = useDisclosure(false);
   const [sceneNoticeVisible, setSceneNoticeVisible] = useState(false);
@@ -204,18 +210,22 @@ const VideoPlayer = (props: Props) => {
   // Where the viewer was before we jumped them to a moment to preview against.
   const preAppearanceTimeRef = useRef<number | null>(null);
 
+  // The bar only ever hides in fullscreen. Windowed, it sits BELOW the video, in flow, and covers
+  // nothing — it used to overlay the bottom of the picture, which on a lecture is exactly where
+  // the instructor writes last, and viewers reported it masking the writing. Fullscreen has no
+  // room below the picture, so there it overlays, and it hides even while paused: a paused
+  // frame is a frame someone is READING, and the bar over its bottom strip is the same mask.
+  // Any pointer movement, key or focus brings it back (see the container's handlers).
+  const barHidden = hideControls && isFullscreen;
   const videoContainerClasses = classNames("video-container", {
-    // The bar only ever hides while playing. Paused, it stays — you paused BECAUSE you want
-    // to do something, and hunting for the controls you just summoned is not that something.
-    clear: hideControls && isPlaying,
-    paused: !isPlaying,
+    clear: barHidden,
     collapsed,
     fullscreen: isFullscreen,
   });
-  // A tip outliving its bar would float over the lecture beside nothing: the bar fades out
-  // under a pointer that has stopped moving, and with pointer-events off it never sees the
-  // mouseleave that would close the tip.
-  const barHidden = hideControls && isPlaying;
+  // How much of the picture's bottom edge the bar covers. Windowed it covers none of it, so
+  // the things docked at the bottom of the picture (the pinned snapshot, the preview notice)
+  // sit at the same small inset as their top-docked counterparts instead of a bar's height up.
+  const barOverlap = isFullscreen ? barHeight : 0;
 
   // Hooks and interactivity
   const { ref: timelineContainerRef, x: timelineX } = useMouse<HTMLDivElement>();
@@ -620,10 +630,20 @@ const VideoPlayer = (props: Props) => {
     rows.find((r) => r && r.getClientRects().length > 0)?.focus();
   };
 
+  // Fullscreen starts collapsed: the bar overlays the picture there, and the one-line bar covers
+  // the least of it. Leaving restores whatever the viewer had chosen windowed, where an
+  // expanded bar costs the picture nothing.
   useEffect(() => {
     const sync = () => {
-      if (document.fullscreenElement) handleIsFullscreen.open();
-      else handleIsFullscreen.close();
+      if (document.fullscreenElement) {
+        windowedCollapsedRef.current = collapsedRef.current;
+        handleCollapsed.open();
+        handleIsFullscreen.open();
+      } else {
+        if (windowedCollapsedRef.current) handleCollapsed.open();
+        else handleCollapsed.close();
+        handleIsFullscreen.close();
+      }
     };
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
@@ -731,11 +751,14 @@ const VideoPlayer = (props: Props) => {
     <Box
       className={videoContainerClasses}
       ref={containerMergedRef}
+      // The windowed player's height is video + bar, and both are bounded by the viewport
+      // together (player.css), so the bar's measured height feeds the width cap. Fullscreen
+      // overlays the bar, so it takes nothing from the picture there.
+      style={{ ["--bar-h" as string]: `${isFullscreen ? 0 : barHeight}px` }}
       onMouseMove={showControls}
-      // The reveal triggers that make auto-hide safe. Pointer movement alone would delete the
-      // moments and the controls for a keyboard or screen-reader user; focus and keypress
-      // bring them back for everyone. (Pause is handled by the `clear` class, which is gated
-      // on isPlaying.)
+      // The reveal triggers that make auto-hide safe (auto-hide is fullscreen-only). Pointer
+      // movement alone would delete the moments and the controls for a keyboard or
+      // screen-reader user; focus and keypress bring them back for everyone.
       //
       // Except the keys whose control is not IN the bar (zoom, moment-stepping) — see
       // NO_REVEAL_KEYS and the hotkey table. Every other key still reveals it, so the bar is
@@ -1130,6 +1153,12 @@ const VideoPlayer = (props: Props) => {
           </UnstyledButton>
         </Group>
       </Box>
+      {/* The picture and everything drawn ON it. Its box is the video's box, so the layers
+          inside size to the video rather than to the container, which also holds the bar.
+          (It was 100% of the container while the bar overlaid the video; with the bar in flow
+          below, that would have stretched every layer over the bar too.) The bar stays first
+          in the DOM, so it keeps its place in the tab order; CSS orders it below. */}
+      <Box className="video-stage">
       <video
         ref={videoMergedRef}
         src={props.src}
@@ -1207,13 +1236,14 @@ const VideoPlayer = (props: Props) => {
           {props.canPlay && atUnanalyzed ? "Analyzing this part…" : null}
         </Box>
         {/* Moving someone's playhead without saying so feels like a glitch. Say so.
-            Anchored above the MEASURED bar height: the pill only ever shows while the
-            Appearance sheet is open, which is exactly when the bar is up — a fixed bottom
-            offset put it behind the bar, illegible at every zoom. */}
+            In fullscreen, anchored above the MEASURED bar height: the pill only ever shows
+            while the Appearance sheet is open, which is exactly when the bar is up — a fixed
+            bottom offset put it behind the bar, illegible at every zoom. Windowed, the bar is
+            below the picture and the pill sits at the ordinary inset. */}
         <Box
           className="overlay-preview-jump"
           role="status"
-          style={{ bottom: barHeight + 12 }}
+          style={{ bottom: barOverlap + 12 }}
         >
           {previewJumped ? "Jumped to a moment so you can see your changes · returns when you close" : null}
         </Box>
@@ -1233,17 +1263,18 @@ const VideoPlayer = (props: Props) => {
           lecture's pace again. Corner and size are the reader's to choose and persist: one default
           cannot be right for both a reader who wants it out of the live action and one who
           needs it big enough to read. The top-center stays reserved either way — the
-          catching-up and scene notices own it — and a bottom-docked panel clears the
-          measured bar, so no choice can bury the controls or the notices. */}
+          catching-up and scene notices own it — and in fullscreen a bottom-docked panel clears
+          the measured bar, so no choice can bury the controls or the notices. */}
       {pinned && (
         <Box
           className={classNames("pin-panel", `size-${pinSize}`, `at-${pinCorner}`)}
-          // The bar is measured, and it sits ABOVE this panel: anything the panel grows
-          // into, the bar covers. Capping the height at the space the bar leaves is what
-          // keeps the panel's own caption controls clickable at every size.
+          // In fullscreen the bar is measured, and it sits ABOVE this panel: anything the panel
+          // grows into, the bar covers. Capping the height at the space the bar leaves is what
+          // keeps the panel's own caption controls clickable at every size. Windowed, the bar
+          // is below the picture and the panel has the whole of it, less the insets.
           style={{
-            maxHeight: `calc(100% - ${barHeight + 24}px)`,
-            ...(pinCorner === "bl" || pinCorner === "br" ? { bottom: barHeight + 12 } : {}),
+            maxHeight: `calc(100% - ${barOverlap + 24}px)`,
+            ...(pinCorner === "bl" || pinCorner === "br" ? { bottom: barOverlap + 12 } : {}),
           }}
           role="group"
           aria-label={`Pinned snapshot: ${momentDescription(pinned.activity, props.meta.analysisWidth, props.meta.analysisHeight)}, ${convertSecondsToTimecode(pinned.activity.start)}`}
@@ -1321,6 +1352,7 @@ const VideoPlayer = (props: Props) => {
           style={{ bottom: barHeight + 24, maxHeight: `calc(100% - ${barHeight + 48}px)` }}
         />
       )}
+      </Box>
       <SVGFilters />
     </Box>
     </PlayerTipRoot.Provider>

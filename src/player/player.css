@@ -10,11 +10,17 @@
   /* The player fills its column, bounded by what actually FITS: the 860px cap was left over
      from when the page was one narrow reading column, and beside the sidebar in a wide window
      it just left the lecture small with grey space around it — the opposite of what this app is
-     for. The bound is now the viewport, not a magic number: a 16:9 video this wide is exactly
-     as tall as the space left once the two bars and the page padding are taken. */
-  max-width: calc((100vh - 160px) * 16 / 9);
+     for. The bound is the viewport, not a magic number: a 16:9 video this wide, plus the control
+     bar under it, is exactly as tall as the space left once the two page bars and the page
+     padding are taken. --bar-h is the bar's MEASURED height (set inline, 0 in fullscreen): it
+     changes with collapsing and with how many rows the bar wraps to, so no constant is right.
+
+     The 20rem floor is for short windows. Subtracting the bar there could shrink the video to
+     a sliver (at 320x320 the formula alone gives a picture under 20px wide); below the floor
+     the page scrolls instead, which is what a page is for. */
+  max-width: max(20rem, calc((100vh - 160px - var(--bar-h, 0px)) * 16 / 9));
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   margin-inline: auto;
   position: relative;
   background-color: black;
@@ -32,31 +38,48 @@
   height: 100vh;
 }
 
+/* The video's box, and the positioning context for everything drawn over the picture. */
+.video-stage {
+  position: relative;
+  width: 100%;
+}
+
+/* display:block — an inline <video> sits on a text baseline, leaving a few pixels of gap under
+   it that the stage would then include and the overlays would misalign by. */
 .video-container video {
+  display: block;
   width: 100%;
   aspect-ratio: 16/9;
+}
+
+/* Fullscreen: the picture takes the whole screen and the bar overlays it. The video box fills
+   the stage and the browser letterboxes the frame inside it, which computeLetterbox expects. */
+.video-container.fullscreen .video-stage {
+  flex: 1;
+  min-height: 0;
+}
+.video-container.fullscreen video {
+  height: 100%;
+  aspect-ratio: auto;
 }
 
 /* A dark surface with a floor, not a gradient. The original gradient faded to NOTHING at the
    top, so against a white slide the controls sat on no background at all — the exact failure
    this app exists to prevent. Translucency is fine as long as the floor holds: at 0.85 alpha
    the worst case (pure white slide behind) composites to rgb(45,57,63), which keeps the
-   #f2f4f7 icons at 10.7:1 — recheck that number if the alpha drops. */
+   #f2f4f7 icons at 10.7:1 — recheck that number if the alpha drops. (Windowed, nothing is
+   behind it but the container's black, so the floor is never tested there.)
+
+   Windowed, the bar sits BELOW the picture, in flow, and never hides: over the picture it
+   masked the bottom strip of the slide, which is where the instructor writes last. It comes
+   first in the DOM — so first in the tab order, where it has always been — hence `order`.
+   This was the under-520px layout alone (WCAG 1.4.10 reflow); it is now the only windowed one. */
 .video-controls-container {
-  position: absolute;
-  /* -1px, with the padding giving it back: a hairline of video under the controls at
-     fractional device-pixel ratios. The player's height is width * 9/16, so its bottom edge
-     lands wherever it lands — at 125% Windows scaling (dpr 1.25) that is 940.469 device px,
-     mid-pixel. The bar is its own composited layer (it animates opacity), so it and the
-     video underneath round that .469 independently; when they disagree, one device pixel of
-     video shows below the bar. Overshooting by a whole CSS pixel means the bar's background
-     always wins the rounding, and `padding-bottom: 5px` (4 + the 1 borrowed) keeps the
-     controls exactly where they were — this changes what is PAINTED, never the layout. */
-  bottom: -1px;
-  left: 0;
-  right: 0;
+  position: relative; /* so its z-index holds: the scrubber's 44px hit zone reaches up over the
+                         picture's bottom edge, and must win there over the click-to-play layer */
+  order: 2;
   z-index: 50;
-  padding: 4px 12px 5px;
+  padding: 4px 12px;
   background-color: rgba(18, 22, 29, 0.85);
   border-top: 1px solid var(--d-line);
   color: var(--d-text);
@@ -64,8 +87,21 @@
   transition: opacity 150ms ease-out; /* DESIGN.md: control bar show/hide is ease-out */
 }
 
-.video-container.paused .video-controls-container {
-  opacity: 1;
+/* Fullscreen has no room below the picture, so the bar overlays it there (and auto-hides).
+   -1px, with the padding giving it back: a hairline of video under the controls at
+   fractional device-pixel ratios. The player's height is width * 9/16, so its bottom edge
+   lands wherever it lands — at 125% Windows scaling (dpr 1.25) that is 940.469 device px,
+   mid-pixel. The bar is its own composited layer (it animates opacity), so it and the
+   video underneath round that .469 independently; when they disagree, one device pixel of
+   video shows below the bar. Overshooting by a whole CSS pixel means the bar's background
+   always wins the rounding, and `padding-bottom: 5px` (4 + the 1 borrowed) keeps the
+   controls exactly where they were — this changes what is PAINTED, never the layout. */
+.video-container.fullscreen .video-controls-container {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  padding-bottom: 5px;
 }
 
 .video-container.clear .video-controls-container {
@@ -364,9 +400,13 @@
   display: block;
 }
 
+/* All of these are 100% of .video-stage, which is the video's box — never of the container,
+   which also holds the bar (windowed). */
 .video-highlights,
 .video-magnification {
   position: absolute;
+  top: 0;
+  left: 0;
   height: 100%;
   width: 100%;
   display: flex;
@@ -872,37 +912,6 @@
 
 /* No max-height here: the Appearance sheet (the only popover) is fixed-size and scrolls
    its own body. Capping the dropdown too stacked a second scrollbar around the first. */
-
-/* --- Narrow viewports / high zoom -----------------------------------------
-   At a 320px CSS width (400% browser zoom, WCAG 1.4.10's reflow target) the video is only
-   180px tall, and the control bar wraps to three rows — so an overlaid bar covers the entire
-   lecture. Below this width the bar leaves the overlay and sits BELOW the video in flow.
-
-   This is free precisely because the overlay geometry measures the <video> element rather
-   than the container: the video's box is unchanged, so the highlight and the magnifier do
-   not move. (Measuring the container, as the code used to, would have drifted them.)
-
-   Fullscreen keeps the overlay — there the viewport is large and the video fills it. */
-@media (max-width: 520px) {
-  .video-container:not(.fullscreen) {
-    flex-direction: column;
-  }
-
-  .video-container:not(.fullscreen) .video-controls-container {
-    position: static;
-    order: 2; /* the controls div precedes <video> in the DOM; in column flow it would
-                 otherwise stack ABOVE the lecture */
-  }
-
-  .video-container:not(.fullscreen) video {
-    order: 1;
-  }
-
-  /* With the bar out of the way, there is nothing to hide from. */
-  .video-container:not(.fullscreen).clear .video-controls-container {
-    opacity: 1;
-  }
-}
 
 /* Says out loud that we moved the playhead for the appearance preview. Without it, the jump
    reads as the player glitching. */
