@@ -263,9 +263,17 @@ const VideoPlayer = (props: Props) => {
     // opened, is someone reading the tip — and the tip goes with the bar, which made it fail
     // WCAG 1.4.13's "persistent" (it vanished after 1.6s with the pointer still on it). Moving
     // off the bar onto the picture is a mousemove, which restarts this timer as usual.
+    //
+    // KEYBOARD focus, that is: `:focus-visible`. A mouse click on a bar button leaves focus on
+    // it too, and counting that as "using the bar" meant entering fullscreen by clicking the
+    // button parked focus on "Exit fullscreen" and the bar never hid again. And never while
+    // one of the bar's own dropdowns (the Appearance sheet, the speed menu) is open: they live
+    // inside the bar, so hiding it would take the sheet away from someone reading it.
     useTimeout(() => {
       const bar = barSizeRef.current;
-      if (bar && bar.contains(document.activeElement)) return;
+      const active = document.activeElement;
+      if (bar && active && bar.contains(active) && active.matches(":focus-visible")) return;
+      if (bar?.querySelector(".ap-pop, .bar-pop")) return;
       if (bar?.matches(":hover") || containerRef.current?.querySelector(".player-tip:hover")) return;
       handleHideControls.open();
     }, 2000);
@@ -776,10 +784,6 @@ const VideoPlayer = (props: Props) => {
     <Box
       className={videoContainerClasses}
       ref={containerMergedRef}
-      // The windowed player's height is video + bar, and both are bounded by the viewport
-      // together (player.css), so the bar's measured height feeds the width cap. Fullscreen
-      // overlays the bar, so it takes nothing from the picture there.
-      style={{ ["--bar-h" as string]: `${isFullscreen ? 0 : barHeight}px` }}
       onMouseMove={showControls}
       // The reveal triggers that make auto-hide safe (auto-hide is fullscreen-only). Pointer
       // movement alone would delete the moments and the controls for a keyboard or

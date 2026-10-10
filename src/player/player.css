@@ -12,14 +12,22 @@
      it just left the lecture small with grey space around it — the opposite of what this app is
      for. The bound is the viewport, not a magic number: a 16:9 video this wide, plus the control
      bar under it, is exactly as tall as the space left once the two page bars and the page
-     padding are taken. --bar-h is the bar's MEASURED height (set inline, 0 in fullscreen): it
-     changes with how many rows the bar wraps to and whether the moment rows are there yet, so
-     no constant is right. (It no longer changes with collapsing: that is fullscreen-only, D32.)
+     padding are taken.
+
+     The bar's share is a CONSTANT — the one-row expanded bar, 140px at the default font size —
+     never the bar's measured height. It was the measured height once, and that is a feedback
+     loop: the bar's height depends on the player's width (a narrower bar wraps its controls and
+     the status line onto more rows), so a tall bar made the player narrower, which made the bar
+     taller, which made the player narrower still. On a 1366x768 laptop it settled at a 477px
+     video in a 1028px column; on a short window at 150% scaling, at the 20rem floor. A width
+     that depends on nothing it causes cannot do that. Where the bar does wrap (narrow windows,
+     high zoom) the page simply grows a little taller and scrolls. The rem part is the status
+     line, whose text scales with the reader's font size; the rest is fixed-px chrome.
 
      The 20rem floor is for short windows. Subtracting the bar there could shrink the video to
      a sliver (at 320x320 the formula alone gives a picture under 20px wide); below the floor
      the page scrolls instead, which is what a page is for. */
-  max-width: max(20rem, calc((100vh - 160px - var(--bar-h, 0px)) * 16 / 9));
+  max-width: max(20rem, calc((100vh - 160px - (108px + 2rem)) * 16 / 9));
   display: flex;
   flex-direction: column;
   margin-inline: auto;
