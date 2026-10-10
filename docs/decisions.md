@@ -1652,6 +1652,14 @@ one-row height depends on the font size but not on the player's width, and a wra
 publishes nothing, so the player's width cannot feed back into it. At a 20px root it is 96px
 and the page no longer scrolls.
 
+Re-measured independently, with the browser's font size at 20px: at 1707x880 at DPR 1.5 the bar
+and `--bar-one-row` are both 96px, the page does not scroll, and the video is 1169.8px, exactly
+its stage (ratio 1.000). 1312px at 1920x960 and 970.7 at 1366x768, both ratio 1.000 with no
+scroll. At 16px every width is unchanged from cb3c512. At 20px there is exactly one width change
+per session (for example 983.1 to 970.7px, between 842 and 878ms after load), while the video's
+`readyState` is still 0, so it lands before the first frame is shown. After that, zero changes
+through analysis and playback.
+
 **Closed by D35.** The horizontal page scroll at 320px and 800px wide, which predates this entry
 and came from the top bar rather than the player, is fixed there (cb3c512).
 
@@ -1662,6 +1670,9 @@ to choose between a pillarboxed video and accepting two rows, no longer happen: 
 fits one row down to a 486px player, and every desktop size measured is one row (1605098).
 
 **Still open.**
+- Leaving fullscreen with the bar expanded briefly publishes the fullscreen bar's height (90px),
+  and the video goes from 992 to 990.2px wide for 32ms before correcting itself. Found by the
+  third Codex review, reproduced; with code-lead.
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
@@ -1757,6 +1768,10 @@ there, and the stored entry stays `{t: 20}`. Leaving mid-preview without touchin
 the 10s start edge working as designed.
 
 **Still open.**
+- Pressing ] during Appearance's preview and then leaving saves the position from before the
+  preview (30s) rather than the moment the viewer stepped to (52.8s). The preview fix above
+  treats every seek during a preview as the player's own, including one the viewer made. Found
+  by the third Codex review, reproduced; with code-lead.
 - At 320x320 the strip wraps to 154px and stacks its buttons, which pushes the video's top to
   237px. The picture starts mostly below the fold until the viewer answers. Answering, or
   pressing play, removes it.
@@ -1861,11 +1876,23 @@ as one row is 504px, at a 560px window; the exact 486px threshold was not search
   little before the start and would otherwise name the current moment as next. The magnifier
   state is its own text node. Measured: 6 updates for 6 moments over 77s at 4x.
 
+Re-measured independently: the volume tip reads "Volume M" at (112, 632), above its button at
+(152, 678), on hover and on keyboard focus alike. The status gives exactly 6 updates for 6 moment
+starts over 77s at 4x, windowed and in fullscreen, none at moment ends; toggling the magnifier
+adds or removes a suffix. With the probe forced to fail, the popover shows a 120x24 horizontal
+range with `aria-orientation="horizontal"`. Clicking its right end gives 1.0 and its left end 0,
+and the keys work.
+
 **The moment marks stay under 24px, on purpose.** The lane's marks are 8-23px wide by 14px tall,
 under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent exception: every
 moment is also reachable by [ and ], by Previous and Next, and by the sidebar's rows.
 
 **Still open.**
+- Returning to a moment while paused is not announced again. Found by the third Codex review,
+  reproduced; with code-lead.
+- The status region is atomic, so toggling the magnifier re-reads the whole moment sentence, and
+  turning it off says nothing about the magnifier ("Magnifier off" is never spoken). Found by the
+  third Codex review, reproduced; with code-lead.
 - Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32
   measured the result: the page scrolls on narrow windows, as page content, not overflow.
 - 2.5.5 AAA is given up, as above. If testing with motor-impaired or high-zoom users shows the
@@ -1942,3 +1969,7 @@ hugs the file name again.
   focuses the Menu button before opening About.
 - Opening the Menu and pressing F entered fullscreen and left the menu open but invisible,
   outside the fullscreen element. The compact menu now closes on `fullscreenchange`.
+
+Re-measured independently: Menu, About, then Escape returns focus to Menu. Menu open, ↓, then F
+enters fullscreen with no menu rendered. The header matches d2e19c3 exactly at desktop sizes:
+0 of 61,470 pixels differ at 1366px wide and 0 of 86,400 at 1920px.
