@@ -53,6 +53,12 @@ export default function About({
       ref={ref}
       className="about"
       onClose={onClose}
+      // A modal: the player behind it is inert, so no key pressed in here may reach the
+      // document-level player shortcuts. Space in particular is how a keyboard user presses
+      // these buttons, and the player's Space handler took it (and preventDefault'd the
+      // activation) — the dialog just sat there while the video started playing behind it.
+      // Escape is unaffected: closing the dialog is its default action, not a listener.
+      onKeyDown={(e) => e.stopPropagation()}
       // Esc is free; clicking the backdrop is not. The backdrop is not a separate element — it
       // is the dialog's own ::backdrop — so a click out there still targets the dialog itself,
       // which is exactly what distinguishes it from a click on the content inside.

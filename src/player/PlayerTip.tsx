@@ -50,6 +50,12 @@ export default function PlayerTip({ label, hotkey, disabled, children }: Props) 
       }
       events={{ hover: true, focus: true, touch: false }}
       openDelay={200}
+      // WCAG 1.4.13: content shown on hover must itself be hoverable — someone at high zoom
+      // moves the pointer onto the tip to read it, or a screen magnifier follows the pointer
+      // there. The tip takes pointer events (player.css), and this delay carries the pointer
+      // across the 5px gap: floating-ui cancels the pending close the moment the pointer
+      // enters the tip, and closes it when the pointer leaves the tip instead. (D31)
+      closeDelay={300}
       portalProps={root ? { target: root } : undefined}
       disabled={disabled}
       classNames={{ tooltip: "player-tip" }}

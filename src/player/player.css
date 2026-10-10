@@ -189,6 +189,9 @@
    tips portal into it) so the rule outranks Mantine's own single-class one whatever order the
    stylesheets load in. */
 .video-container .player-tip {
+  /* Mantine makes tooltips pointer-events:none; this one must be hoverable (WCAG 1.4.13 — see
+     closeDelay in PlayerTip.tsx). */
+  pointer-events: auto;
   background: #12161d;
   color: var(--d-text);
   border: 1px solid var(--d-line);

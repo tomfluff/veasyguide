@@ -57,6 +57,7 @@ export function TopBar({
           type="button"
           className="filechip-change"
           onClick={onChangeVideo}
+          onKeyDown={stopPlayerHotkeys}
           aria-label="Change video"
         >
           Change
@@ -72,6 +73,7 @@ export function TopBar({
           type="button"
           className="filechip-change"
           onClick={onLoadMoments}
+          onKeyDown={stopPlayerHotkeys}
           aria-label="Load moments file"
           title="Load a .veasyguide.json for this video and skip the analysis"
         >

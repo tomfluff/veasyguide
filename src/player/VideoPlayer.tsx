@@ -99,7 +99,14 @@ type Props = {
   // (coverage, moments found) the player can already derive from ranges/activities.
   xRealtime?: number;
   selectOpts: SelectOpts;
-  onSeeked?: (t: number) => void;
+  // `byViewer` is false for the seeks the player makes on its own (the Appearance preview jump
+  // and the step back from it). Those are not the viewer choosing a place, so App must not
+  // treat them as an answer to the resume offer or as a position worth saving (D33).
+  onSeeked?: (t: number, byViewer: boolean) => void;
+  // While the Appearance preview has moved the playhead, where the viewer actually is — the
+  // place it will step back to. null once it has. App saves THIS as the resume position if the
+  // page goes away mid-preview, never the moment it was parked on to show the changes.
+  onPreviewJump?: (returnTo: number | null) => void;
   onTimeChange?: (t: number) => void;
   // Play/pause as the element reports it. App needs both edges for the resume position: play
   // is the viewer answering the resume offer by doing something else, and pause is a moment
@@ -213,6 +220,10 @@ const VideoPlayer = (props: Props) => {
   pinnedRef.current = pinned;
   // Where the viewer was before we jumped them to a moment to preview against.
   const preAppearanceTimeRef = useRef<number | null>(null);
+  // The target of a seek the player made itself, so its `seeked` can be told apart from one
+  // the viewer made. Matched by time rather than a boolean: a viewer seek that lands while
+  // ours is still in flight must still count as theirs.
+  const ownSeekRef = useRef<number | null>(null);
 
   // The bar only ever hides in fullscreen. Windowed, it sits BELOW the video, in flow, and covers
   // nothing — it used to overlay the bottom of the picture, which on a lecture is exactly where
@@ -248,9 +259,15 @@ const VideoPlayer = (props: Props) => {
     // is USING the bar even though no events are firing. Just skip — re-arming from inside
     // the callback is a no-op (Mantine's useTimeout still holds its ref while the callback
     // runs); the container's onBlurCapture restarts the timer when focus leaves.
+    //
+    // Nor out from under a resting pointer. A pointer parked on a bar button, or on the tip it
+    // opened, is someone reading the tip — and the tip goes with the bar, which made it fail
+    // WCAG 1.4.13's "persistent" (it vanished after 1.6s with the pointer still on it). Moving
+    // off the bar onto the picture is a mousemove, which restarts this timer as usual.
     useTimeout(() => {
       const bar = barSizeRef.current;
       if (bar && bar.contains(document.activeElement)) return;
+      if (bar?.matches(":hover") || containerRef.current?.querySelector(".player-tip:hover")) return;
       handleHideControls.open();
     }, 2000);
   const { start: startSceneNoticeTimeout, clear: clearSceneNoticeTimeout } = useTimeout(
@@ -575,14 +592,18 @@ const VideoPlayer = (props: Props) => {
         if (target) {
           preAppearanceTimeRef.current = video.currentTime;
           const t = seekTargetFor(target, props.selectOpts.lead) + props.selectOpts.lead + 0.2;
+          ownSeekRef.current = t;
           video.currentTime = t;
           setPreviewJumped(true);
+          props.onPreviewJump?.(preAppearanceTimeRef.current);
         }
       }
     } else if (preAppearanceTimeRef.current !== null) {
+      ownSeekRef.current = preAppearanceTimeRef.current;
       video.currentTime = preAppearanceTimeRef.current;
       preAppearanceTimeRef.current = null;
       setPreviewJumped(false);
+      props.onPreviewJump?.(null);
     }
   };
 
@@ -1179,7 +1200,12 @@ const VideoPlayer = (props: Props) => {
           const v = videoRef.current;
           if (v) updateAtTimeRef.current(v.currentTime);
         }}
-        onSeeked={() => props.onSeeked?.(videoRef.current?.currentTime ?? 0)}
+        onSeeked={() => {
+          const t = videoRef.current?.currentTime ?? 0;
+          const own = ownSeekRef.current !== null && Math.abs(t - ownSeekRef.current) < 0.05;
+          if (own) ownSeekRef.current = null;
+          props.onSeeked?.(t, !own);
+        }}
         onPlay={() => { handleIsPlaying.open(); props.onPlayingChange?.(true); }}
         onPause={() => { handleIsPlaying.close(); props.onPlayingChange?.(false); }}
         onEnded={handleVideoEnded}

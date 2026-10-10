@@ -20,7 +20,9 @@ describe("the scene-change notice setting", () => {
   it("is on for anyone who has never touched it", () => {
     // It is a cue some viewers rely on to know the slide changed under them, and a feature
     // that never appears is one nobody discovers well enough to want off.
-    expect(useViewSettingsStore.getState().sceneNotice).toBe(true);
+    // The store's INITIAL state, not getState(): beforeEach has just set it to true, so
+    // reading it back would pass whatever the default were.
+    expect(useViewSettingsStore.getInitialState().sceneNotice).toBe(true);
   });
 
   it("turns off and back on again", () => {
@@ -84,7 +86,9 @@ describe("the single-key shortcuts setting", () => {
   it("is on for anyone who has never touched it", () => {
     // The keys are how a keyboard user drives the player; switching them off is the
     // exception WCAG 2.1.4 asks for, not the default.
-    expect(useViewSettingsStore.getState().letterShortcuts).toBe(true);
+    // The store's INITIAL state, not getState(): beforeEach has just set it to true, so
+    // reading it back would pass whatever the default were.
+    expect(useViewSettingsStore.getInitialState().letterShortcuts).toBe(true);
   });
 
   it("turns off and back on again", () => {

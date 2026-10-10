@@ -8,6 +8,7 @@ import { validActivities } from "./analyzer/select";
 import { buildMomentsFile, keyOf, momentsMarkdown, parseMomentsFile, sidecarMatchesFile, videoKey, type MomentsFile } from "./analyzer/momentsFile";
 import { cacheGet, cachePut } from "./utils/analysisCache";
 import { loadPosition, resumeStore, savePosition } from "./player/resume";
+import { stopPlayerHotkeys } from "./player/hotkeys";
 import { thumbRect } from "./analyzer/snippets";
 import { convertSecondsToTimecode } from "./utils/misc";
 import type { SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
@@ -264,6 +265,9 @@ export default function App() {
   const resumeDurRef = useRef(0);
   const resumeReadForRef = useRef<string | null>(null);
   const playheadRef = useRef(0);
+  // Set while the Appearance preview has parked the playhead on a moment: where the viewer
+  // really is, and so what a save made mid-preview must record.
+  const previewReturnRef = useRef<number | null>(null);
   const lastResumeSaveRef = useRef(0);
   // Nothing is saved for a video until the viewer has played or seeked in it. Opening a lecture
   // and closing the tab again is not "I am now at 0:00" — saving that would erase the place
@@ -626,10 +630,14 @@ export default function App() {
 
   // Seeking somewhere unanalyzed: tell the worker to abandon what it's doing and
   // analyze from here, so the viewer's position always wins.
-  function onSeeked(t: number) {
+  function onSeeked(t: number, byViewer = true) {
     // A seek of the viewer's own answers the resume offer too, and is somewhere worth saving.
-    resumeTouchedRef.current = true;
-    setResumeAt(null);
+    // The player's own preview jump is neither: it used to dismiss the offer, mark the video
+    // touched and then save 0:00 on the way out — erasing the bookmark it never showed them.
+    if (byViewer) {
+      resumeTouchedRef.current = true;
+      setResumeAt(null);
+    }
     if (done || !workerRef.current) return;
     if (!isAnalyzed(ranges, t)) {
       workerRef.current.postMessage({ type: "seek", t });
@@ -655,7 +663,7 @@ export default function App() {
     const key = resumeKeyRef.current;
     if (!store || !key || !resumeTouchedRef.current) return;
     lastResumeSaveRef.current = performance.now();
-    savePosition(store, key, playheadRef.current, resumeDurRef.current);
+    savePosition(store, key, previewReturnRef.current ?? playheadRef.current, resumeDurRef.current);
   }, []);
 
   // Before this video goes away: save where the viewer is, then forget the video, so nothing
@@ -666,6 +674,7 @@ export default function App() {
     resumeReadForRef.current = null;
     resumeTouchedRef.current = false;
     playheadRef.current = 0;
+    previewReturnRef.current = null;
     setResumeAt(null);
   }
 
@@ -931,7 +940,7 @@ export default function App() {
                 Everything before that still works — highlights and magnification simply stop
                 past that point.
               </span>
-              <button type="button" onClick={() => setErrorDismissed(true)} aria-label="Dismiss">
+              <button type="button" onClick={() => setErrorDismissed(true)} onKeyDown={stopPlayerHotkeys} aria-label="Dismiss">
                 ✕
               </button>
             </div>
@@ -939,7 +948,7 @@ export default function App() {
           {notice && (
             <div className="strip" role="status">
               <span>{notice}</span>
-              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss">
+              <button type="button" onClick={() => setNotice(null)} onKeyDown={stopPlayerHotkeys} aria-label="Dismiss">
                 ✕
               </button>
             </div>
@@ -956,7 +965,10 @@ export default function App() {
               notices). D33. */}
           <div className="resume-slot" role="status">
             {resumeAt !== null && canPlay && (
-              <div className="strip resume">
+              // Space and Enter press THESE buttons, not the player: without the guard, Space on
+              // Resume started the video from 0:00 and dismissed the offer — the one key a
+              // keyboard user presses a button with skipped the very bookmark it offered.
+              <div className="strip resume" onKeyDown={stopPlayerHotkeys}>
                 <span>Resume at <b>{convertSecondsToTimecode(resumeAt)}</b>?</span>
                 <span className="resume-actions">
                   <button
@@ -1000,6 +1012,7 @@ export default function App() {
               onSeeked={onSeeked}
               onTimeChange={onTimeChange}
               onPlayingChange={onPlayingChange}
+              onPreviewJump={(returnTo) => { previewReturnRef.current = returnTo; }}
               onActivityChange={setCurrMoment}
               thumbs={thumbs}
               seekFnRef={seekFnRef}
