@@ -1914,7 +1914,8 @@ Leaving at 0, 50 and 300ms after closing Appearance stores `{t: 30}` every time.
 layout shift, every key, click and dismissal path, the tab order and the preview paths are
 unchanged from 37535ac.
 
-**Fixed after the seventh Codex review** (d3d32ca; superseded by 3d8cdd4, "Final rule" below). 7fc8c45 put the card's slot at z 55 in
+**Fixed after the seventh Codex review** (d3d32ca; superseded by 3d8cdd4, "Final rule"
+below). 7fc8c45 put the card's slot at z 55 in
 every mode, above the bar (50), and the bar's popovers live in the bar's layer. At 320x640
 windowed the card covered the popovers that opened under it: 3 of the Appearance sheet's 6
 controls, the volume range, and 4 of the 7 speed items. Nothing was covered at 1366px wide. The
