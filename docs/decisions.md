@@ -611,6 +611,9 @@ with the image shrinking (`min-height: 0`) rather than pushing the caption out o
 Verified across all 12 size×corner combinations: each clears the bar, stays in the
 viewport, and keeps every button hittable.
 
+*Later (D32):* windowed, the bar now sits below the video, so the bar-height cap applies only
+in fullscreen. D31 also gave the two cycles keys (C and S) after all, at the user's request.
+
 ---
 
 ## D21 — A pin holds the moment you pinned; it does not follow the lecture
@@ -1059,3 +1062,380 @@ for nothing.
 
 **Not covered.** The "Analyzing this part…" cue is a different thing — it reports that the app
 is not ready yet, rather than commenting on the lecture — and it stays unconditional.
+
+---
+
+## D29 — "Change" opens a file picker, and only a running analysis asks before it goes
+
+**Decision.** The top bar's Change button no longer calls `reset()`. It opens a file picker
+that feeds the same `loadFiles` a drop does, so dismissing the picker changes nothing and
+picking a file is the decision. Loading a different video while an analysis is still running
+goes through a confirm first (`ConfirmSwitch`). Dropping a video on the player screen goes
+through the same gate, because it goes through the same `loadFiles`.
+
+**What was wrong.** Change sent the viewer straight back to the landing screen. One click,
+and the lecture, its playhead and any analysis in progress were gone, with nothing to go back
+to: the landing screen has no "return to what I was watching". A user reported exactly that.
+The button's label promised a choice and its behaviour made the choice for you before you had
+seen any alternative.
+
+**Why the confirm is only mid-analysis.** A finished analysis is already in the IndexedDB
+cache (`utils/analysisCache.ts`, keyed by size, duration and frame size), so opening that
+video again restores it at once and nothing is lost by switching. A running one is not cached
+until `done` arrives, and switching away throws away every minute it has spent. The dialog
+asks only when there is something to lose, and its second paragraph says what: "Only a
+finished analysis is kept. Open this video again later and it starts over." A confirm on
+every switch would train the viewer to click through it, which is how a confirm stops working
+the one time it matters.
+
+**Same pattern as D23.** A native `<dialog>` for focus trapping, Esc and a backdrop; Esc and
+the backdrop both mean cancel; "Keep watching" is autofocused, because the risk is a stray
+Enter destroying twenty minutes of work, not the cost of one more click. The picker's value
+is cleared after each pick, or choosing the same file twice in a row would fire nothing the
+second time.
+
+**Rejected: keep `reset()` behind a confirm.** That would make the loss deliberate without
+making it necessary. The landing screen exists to get a first file in; once a video is open,
+the only reason to go back there was to pick another one, and a picker does that without
+unloading anything first.
+
+**Verified** (headless Chromium 145, 1366x768). Dismissing the picker leaves the file and the
+analysis untouched. A pick or a drop mid-analysis opens "Switch to another video?" with "Keep
+watching" focused, and Esc, the backdrop and Enter all keep the lecture. Once the analysis has
+finished (a 12s clip, done in 4.4s), a pick switches with no dialog.
+
+**A hole in "finished means cached", fixed in the same round** (2a6e16f). It predates this
+entry. An analysis that came from a moments file was finished (`done` is set by `hydrateFrom`)
+but never cached, because only the worker's `done` path called `cachePut`. Switching away from
+one asked nothing, which this entry's own reasoning allows only for cached analyses, and
+reopening the video re-analyzed from scratch. The `.veasyguide.json` was still on the viewer's
+disk, so dropping it again would have recovered the moments, but "nothing is lost" was not true.
+
+`cachePut` now also runs in `applySidecar` and in the video-plus-sidecar branch of
+`loadFilesNow`. It does not run in `hydrateFrom`, because a cache hit restores through
+`hydrateFrom` too, and would rewrite its own entry on every reopen.
+
+The fix exposed a second bug. The cache keeps the newest 20 entries, ordered by a `savedAt`
+index, and that `savedAt` was the **file's**: the time the analysis was made, not the time it
+was cached. For a sidecar a classmate made months ago, the entry just written was the oldest in
+the cache and the first one evicted. The record's `savedAt` is now the time it was cached (an
+ISO string, the same type as before, so it orders correctly against existing entries). The
+file's own `savedAt` is untouched inside `file`.
+
+Measured on a fresh headless profile with a 12s clip and its sidecar: the cache entry exists
+right after the video and sidecar load. After a reload, opening the video alone restored the
+analysis in 923ms, where a fresh analysis of it takes about 4s or more.
+
+**Still open.**
+- `cachePut` is best-effort and swallows failures (a full quota, storage blocked). If the
+  write failed, a finished analysis is gone after a switch, with no confirm.
+- The cache restores the analysis, not the playhead. Reopening a finished video started at
+  0:00. *Later in the same round:* D33 offers to resume where the viewer left off.
+
+---
+
+## D30 — The fill pair reads Fill / Opacity, and the magnifier gets its own way in
+
+**Decision.** In the Appearance sheet's box group, the fill colour comes first, labelled
+"Fill", with the slider under it labelled "Opacity". The sheet's root has two rows where it had
+one: "Fine-tune the highlight" (showing the active preset) and "Fine-tune the magnifier"
+(showing the current zoom, e.g. "2.0×"). The tab and the screen title say "Magnifier" rather
+than "Zoom", and the tabs run Box, Pointer, Motion, Ink, Magnifier — the highlight's groups
+together, the magnifier last, with Ink between them because it spans both.
+
+**"Fill" was read as an amount.** The slider was labelled "Fill" and sat above "Fill colour",
+so a percentage beside the word "Fill" read as how much of the box is filled, not how strongly
+the colour shows. A user asked for it to say Opacity. Putting the colour first makes the two
+rows a pair — what colour, then how strong — and "Opacity" under "Fill" reads that way without
+repeating the noun.
+
+**Rejected: "Fill opacity" as the visible label.** It is the accurate name, and it wraps in the
+62px label column, which pushes the slider onto its own line and breaks the row rhythm of the
+whole group. The accessible names were already "Fill colour" and "Fill opacity" and are
+unchanged, so a screen-reader user hears the full name either way; only the visible label is
+shortened.
+
+**The magnifier was there and nobody found it.** Its settings were a tab inside the box's
+Fine-tune screen. The root's only row said "Fine-tune" and opened the box, so a viewer looking
+for the magnifier's strength had to guess that the box's screen also held it. A user reported
+not knowing it could be adjusted at all. Both rows lead to the same tabbed screen; each just
+opens its own group, so nothing is duplicated and nothing moved. "Zoom" became "Magnifier"
+because the control bar's toggle already says "Magnify (Z)" and "Magnify the highlighted
+area", so the sheet was the one place calling the feature something else. The store keys
+(`zoom_strength`, `zoom_motion`) and the screen id `zoom` are unchanged; only words a viewer
+reads moved.
+
+**Cost, measured** (headless Chromium 145, 1366x768, DSF 1). The root grows from 289.42px to
+320.83px with the second row. Every drill screen (Box, Pointer, Motion, Ink, Magnifier) is
+349.05px, the same as before, so the root is still shorter than the screens under it. The
+promise the sheet was built on, "you go DEEPER, not longer, so the band of video it occludes
+never changes", still holds. The header comment's "a fixed 340x260" is not what renders,
+though: the drill screens are 349px tall at this size. That predates this entry and is
+recorded rather than fixed here.
+
+Rendered label widths in the 62px column: Border 37, Colour 37, Fill 17, Opacity 44, Shape 36,
+Size 25. All fit on one line. The five tabs end at 293px of a 372px row (79px spare), with no
+horizontal scroll. The Ink screen's "The highlight" / "The magnifier" choice renders both
+options on one line, 30px tall, in a 300px control. On the old layout "Fill colour" also fitted
+in the column, so the reorder was about how the pair reads, not about room.
+
+---
+
+## D31 — Four player buttons name themselves on hover and focus, and get keys
+
+**Decision** (aac5b37). Appearance, the moments list, Snapshot size and Move snapshot show a
+styled tooltip, `PlayerTip`, with the control's name and a keycap. It opens on pointer hover
+and on keyboard `focus-visible`, and it replaces the native `title` those buttons had (or the
+nothing they had). New keys: A opens Appearance; L is the moments list; C and S move and resize
+the pinned snapshot. A "Single-key shortcuts" switch in the moments sidebar's footer turns off
+every printable-character key (`letterShortcuts` in `ViewSettingsStore`, default on). Space and
+the arrow keys stay on regardless. The other bar controls are deliberately left for later
+(TODOS.md, "Keyboard reach for every player control").
+
+**What was wrong.** A user on Windows saw no names and no shortcuts on these controls. Appearance
+and the moments list had no visible name at all, only an `aria-label` that a screen reader
+announces and a sighted viewer never sees. Size and corner had a native `title`, which uses a
+small system font that ignores page zoom, arrives after a slow fixed delay, never shows on
+keyboard focus, and did not appear for the user on Windows. It also does not appear over a
+fullscreen element.
+
+**This partly reverses a rule.** `AppearanceSheet.tsx` says "No tooltips: a hover tooltip is
+invisible to a keyboard user, a screen-reader user and anyone driving a magnifier". That rule's
+reason was tips shown only on hover. This tip also opens on keyboard focus, so a keyboard user
+gets it on Tab. The screen reader already has the name from the `aria-label`, and gets the key
+from `aria-keyshortcuts`. A magnifier user who tabs to the button finds the tip beside the focus
+ring, where their view already is. The rule still governs the sheet's own hints, which stay
+visible text inside the sheet, and the comment there now says so and points here (625956a).
+
+**It also reverses D20's "No new hotkeys".** D20 left the snapshot cycles without keys because
+"the keyboard map is already dense". The user asked for keys. C and S act only while something
+is pinned, and they do not reveal the bar (they are in `NO_REVEAL_KEYS`, like Z and P), so
+moving the snapshot does not put the bar over the video.
+
+**L does different things in the two modes, because there is different work to do.** In
+fullscreen it toggles the moments overlay, like the button. Windowed, the list is always on the
+page, so there is nothing to open, and L moves focus to the list's current row instead.
+
+**Where the tip is drawn.** It portals into the player container, which is shared through a
+React context (`player/tipRoot.ts`) holding the element from a callback ref merged with
+`containerRef`.
+- Rejected: portal to `<body>`. In fullscreen only the fullscreen element's subtree is drawn, so
+  the tip would vanish exactly where the bar is most used. D24's Speed menu sets
+  `withinPortal={false}` for the same reason.
+- Rejected: render inline. `.pin-panel` has `overflow: hidden`, which would clip the tips on the
+  snapshot's own buttons.
+
+**Details the library forced.**
+- The `Tooltip` wraps **outside** `Popover.Target`. `Popover.Target` forwards its props to its
+  child, and `Tooltip` spreads unknown props onto its floating box. Nested the other way, the
+  popover's anchor ref and ARIA land on the tip instead of the button.
+- `events: { hover, focus, touch: false }`. Mantine passes `visibleOnly` to floating-ui's
+  `useFocus`, so a Tab shows the tip and a mouse click does not. Touch is off because on touch
+  the tap is the click; a tip would flash on top of the popover it just opened.
+- The tip is disabled while its own popover or overlay is open, and while the bar is
+  auto-hidden. A hidden bar has `pointer-events: none`, so it never receives the `mouseleave`,
+  and the tip would stay over the video.
+- `aria-describedby` is suppressed. floating-ui's tooltip role would make a screen reader read
+  the name twice, since the `aria-label` already says it.
+- 200ms open delay, immediate close. Font 1rem, not Mantine's default 0.875rem, because the people who need the
+  tip are the people who need it bigger. Dark `#12161d`, like the bar.
+
+**Names changed with it.** Appearance is now "Appearance: highlight and magnifier"; plain
+"Appearance" read as the app's theme. The corner button's `aria-label` now starts "Move
+snapshot: now top right. Move to bottom right.", so it contains the words its tip shows
+(WCAG 2.5.3, Label in Name). A voice-control user says what they see.
+
+**Why the switch (WCAG 2.1.4, Character Key Shortcuts).** A one-character shortcut must be
+possible to turn off or remap. Speech-input users trigger it by saying an ordinary word, and the
+player's keys are registered with Mantine's `useHotkeys`, which listens on the whole document,
+so they fire wherever focus is. Adding A, L, C and S grew the set to F M Z P A L C S [ ] < >,
+and all of them are gated. Space and the arrows are not character keys, and they are the only
+non-pointer way to drive the player at all. When the switch is off, the tips drop their keycap
+rather than advertise a key that does nothing. The setting lives in `ViewSettingsStore`, not
+`HighlightSettingsStore`, for the same preset reason as D28, and a test asserts that.
+
+**The sidebar footer now always renders.** It used to exist only for the scene-notice switch,
+which is gated on more than one scene (D28). The shortcuts switch applies to every video, so the
+footer is always there, as a flex column with an 8px gap. The scene-notice switch keeps its gate.
+About lists A, L, C and S, with a note that single-key shortcuts can be switched off.
+
+**Rejected: scoping the letter keys to player focus** instead of a switch. That is 2.1.4's third
+option, and it needs no setting, but a key pressed after clicking into the sidebar would stop
+working for everyone. It is recorded in TODOS.md as something to weigh, not done here.
+
+**Two older keyboard bugs, found while testing these keys.** Both predate this entry.
+- The bar's `onKeyDown` stopped propagation of every key, so every letter shortcut was dead
+  while focus sat on a bar control. That is the normal state right after clicking one: F did
+  nothing right after clicking Fullscreen. It now stops only what `stopPlayerHotkeys` says to
+  stop, the rule the sidebar already used, so `hotkeys.ts`'s "keys work wherever focus sits" is
+  true for the bar as well (8883cbd). video-lead found it while recording D31's keys.
+- ← and → seeked from `currTime`, a throttled state copy of the playhead, not from the video.
+  After a seek while paused that copy can be far behind: three presses of ← right after seeking
+  to 60s landed at 0.0s on main, and land at 45.0s now. They read `video.currentTime`, as the
+  comment on `handleStepMoment` already said they should (ba12eb9).
+
+**Measured.** <!-- TODO(verify-lead): tip appears on Tab for each of the four, windowed and
+fullscreen; not on mouse click; delay; switch off silences each letter key while Space/arrows
+still work; tip never left hanging when the bar auto-hides; 320x320 footer against the D28
+floor. -->
+
+**Still open.** Previous moment, Next moment, Playback speed, the Magnify toggle, the Pin
+toggle, the sidebar's Export, and both footer switches still use a native `title`. The
+Single-key shortcuts switch's `title` is where the list of keys it covers lives. Fullscreen,
+Mute and Collapse/Expand have only an `aria-label`, with no visible name at all. All of these
+are the same defect this entry fixed for four buttons. TODOS.md has the plan.
+
+---
+
+## D32 — The control bar sits below the video, except in fullscreen
+
+**Decision** (9e5fdbf). In the windowed player, the control bar is laid out under the video and
+never hides. In fullscreen it overlays the picture as before, but it now auto-hides even while
+paused, and it starts collapsed. Leaving fullscreen restores whatever collapsed state the viewer
+had chosen in the window. That state is kept in a ref, because the `fullscreenchange` listener is
+registered once and would otherwise read a stale value.
+
+**What was wrong.** A user reported that the bar covered the bottom of the video. On a lecture,
+that is where the instructor writes last, at the foot of the slide, so the bar masked the
+newest writing, and the highlight and magnifier could sit under it. Measured at 1400x900, the
+expanded bar is 139.8px tall with the moments strip (53px collapsed). Overlaid on a 597.4px tall
+video, that is 23% of the picture expanded, and 9% collapsed.
+<!-- TODO(verify-lead): baseline main@d2e19c3 overlap at the same size, if it differs. -->
+
+**Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
+bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
+on every reveal (rejected below). So the bar overlays, and the cost is kept small instead: it
+starts collapsed (54px measured at 1400x900), and it hides after a short idle even while paused,
+because a paused frame is one someone is reading. The idle delay is still 2000ms, and the bar
+still never hides while keyboard focus is inside it. Measured: opacity 0 by 2.6s idle while
+paused, the 2000ms delay plus the fade. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
+and the `.paused` force-visible rule is gone.
+
+**Rejected.**
+- Hide the bar only while paused. A viewer pauses to read, moves the mouse, and the bar comes
+  back over the very line they paused for.
+- Keep the overlay and start it collapsed. Shorter, but it still covers the bottom of the frame,
+  and the bottom is where the writing is.
+- In fullscreen, shrink the video whenever the bar shows. Every reveal changes the video's box,
+  so the highlight and magnifier recompute and jump under the viewer's eye each time the mouse
+  moves.
+- Move the bar after the video in the DOM. The bar stays first in the DOM, and CSS `order: 2`
+  places it below. Moving it would change a tab order viewers already know, and would put the
+  pin panel's buttons ahead of the bar.
+
+**It resolves the geometry landmine.** TODOS.md carried a warning: the overlay layers were 100%
+of `.video-container`, and the letterbox math held only because the video was that container's
+only in-flow child. "Do it before any change that puts a second element in the player
+container's flow". This is that change. Every layer drawn on the picture now lives in
+`.video-stage` (`position: relative`), whose box is the `<video>` box. That covers
+`.video-highlights`, `.video-magnification`, `.video-overlay`, the pin panel and the fullscreen
+moments overlay. Left where they were, they would have stretched over the bar. Highlights and
+magnification also got an explicit `top: 0; left: 0`. Static position inside a block parent
+would have put them below the video, not on it.
+
+The highlight math did not change. It already measured the `<video>` element
+(`useElementSize` on the video), not the container, so the half of the TODOS fix about
+measuring is already done. The `object-fit: contain` change it proposed was not needed.
+Windowed, `aspect-ratio: 16/9` stays. In fullscreen the video is `height: 100%` with
+`aspect-ratio: auto`, and the browser letterboxes it, which is what `computeLetterbox` expects.
+The video is now `display: block`. An inline video leaves a baseline gap under itself, which
+would have offset every overlay by a few pixels.
+
+Measured at 1400x900: the stage, the video and all overlay layers share one 1062x597.4 box.
+<!-- TODO(verify-lead): highlight-to-ink alignment after, D26/D27 method, at more than one window
+size and DPR. -->
+
+**Offsets that assumed the bar was on the picture.** The pin panel's `bottom` and `max-height`
+(D20's `calc(100% - barHeight - 24px)` and `barHeight + 12`) and the preview-jump pill now
+subtract the bar height only in fullscreen (`barOverlap = isFullscreen ? barHeight : 0`).
+Windowed, they become `calc(100% - 24px)` and a 12px inset, the same as the top corners.
+The moments overlay exists only in fullscreen, so it keeps `barHeight`. D20's note that "a tall
+panel grew UNDER the bar" now describes fullscreen only.
+
+**Player sizing.** The width cap was `calc((100vh - 160px) * 16/9)`, which assumed the bar sat on
+the video. It is now `max(20rem, calc((100vh - 160px - var(--bar-h, 0px)) * 16/9))`, where
+`--bar-h` is the measured bar height set inline (0 in fullscreen), so the video and the bar
+together fit the window. The 20rem floor exists because at 320x320 the formula alone gives a
+video under 20px wide. Below the floor the page scrolls, which is what a page is for.
+Measured at 1400x900: the player's bottom edge is at 802px, inside the 900px window, and the
+sidebar spans the player's full 737.2px height.
+
+The old `@media (max-width: 520px)` block that already put the bar in flow (the WCAG 1.4.10
+reflow case) is now the default everywhere, and it is gone.
+
+**Still open.**
+- `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
+  by the bar's height when the player replaces it. It grows downward and does not shift what the
+  viewer was looking at, but it is a jump.
+- Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
+  nav, not the player, and is in TODOS.md.
+
+---
+
+## D33 — Reopening a video offers to resume; it never resumes on its own
+
+**Decision** (91a9849). When a video opens and a saved position exists for it, a strip above the
+player asks "Resume at 12:34?" with two buttons, Resume and Start from the beginning. The player
+never jumps to the saved place without being asked.
+
+**Why.** D29 made switching videos safe for the analysis, but the place in the lecture was still
+lost: reopening any video started at 0:00, so coming back to a 90-minute lecture meant scrubbing
+to find where you were. That is a needle-in-a-timeline task, and it is hardest for a low-vision
+viewer reading a tiny timestamp next to a thin scrubber.
+
+**Why offered, not automatic.** Someone reopening a lecture may be continuing it, or starting
+over to revise for an exam, and the app cannot tell which. Guessing wrong in the automatic
+direction is the worse error. A sighted viewer sees the playhead mid-lecture and can drag it
+back. A screen-reader user gets silence, or speech, at a timestamp nobody explained. Asking costs
+one press.
+
+**A strip, not a modal.** It reuses the amber `.strip` above the player. A modal would block the
+video for a question that can be ignored, and would take focus the viewer did not offer. Pressing
+play, seeking anywhere, or either button all count as an answer and remove the strip; the viewer
+does not have to deal with it before doing what they came to do. Focus is not moved to it, but
+Resume comes first in the tab order. Both buttons are at least 44px; Resume is filled
+(`var(--accent)`) and Start is outlined, so the likelier answer is the more visible one. When
+the buttons unmount, focus goes to the player's Play/Pause button. Left alone, it would fall to
+`<body>`, and a keyboard user would have to tab back into the page from the top.
+
+**Only once the video can play.** On a fresh analysis the strip waits for `canPlay`, which is
+true once the analysis is done or has covered the first 10s (`PLAYBACK_LEAD`). An offer to jump somewhere you cannot play yet is a dead button. Resuming far
+ahead on a fresh analysis seeks into video that has not been analyzed yet, and D12's
+segment restart already handles that.
+
+**Announced.** The strip renders inside a `role="status"` region that is always mounted. A live
+region inserted together with its content is not announced, which is the same rule the player's
+notices follow.
+
+**Storage: localStorage, not the analysis cache.** Key `veasyguide.resume`, holding
+`{ [videoKey]: { t, at } }`, with the newest 50 kept by last-saved time.
+- Rejected: storing it in the IndexedDB analysis cache (D29). The entry is two numbers. It has to
+  exist for videos whose analysis never finished and was never cached. And the most important
+  write happens on `pagehide`, where an async IndexedDB transaction may never commit, while a
+  `localStorage` write is synchronous.
+
+**When it writes.** About every 5s of wall time while playback advances, and also on pause, on
+`pagehide`, on `visibilitychange` to hidden, and before any switch or reset
+(`leaveVideoForResume`). `pagehide`, not `beforeunload`, because `pagehide` fires on mobile and
+when the page goes into the back/forward cache. `visibilitychange` too, because a backgrounded
+mobile tab can be killed without ever getting `pagehide`.
+
+**What it refuses to save.** Nothing is saved for a video until the viewer has played or seeked
+in it. Otherwise opening a lecture to check something and closing the tab would save 0:00 over
+the real place. Within 10s of the start (`RESUME_EDGE`) nothing is offered, and a save there
+clears the entry: someone who rewound to rewatch the introduction is no longer at their old
+place. Within 10s of the end the entry is cleared too, because there is nothing left to resume.
+
+**Tests and measurements.** `player/resume.ts` is a pure module with 9 unit tests: round-trip,
+both edges, newest wins, keep-50 eviction, eviction by last watched, tolerance of garbage in
+storage, and a quota error on write. Measured in headless Chromium: after saving at 61.9s, the
+reopened video offered "Resume at 01:01?". Resume took it to 62.2s, playing, with focus on
+Pause. Opening and closing the video without touching it kept the old entry. Seeking to 3s
+before the end and pausing cleared it.
+<!-- TODO(verify-lead): independent check, incl. the screen-reader announcement and 320x320 layout of the strip. -->
+
+**Still open.**
+- The position lives in one browser's `localStorage`. A different browser, a private window or
+  cleared site data starts at 0:00, with no offer.
+- The key is `videoKey` (size, duration, frame size), the same as the cache. Two different files
+  that match on all of these would share a position. The cache already accepts that collision.
