@@ -1149,9 +1149,12 @@ the colour shows. A user asked for it to say Opacity. Putting the colour first m
 rows a pair — what colour, then how strong — and "Opacity" under "Fill" reads that way without
 repeating the noun.
 
-**Rejected: "Fill opacity" as the visible label.** It is the accurate name, and it wraps in the
-62px label column, which pushes the slider onto its own line and breaks the row rhythm of the
-whole group. The accessible names were already "Fill colour" and "Fill opacity" and are
+**Rejected: "Fill opacity" as the visible label.** It is the accurate name, but at the label
+size it would wrap in the 62px column, pushing the slider onto its own line and breaking the
+row rhythm of the group. That was the reasoning when the change was made. The width of "Fill
+opacity" itself was never measured. "Opacity" alone renders at 44px and "Fill" at 17px, so
+with a space between them they add up to about 65px, over the column's 62px. That sum is
+arithmetic on two measured words, not a measurement of the label. The accessible names were already "Fill colour" and "Fill opacity" and are
 unchanged, so a screen-reader user hears the full name either way; only the visible label is
 shortened.
 
@@ -1165,13 +1168,16 @@ area", so the sheet was the one place calling the feature something else. The st
 (`zoom_strength`, `zoom_motion`) and the screen id `zoom` are unchanged; only words a viewer
 reads moved.
 
-**Cost, measured** (headless Chromium 145, 1366x768, DSF 1). The root grows from 289.42px to
-320.83px with the second row. Every drill screen (Box, Pointer, Motion, Ink, Magnifier) is
-349.05px, the same as before, so the root is still shorter than the screens under it. The
-promise the sheet was built on, "you go DEEPER, not longer, so the band of video it occludes
-never changes", still holds. The header comment's "a fixed 340x260" is not what renders,
-though: the drill screens are 349px tall at this size. That predates this entry and is
-recorded rather than fixed here.
+**Cost, measured** (headless Chromium 145, 1366x768, DSF 1, Atkinson Hyperlegible loaded). The
+root's content grows from 289.42px to 320.83px with the second row; the sheet's outer box, with
+its border, goes from 291.4px to 322.8px. Every drill screen (Box, Pointer, Motion, Ink,
+Magnifier) is 351.1px outer, the same as before, so the root is still shorter than the screens
+under it. The promise the sheet was built on, "you go DEEPER, not longer, so the band of video
+it occludes never changes", still holds.
+
+The header comment's "a fixed 340x260" is wrong on both axes. The sheet renders 398px wide
+(396 plus a 1px border each side) and 351.1px tall on the drill screens. That predates this
+entry and is recorded rather than fixed here.
 
 Rendered label widths in the 62px column: Border 37, Colour 37, Fill 17, Opacity 44, Shape 36,
 Size 25. All fit on one line. The five tabs end at 293px of a 372px row (79px spare), with no
@@ -1274,10 +1280,30 @@ working for everyone. It is recorded in TODOS.md as something to weigh, not done
   to 60s landed at 0.0s on main, and land at 45.0s now. They read `video.currentTime`, as the
   comment on `handleStepMoment` already said they should (ba12eb9).
 
-**Measured.** <!-- TODO(verify-lead): tip appears on Tab for each of the four, windowed and
-fullscreen; not on mouse click; delay; switch off silences each letter key while Space/arrows
-still work; tip never left hanging when the bar auto-hides; 320x320 footer against the D28
-floor. -->
+**Measured** (headless Chromium 145, at aac5b37 plus 8883cbd).
+- Open delay: the tip is in the DOM 212-217ms after hover over three runs, against 200ms
+  configured, and fully opaque at 335-350ms once the fade has run.
+- Tab focus shows the tip on Appearance, windowed and in fullscreen, and on the Moments list
+  button in fullscreen (it exists only there). Snapshot size and Move snapshot were checked on
+  hover, at size small in all four corners. Every tip landed inside the player container and
+  the viewport, and in fullscreen inside the fullscreen element. **Not checked:** Tab focus onto
+  the two snapshot buttons.
+- A mouse click on Appearance opens the sheet with no tip. Clicking again closes it, and the
+  tip shows only while the pointer is still over the button. Once the pointer leaves, there is
+  no tip, though focus stays on the button. That is `visibleOnly` doing its job: the focus came
+  from a mouse, so it is not `focus-visible`.
+- With the switch off, A, F, M, Z, P, L and ] changed nothing (time, fullscreen, mute, sheet,
+  pin and magnifier all unchanged), while → still seeked 0 to 5s and Space still played. The
+  tip dropped its keycap and `aria-keyshortcuts` went to null. The off state survives a reload.
+  **Not pressed with the switch off:** C, S, [, < and >. They go through the same gate, but
+  that is read from the code, not measured.
+- Auto-hide in fullscreen with the pointer resting on Appearance: the tip shows from 0 to 1.2s
+  and is gone at 1.6s, the same moment the bar's opacity reaches 0. No tip is left hanging.
+- 320x320: the sidebar is 240px, D28's 15rem floor. "Notify scene changes" sits at 713-737px and
+  "Single-key shortcuts" at 745-769px, both inside the panel (540 to 780). The page scrolls to
+  them (`scrollHeight` 852), and both are reachable. Same at 320x568, 600x400, 899x500 and
+  899x700, where the cap is 40vh = 280px.
+- A real screen reader was not run.
 
 **Still open.** Previous moment, Next moment, Playback speed, the Magnify toggle, the Pin
 toggle, the sidebar's Export, and both footer switches still use a native `title`. The
@@ -1297,10 +1323,19 @@ registered once and would otherwise read a stale value.
 
 **What was wrong.** A user reported that the bar covered the bottom of the video. On a lecture,
 that is where the instructor writes last, at the foot of the slide, so the bar masked the
-newest writing, and the highlight and magnifier could sit under it. Measured at 1400x900, the
-expanded bar is 139.8px tall with the moments strip (53px collapsed). Overlaid on a 597.4px tall
-video, that is 23% of the picture expanded, and 9% collapsed.
-<!-- TODO(verify-lead): baseline main@d2e19c3 overlap at the same size, if it differs. -->
+newest writing, and the highlight and magnifier could sit under it. Measured on main@d2e19c3 at
+1400x900: on a 1062x597.4 video, the overlaid bar covered the bottom 139.8px expanded (23.4% of
+the picture) and 53px collapsed (8.9%). After the change it covers 0px. Windowed, the bar's top
+minus the video's bottom is 0.00px at 1366x768, 1920x1080, 1536x864 at DPR 1.25, and 320x640.
+
+**The cost: a smaller picture on short windows.** The bar's height now comes off the height
+available to the video, not off the video. At 1366x768 with moments, the expanded bar is 139.8px
+(scrubber, moment lane, now-line, controls), and the video drops from 1028px to 832px wide,
+19% narrower. With the bar collapsed it is 987px. At 1400x900 the video stays 1062px wide,
+because there the available width limits it before the height cap does: the new cap works out
+to about 1067px there. The user chose the bar below the video; this is the price of that
+choice, recorded here so it is a known trade and not a surprise. Collapsing the bar gets most of
+the size back.
 
 **Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
 bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
@@ -1308,7 +1343,9 @@ on every reveal (rejected below). So the bar overlays, and the cost is kept smal
 starts collapsed (54px measured at 1400x900), and it hides after a short idle even while paused,
 because a paused frame is one someone is reading. The idle delay is still 2000ms, and the bar
 still never hides while keyboard focus is inside it. Measured: opacity 0 by 2.6s idle while
-paused, the 2000ms delay plus the fade. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
+paused, the 2000ms delay plus the fade. Entering fullscreen always collapses the bar, and
+leaving restores the windowed state both ways, expanded to expanded and collapsed to collapsed,
+even when the viewer expanded it while in fullscreen. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
 and the `.paused` force-visible rule is gone.
 
 **Rejected.**
@@ -1342,8 +1379,27 @@ The video is now `display: block`. An inline video leaves a baseline gap under i
 would have offset every overlay by a few pixels.
 
 Measured at 1400x900: the stage, the video and all overlay layers share one 1062x597.4 box.
-<!-- TODO(verify-lead): highlight-to-ink alignment after, D26/D27 method, at more than one window
-size and DPR. -->
+
+**Alignment, measured from screenshots** against main@d2e19c3. The painted video rectangle was
+found from pixels. The highlight's box came from a with/without-overlay diff. The magnifier was
+compared by normalized cross-correlation against a synthetic zoom of the unmagnified frame.
+- 1920x1080, DPR 1, where the video's size is the same before and after: every number is
+  identical to 0.01px. Highlight edge outsets (left, top, right, bottom) are
+  6.83/1.04/6.31/3.31px windowed and 11/2.39/10/3.84px in fullscreen. The magnifier residual is
+  (−1, −4)px windowed and (0, −2)px in fullscreen, before and after alike.
+- 1366x768, DPR 1, where the picture shrinks: before, the outsets were 5.11/1.24/5.88/2.51px on
+  a 1028px picture. Scaled to 832px that predicts 4.14/1.00/4.76/2.03px, and after they are
+  4.27/0.83/5.00/2.55px, at most 0.5px from the prediction. Magnifier residual (−1, −2) before,
+  (0, −3) after. Fullscreen identical.
+- 1536x864, DPR 1.25: after, outsets are 5.76/0.96/6.48/3.36px windowed and 5.44/1.84/7.28/2.87px
+  with the bar collapsed; fullscreen identical to before. The magnifier residual is (1.6, −1.6)
+  after against (0, 0) before, on different picture sizes. At zoom 1, as a control, it is
+  (0.8, −0.8) after and (0, −0.8) before.
+
+Largest change against before: the highlight within 0.5px at DPR 1 and 1.1px at DPR 1.25, the
+magnifier within 2 device pixels. All of it is inside the residual main already shows, up to
+4px at 2.5x zoom, which looks like a bias in the measurement from the dark bottom rows of the
+test frame rather than a real offset. Nothing here moved the overlays off the picture.
 
 **Offsets that assumed the bar was on the picture.** The pin panel's `bottom` and `max-height`
 (D20's `calc(100% - barHeight - 24px)` and `barHeight + 12`) and the preview-jump pill now
@@ -1358,7 +1414,10 @@ the video. It is now `max(20rem, calc((100vh - 160px - var(--bar-h, 0px)) * 16/9
 together fit the window. The 20rem floor exists because at 320x320 the formula alone gives a
 video under 20px wide. Below the floor the page scrolls, which is what a page is for.
 Measured at 1400x900: the player's bottom edge is at 802px, inside the 900px window, and the
-sidebar spans the player's full 737.2px height.
+sidebar spans the player's full 737.2px height. At 1366x768, 1920x1080 and 1536x864 at DPR 1.25
+nothing scrolls, and the player causes no horizontal overflow. At 320px wide the player is
+264px and fits. At 320x320 with the bar expanded it runs to 397px, past the window: that is the
+20rem floor, by design.
 
 The old `@media (max-width: 520px)` block that already put the bar in flow (the WCAG 1.4.10
 reflow case) is now the default everywhere, and it is gone.
@@ -1369,6 +1428,9 @@ reflow case) is now the default everywhere, and it is gone.
   viewer was looking at, but it is a jump.
 - Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
   nav, not the player, and is in TODOS.md.
+- The windowed picture is smaller on short windows (above). If that proves to be the wrong
+  trade for some viewers, the measured options are the collapsed bar (987px at 1366x768) or a
+  setting; neither is built.
 
 ---
 
@@ -1432,9 +1494,19 @@ storage, and a quota error on write. Measured in headless Chromium: after saving
 reopened video offered "Resume at 01:01?". Resume took it to 62.2s, playing, with focus on
 Pause. Opening and closing the video without touching it kept the old entry. Seeking to 3s
 before the end and pausing cleared it.
-<!-- TODO(verify-lead): independent check, incl. the screen-reader announcement and 320x320 layout of the strip. -->
+
+Checked again independently, at 8883cbd. The `role="status"` slot is in the DOM 50-64ms after
+load, and the strip is inserted into that existing node at 279-328ms, which is the order a live
+region needs. The accessibility tree shows status, polite, atomic. Resume is 90x44px and "Start
+from the beginning" 213x44px. Focus stays where it was (on `<body>` after a load), as intended.
+After a seek to 124s and a reload, the stored entry held 124 and the strip read "Resume at
+02:04?". The strip is 68px tall at 1366x768. A real screen reader was not run, so "announced"
+rests on the tree, not on hearing it.
 
 **Still open.**
+- At 320x320 the strip wraps to 154px and stacks its buttons, which pushes the video's top to
+  237px. The picture starts mostly below the fold until the viewer answers. Answering, or
+  pressing play, removes it.
 - The position lives in one browser's `localStorage`. A different browser, a private window or
   cleared site data starts at 0:00, with no offer.
 - The key is `videoKey` (size, duration, frame size), the same as the cache. Two different files

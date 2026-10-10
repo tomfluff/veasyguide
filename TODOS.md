@@ -8,7 +8,9 @@ Deferred work, with enough context to pick it up cold. Newest first.
 
 **What:** At 320px and at 800px wide, the page scrolls horizontally. The overflow comes from the
 top nav, not the player. Measured in a 320px viewport: the analysis chip ends at x=551, the nav
-at x=797, and the page's `scrollWidth` is 859. Identical on main@d2e19c3.
+at x=797, and the page's `scrollWidth` is 859. Identical on main@d2e19c3. A second, independent run
+measured a `scrollWidth` of 916. The two runs were not compared, so what makes the difference is
+not known.
 
 **Why:** WCAG 1.4.10 (Reflow) asks for no two-dimensional scrolling at 320 CSS px, the width a
 1280px window has at 400% zoom. That zoom is this app's audience. A viewer who has zoomed in
