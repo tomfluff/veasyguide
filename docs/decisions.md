@@ -1929,6 +1929,12 @@ the Appearance sheet, volume or speed open, the slot drops to z 45 and no popove
 covered; after Escape it returns to z 55 with the card's buttons reachable.
 
 **Still open.**
+- In fullscreen the card (z 55) covers the moments list (z 40): 2 of 3 visible rows at 320x180
+  at DPR 4, and 2 of 8 at 375x667 at DPR 2. Nothing is covered at 667x375 or 1366x768. Found by
+  the eighth Codex review, reproduced; with code-lead.
+- In fullscreen at 320x180 at DPR 4 with the bar expanded, Play, Previous and Next moment and
+  Volume take keyboard focus while hidden under the card, which fails WCAG 2.4.11 (Focus Not
+  Obscured). Found by the eighth Codex review, reproduced; with code-lead.
 
 
 
@@ -2168,3 +2174,8 @@ hugs the file name again.
 Re-measured independently: Menu, About, then Escape returns focus to Menu. Menu open, ↓, then F
 enters fullscreen with no menu rendered. The header matches d2e19c3 exactly at desktop sizes:
 0 of 61,470 pixels differ at 1366px wide and 0 of 86,400 at 1920px.
+
+**Still open.**
+- Low, left by the stop rule: the compact Menu stays open, with its focus trap, if the window is
+  widened past 62.5em while it is open, and that hides its trigger (`Shell.tsx`). Found by the
+  eighth Codex review from the code; not reproduced.
