@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Where the viewer left off, per video, so reopening a lecture can OFFER to take them back.
+// docs/decisions.md D33.
 //
 // Offered, never automatic: someone reopening a lecture may be coming back to it, or may be
 // starting it over for the exam, and only they know which. Landing mid-lecture without asking

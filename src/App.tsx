@@ -953,7 +953,7 @@ export default function App() {
               that does nothing.
               The live region stays mounted and the strip appears INSIDE it: a region inserted
               together with its content is not announced (the same rule as the player's
-              notices). */}
+              notices). D33. */}
           <div className="resume-slot" role="status">
             {resumeAt !== null && canPlay && (
               <div className="strip resume">
