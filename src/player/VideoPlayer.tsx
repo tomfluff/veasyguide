@@ -168,10 +168,6 @@ const VideoPlayer = (props: Props) => {
   // The moments overlay anchors just above the control bar, whose height depends on
   // collapsed state and which rows (lane, now-line) are present — so it is measured.
   const { ref: barSizeRef, height: barHeight } = useElementSize<HTMLDivElement>();
-  // Remembers the windowed bar's collapsed state across a fullscreen visit, which always
-  // starts collapsed. A ref, because the fullscreenchange listener is registered once.
-  const collapsedRef = useRef(false);
-  const windowedCollapsedRef = useRef(false);
 
   // State
   const [volume, setVolume] = useState(1);
@@ -186,8 +182,11 @@ const VideoPlayer = (props: Props) => {
   const [isZoomIn, handleIsZoomIn] = useDisclosure(false);
   const [isFullscreen, handleIsFullscreen] = useDisclosure(false);
   const [hideControls, handleHideControls] = useDisclosure(false);
+  // Fullscreen only (D32). Windowed, the bar is in flow under the picture, so collapsing it
+  // changed the bar's height — and the player's width cap subtracts that height, so the whole
+  // player resized under the viewer's pointer. Windowed is always expanded; this state is only
+  // ever true while fullscreen, and is never persisted.
   const [collapsed, handleCollapsed] = useDisclosure(false);
-  collapsedRef.current = collapsed;
   // Fullscreen-only: the moments list summoned as an overlay inside the player.
   const [momentsOpen, handleMomentsOpen] = useDisclosure(false);
   const [sceneNoticeVisible, setSceneNoticeVisible] = useState(false);
@@ -234,7 +233,7 @@ const VideoPlayer = (props: Props) => {
   const barHidden = hideControls && isFullscreen;
   const videoContainerClasses = classNames("video-container", {
     clear: barHidden,
-    collapsed,
+    collapsed: collapsed && isFullscreen,
     fullscreen: isFullscreen,
   });
   // How much of the picture's bottom edge the bar covers. Windowed it covers none of it, so
@@ -656,17 +655,14 @@ const VideoPlayer = (props: Props) => {
   };
 
   // Fullscreen starts collapsed: the bar overlays the picture there, and the one-line bar covers
-  // the least of it. Leaving restores whatever the viewer had chosen windowed, where an
-  // expanded bar costs the picture nothing.
+  // the least of it. Leaving always returns to the expanded bar, the only windowed one (D32).
   useEffect(() => {
     const sync = () => {
       if (document.fullscreenElement) {
-        windowedCollapsedRef.current = collapsedRef.current;
         handleCollapsed.open();
         handleIsFullscreen.open();
       } else {
-        if (windowedCollapsedRef.current) handleCollapsed.open();
-        else handleCollapsed.close();
+        handleCollapsed.close();
         handleIsFullscreen.close();
       }
     };
@@ -1175,15 +1171,19 @@ const VideoPlayer = (props: Props) => {
           >
             {isFullscreen ? <IconMaximizeOff /> : <IconMaximize />}
           </UnstyledButton>
-          <UnstyledButton
-            className="collapse-end"
-            onClick={() => handleCollapsed.toggle()}
-            onKeyDown={stopPlayerHotkeys}
-            aria-label={collapsed ? "Expand controls" : "Collapse controls"}
-            aria-expanded={!collapsed}
-          >
-            {collapsed ? <IconChevronUp /> : <IconChevronDown />}
-          </UnstyledButton>
+          {/* Fullscreen only, like collapsing itself (D32): windowed, a shorter bar meant a
+              resized player. */}
+          {isFullscreen && (
+            <UnstyledButton
+              className="collapse-end"
+              onClick={() => handleCollapsed.toggle()}
+              onKeyDown={stopPlayerHotkeys}
+              aria-label={collapsed ? "Expand controls" : "Collapse controls"}
+              aria-expanded={!collapsed}
+            >
+              {collapsed ? <IconChevronUp /> : <IconChevronDown />}
+            </UnstyledButton>
+          )}
         </Group>
       </Box>
       {/* The picture and everything drawn ON it. Its box is the video's box, so the layers

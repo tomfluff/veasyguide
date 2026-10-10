@@ -13,7 +13,8 @@
      for. The bound is the viewport, not a magic number: a 16:9 video this wide, plus the control
      bar under it, is exactly as tall as the space left once the two page bars and the page
      padding are taken. --bar-h is the bar's MEASURED height (set inline, 0 in fullscreen): it
-     changes with collapsing and with how many rows the bar wraps to, so no constant is right.
+     changes with how many rows the bar wraps to and whether the moment rows are there yet, so
+     no constant is right. (It no longer changes with collapsing: that is fullscreen-only, D32.)
 
      The 20rem floor is for short windows. Subtracting the bar there could shrink the video to
      a sliver (at 320x320 the formula alone gives a picture under 20px wide); below the floor
@@ -854,7 +855,9 @@
   font-size: 0.9375rem;
 }
 
-/* --- Collapsed -----------------------------------------------------------
+/* --- Collapsed (fullscreen only, D32) ------------------------------------
+   The class is only ever set in fullscreen, where the bar overlays the picture. Windowed, the
+   bar sits below the picture and collapsing it would only have resized the player.
    The biggest picture, without losing the ability to stop what you are hearing. One line:
    play/pause, timecode, scrubber, then speed, zoom, pin, Appearance, fullscreen, expand.
    The moment marks, the now-line, volume and the moment steppers belong to the expanded
