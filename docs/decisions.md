@@ -1634,8 +1634,10 @@ both were measured, 50ac023 gave the same widths): 1333.3px at 1920x960, 782.2 a
 2048x1030 at DPR 1.25 and 1937.8 at 3440x1300. At every size the video's width is exactly the
 smaller of the stage width and the height bound (ratio 1.000), and the page does not scroll
 vertically. Unlike the earlier "fits the window" checks, that test fails if the video comes out
-smaller than the space allows. The resume strip pushes the page down by 78px (68px of strip plus
-the gap) and the video stays 992px wide: nothing is resized. "Ends 24px above the footer" and
+smaller than the space allows. The resume strip pushed the page down by 78px (68px of strip
+plus the gap) while the video stayed
+992px wide: nothing was resized. Since c8ec242 the offer is a card on the video and pushes
+nothing (D33); the notices still push. "Ends 24px above the footer" and
 the sidebar's centring were not measured separately; both are consistent with the numbers above.
 
 **Narrow windows scroll, by design.** At 560px wide and below the page scrolls vertically:
@@ -1694,9 +1696,11 @@ fits one row down to a 486px player, and every desktop size measured is one row 
 
 ## D33 — Reopening a video offers to resume; it never resumes on its own
 
-**Decision** (91a9849). When a video opens and a saved position exists for it, a strip above the
-player asks "Resume at 12:34?" with two buttons, Resume and Start from the beginning. The player
-never jumps to the saved place without being asked.
+**Decision** (91a9849, revised in c8ec242). When a video opens and a saved position exists for
+it, the player asks "Resume at 12:34?" with two buttons, Resume and Start from the beginning. The
+player never jumps to the saved place without being asked. The question first shipped as a strip
+above the player, and now is a card centred on the video ("Revised: a card on the video",
+below).
 
 **Why.** D29 made switching videos safe for the analysis, but the place in the lecture was still
 lost: reopening any video started at 0:00, so coming back to a 90-minute lecture meant scrubbing
@@ -1709,7 +1713,8 @@ direction is the worse error. A sighted viewer sees the playhead mid-lecture and
 back. A screen-reader user gets silence, or speech, at a timestamp nobody explained. Asking costs
 one press.
 
-**A strip, not a modal.** It reuses the amber `.strip` above the player. A modal would block the
+**A strip, not a modal** (as first shipped; see the revision below). It reused the amber `.strip`
+above the player. A modal would block the
 video for a question that can be ignored, and would take focus the viewer did not offer. Pressing
 play, seeking anywhere, or either button all count as an answer and remove the strip; the viewer
 does not have to deal with it before doing what they came to do. Focus is not moved to it, but
@@ -1810,10 +1815,33 @@ position as of the last render (`useMouse`'s state), not the click's own. A clic
 mouse movement just before it landed wherever the pointer had last been seen: measured, at 0:00.
 It now reads the click's coordinates. This predates the round.
 
+**Revised: a card on the video** (c8ec242, the owner's decision after watching the demo). The
+strip pushed the whole player down when it appeared, which is the layout jump this round removed
+everywhere else (D32). At 320x320 it wrapped to 154px and pushed the video's top to 237px, so the
+picture started mostly below the fold. The offer is now a card centred on the video, inside
+`.video-stage`, and the player's box is identical with and without it, measured at 1366x650 and
+320x640. At 320px the card fits inside the 264px-wide picture.
+- Rejected: the strip, because it moves the page.
+- Rejected: a toast at page level. It would be detached from the player it is about, and
+  invisible in fullscreen.
+- Rejected: bottom left, above the bar. It would collide with the preview-jump pill and the
+  pin's two bottom corners.
+
+Centred keeps it clear of the notices at the top centre and of every pin corner. It is a
+near-opaque dark card with an amber edge, so its contrast is the same on a white slide and a black
+one. It sits above the pin (z 35) and the fullscreen moments list (z 40), and under the bar (z 50).
+It now works in fullscreen too, which the strip did not. The cost is that it covers the middle of
+the picture until the viewer answers, presses play or seeks.
+
+What was promised above still holds: offered, never automatic; Resume first; no focus taken, with
+the buttons in the tab order after the bar (on the strip they came before the player); the live
+region mounted before the card arrives; Space and Enter press its buttons; play, a seek or either
+button dismisses it. Clicks on the card stop there, so they cannot toggle playback underneath.
+The buttons are now 36px tall, not 44px, so the card fits a 180px-tall picture at 320px wide.
+That is above 2.5.8's 24px, and below the 44px the strip had.
+
 **Still open.**
-- At 320x320 the strip wraps to 154px and stacks its buttons, which pushes the video's top to
-  237px. The picture starts mostly below the fold until the viewer answers. Answering, or
-  pressing play, removes it.
+
 - The position lives in one browser's `localStorage`. A different browser, a private window or
   cleared site data starts at 0:00, with no offer.
 - The key is `videoKey` (size, duration, frame size), the same as the cache. Two different files
