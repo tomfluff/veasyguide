@@ -1913,12 +1913,15 @@ Leaving at 0, 50 and 300ms after closing Appearance stores `{t: 30}` every time.
 layout shift, every key, click and dismissal path, the tab order and the preview paths are
 unchanged from 37535ac.
 
+**Fixed after the seventh Codex review** (d3d32ca). 7fc8c45 put the card's slot at z 55 in
+every mode, above the bar (50), and the bar's popovers live in the bar's layer. At 320x640
+windowed the card covered the popovers that opened under it: 3 of the Appearance sheet's 6
+controls, the volume range, and 4 of the 7 speed items. Nothing was covered at 1366px wide. The
+card is back under the bar (z 45) and rises above it (z 55) only in fullscreen, and only while
+none of the bar's popovers is open.
+
 **Still open.**
-- **The card covers the bar's popovers on narrow windows.** Since 7fc8c45 the card's slot is at
-  z 55 in every mode, above the bar (50). At 320x640 windowed, popovers that open under the card
-  are covered: 3 of the Appearance sheet's 6 controls, the volume range, and 4 of the 7 speed
-  items. At 1366px wide nothing is covered. A regression from 7fc8c45; before it the card was
-  z 45, under the bar. Found by the seventh Codex review, reproduced; with code-lead.
+
 
 
 - The position lives in one browser's `localStorage`. A different browser, a private window or
@@ -2070,9 +2073,11 @@ under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent e
 moment is also reachable by [ and ], by Previous and Next, and by the sidebar's rows.
 
 **Still open.**
-- Low: after a backfill renumbers the moments, the status region's text still says "Moment 1"
-  for what is now moment 35 of 37. It is not re-announced, which is right, but a screen-reader
-  user reading it in browse mode finds a stale number.
+- Low, left by the stop rule: if a moment is first selected while the analysis is still running
+  (for example, found under a paused playhead), the status region keeps its first sentence
+  ("Moment 1, …") after a backfill renumbers it to 35 of 37. Re-announcing is suppressed on
+  purpose, so it is not spoken again, but a screen-reader user reading it in browse mode finds a
+  stale number.
 
 
 - Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32
