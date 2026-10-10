@@ -1894,12 +1894,19 @@ That is above 2.5.8's 24px, and below the 44px the strip had.
   about 3.4s before the card. A click on the picture outside the card plays and dismisses it; the
   Space, Enter and click-on-card results are unchanged.
 
+**Fixed after the sixth Codex review** (7fc8c45).
+- In fullscreen the bar could cover the card. At 1280x720 at 400% zoom (a 320x180 screen) the
+  expanded bar is 122px of the screen's 180, and it overlapped the card by 91.4px, so neither
+  button could be clicked. In fullscreen the card now stacks above the bar (z 55), which
+  reverses "under the bar (z 50)" above for fullscreen only. Rejected: reserving room above the
+  bar, which left 53px, too little for the card. Windowed, the card and the bar never meet.
+- Leaving the page about 50ms after closing Appearance stored the preview's position (47.8s)
+  instead of the viewer's (30s); at 0ms or 300ms it stored 30s. A save in the window before the
+  restore landed read the preview's time. The preview jump now carries the playhead's
+  destination, so a save in that window records 30s.
+
 **Still open.**
-- In fullscreen at 320x180 with the bar expanded, the bar overlaps the resume card by 91.4px
-  and both buttons are unclickable. Found by the sixth Codex review, reproduced; with code-lead.
-- Leaving the page 50ms after closing Appearance stores the preview's position (47.8s) instead
-  of the viewer's (30s). Leaving at 0ms or 300ms stores 30s. Found by the sixth Codex review,
-  reproduced; with code-lead.
+
 
 - The position lives in one browser's `localStorage`. A different browser, a private window or
   cleared site data starts at 0:00, with no offer.
@@ -2027,19 +2034,22 @@ magnifier's region is a second `role="status"`: Z gave "Magnifier on, 1.5 times.
 region throughout. Re-entry while playing, measured later: playing from 83s, "Moment 8" at
 84.7s; ← to 83.5s gives
 "Moment 7"; playing on re-enters 8 and announces it again. A backfill renumbering staying quiet
-could not be exercised as intended (Still open has why). Strength changes while the magnifier is
-off do not exist as a path: ↑ and ↓ always turn the magnifier on (↑ also steps the strength),
-which is how main behaves too.
+could not be exercised as intended (Still open has why). Strength changes while the magnifier is off did not exist as a path: ↑ and ↓ both turned the
+magnifier on, as on main. That turned out to be a bug, fixed below (5c4bffd).
+
+**Two older bugs, found by these checks** (5c4bffd). Both are on main too.
+- ↓ with the magnifier off turned it on: "zoom out" zoomed in. It now does nothing.
+- A moment the analysis found under a paused playhead was never selected until the time moved:
+  no status, no highlight. After a nudge it was announced ("Moment 35 of 37…"). The current
+  moment is now re-selected when the list grows. This is also why "a backfill renumbering stays
+  quiet" could not be measured before.
 
 **The moment marks stay under 24px, on purpose.** The lane's marks are 8-23px wide by 14px tall,
 under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent exception: every
 moment is also reachable by [ and ], by Previous and Next, and by the sidebar's rows.
 
 **Still open.**
-- A moment found by the analysis under a paused playhead is not selected until the time
-  changes: no status, no highlight. After a nudge it is announced ("Moment 35 of 37…"). That
-  predates the round, and main does the same; it is also why "a backfill renumbering stays
-  quiet" could not be measured.
+
 
 - Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32
   measured the result: the page scrolls on narrow windows, as page content, not overflow.
