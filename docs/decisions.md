@@ -1395,8 +1395,10 @@ now-line into the sidebar was weighed as another way back and rejected (below), 
 accepted, not pending. The 832px is exact arithmetic for a 139.8px bar. It has to be re-checked
 once the feedback loop under Still open is fixed, because the loop makes the bar taller than
 that on some windows. After the fix (eaceeb5, below) the cap subtracts a constant 140px, which
-gives the same 832px by arithmetic. D34 then cut the constant to an 89px bar, which by arithmetic
-gives about 923px at 1366x768; not yet measured.
+gives the same 832px by arithmetic. D34 then cut the constant to an 89px bar, and 50ac023 (below)
+replaced the guessed 160px of page chrome with the measured chrome, so neither 832 nor any
+later arithmetic for 1366x768 describes the current build, and that size has not been
+re-measured since.
 
 **Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
 bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
@@ -1479,7 +1481,9 @@ panel grew UNDER the bar" now describes fullscreen only.
 the video. It is now `max(20rem, calc((100vh - 160px - var(--bar-h, 0px)) * 16/9))`, where
 `--bar-h` is the measured bar height set inline (0 in fullscreen), so the video and the bar
 together fit the window. That measured height turned out to be a feedback loop, and was replaced
-by a constant within the round (eaceeb5, "Fixed: the width cap fed on itself" below). The 20rem floor exists because at 320x320 the formula alone gives a
+by a constant within the round (eaceeb5, "Fixed: the width cap fed on itself" below). The
+flat 160px was itself a guess, replaced by measured chrome (50ac023, "Fixed: the cap guessed
+the page chrome" below). The 20rem floor exists because at 320x320 the formula alone gives a
 video under 20px wide. Below the floor the page scrolls, which is what a page is for.
 Measured at 1400x900: the player's bottom edge is at 802px, inside the 900px window, and the
 sidebar spans the player's full 737.2px height. At 1366x768, 1920x1080 and 1536x864 at DPR 1.25
@@ -1593,6 +1597,31 @@ unchanged.
 blocked the idle hide, so clicking the Fullscreen button parked focus on "Exit fullscreen" and
 the bar stayed up for good. Now only `:focus-visible` focus blocks it, plus an open Appearance
 sheet or speed menu, which live inside the bar. Not yet re-measured independently.
+
+**Fixed: the cap guessed the page chrome** (50ac023). The owner reported about 100px of empty
+window under the player and the sidebar. The cap subtracted a flat 160px for everything around
+the player, and the real chrome is 126px: a 4px hairline, the 45px top bar, 16px and 24px of
+page padding, and the 37px footer. The top bar and footer now publish their measured heights as
+`--chrome-top` and `--chrome-foot` (a `ResizeObserver` in `Shell.tsx`), and one `--video-cap`
+in `index.css` derives the video's width from them, the page padding and the 89px one-row bar
+(D34). This is not the eaceeb5 loop again: neither bar's height depends on the player's width,
+so measuring them cannot feed back.
+
+The same commit replaces `.app.with-side`'s fixed `max-width: 1560px` with `--video-cap` plus
+the sidebar and padding. 1560 was wrong both ways. On tall windows it held the video narrower
+than the height allowed (1222px at 1920x1080). On short windows the page grew wider than the
+height-bound video, and the sidebar was stranded at the far edge, as in the owner's screenshot.
+The video and the moments list are now one centred block.
+- Rejected: counting the transient strips (resume, notices) in the cap. They would resize the
+  player as they appear and go, the jump this entry has spent the round removing. They push the
+  player down instead, and the page scrolls by their height while they are shown.
+
+Video width before (1605098) and after: 1920x960, 1222 to 1333px; 2048x1030, 1222 to 1458;
+1707x840, 1051 to 1120; 1600x700, 802 to 871; 1366x650, 713 to 782; 1280x600 at DPR 1.5, 624 to
+693. The owner's 1333x750 at DPR 1.5 gives 960. In every case the player ends 24px above the
+footer. Over the whole round, at 1366x650: 477px with the loop, 622 after eaceeb5, 688 without
+the now-line, 713 with the 28px bar, and 782 with the measured chrome. These are code-lead's
+numbers; an independent re-measure is pending.
 
 **Closed by D34.** Two items that were open here were settled by the owner after trying cd5a242.
 The empty space reserved under the now-line at narrow widths (393px of bar at 320px wide) is gone
