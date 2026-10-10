@@ -782,18 +782,22 @@ const VideoPlayer = (props: Props) => {
     >
       {/* No py prop: it lands as an inline style and silently overrides the stylesheet's
           padding, so the bar's vertical rhythm ends up owned by two places. CSS owns it. */}
-      {/* Keys pressed while focus is on a control in the bar belong to THAT control — the
-          same rule the moments sidebar already applies. Without this, Space on the focused
-          Mute button toggles playback instead of mute, and ArrowLeft on the volume slider
-          nudges the volume AND seeks −5s (the document-level hotkeys see every bubbled
-          keydown). The reveal is re-applied here because the stop also hides the event from
-          the container's own reveal handler. */}
+      {/* The keys a focused bar control USES belong to that control — the same rule the
+          moments sidebar applies. Without this, Space on the focused Mute button toggles
+          playback instead of mute, and ArrowLeft on the volume slider nudges the volume AND
+          seeks −5s (the document-level hotkeys see every bubbled keydown). The reveal is
+          re-applied here because the stop also hides those keys from the container's own
+          reveal handler.
+          Scoped to those keys (stopPlayerHotkeys), not every key. This was a blanket
+          stopPropagation, which made every letter shortcut dead while focus sat on ANY bar
+          control — including right after clicking one with the mouse, so F, P, A and L
+          silently did nothing until you clicked the video. Found testing D31's keys. */}
       <Box
         className="video-controls-container"
         ref={barSizeRef}
         onKeyDown={(e) => {
           showControls();
-          e.stopPropagation();
+          stopPlayerHotkeys(e);
         }}
       >
         {/* The scrubber is a slider to the keyboard and AT, not just a mouse strip: it was
