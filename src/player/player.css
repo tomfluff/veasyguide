@@ -58,10 +58,14 @@
 }
 
 /* Before the first frame (VideoPlayer's `framed`): the picture and its overlays are transparent
-   and the container shows the page, not black, so the lecture fades in from the page rather
-   than blinking white -> black -> white. The resume card fades with the picture it sits on. */
+   and the container holds the loading placeholder's own dark (#12161d, .preparing in App.css),
+   so the sequence is placeholder -> the same dark -> the picture fading in. It was black: a
+   ~100ms hard-black blink between the placeholder and the slide. It was briefly transparent,
+   which on the light theme swapped the black for a WHITE flash (the page showing through
+   between two dark states, a bigger swing than the blink it replaced; measured by
+   verify-lead). The resume card fades with the picture it sits on. */
 .video-container { transition: background-color 200ms ease-out; }
-.video-container.unframed { background-color: transparent; }
+.video-container.unframed { background-color: #12161d; }
 .video-container.unframed .video-stage,
 .video-container.unframed .resume-slot { opacity: 0; }
 .resume-slot { transition: opacity 200ms ease-out; }

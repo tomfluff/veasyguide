@@ -225,9 +225,10 @@ const VideoPlayer = (props: Props) => {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
   // Whether the video has a first frame to show. Until it has, the picture and everything drawn
-  // on it are transparent and the container shows no black: loading a lecture blinked the page
-  // white -> black (an empty <video> over the container's black, ~100ms) -> the white slide.
-  // Now the picture fades in over 200ms from the page instead (player.css). A fade is not
+  // on it are transparent and the container holds the loading placeholder's dark: loading a
+  // lecture used to blink through ~100ms of hard black (an empty <video> over the container's
+  // black) between the placeholder and the slide. Now the picture fades in over 200ms from that
+  // same dark instead (player.css). A fade is not
   // vestibular motion, so there is no reduced-motion gate — the same call as the magnifier's
   // crossfade. Opacity changes nothing about layout, so every measurement of the video box is
   // the same before and after.
