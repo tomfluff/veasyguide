@@ -17,6 +17,7 @@ import { TopBar, Footer } from "./Shell";
 import { feedbackMailto } from "./feedback";
 import About from "./About";
 import ConfirmSidecar from "./ConfirmSidecar";
+import ConfirmSwitch from "./ConfirmSwitch";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
 
@@ -38,6 +39,8 @@ const SNIPPETS = QUERY.get("snippets") === "1";
 const FORCE_CPU = QUERY.get("cpu") === "1";
 // In-memory cap for stored analyzer frames (~25 KB each => ~150 MB worst case).
 const MAX_DEBUG_FRAMES = 6000;
+
+const isVideoFile = (f: File) => f.type.startsWith("video/") || /\.(mp4|webm|mkv)$/i.test(f.name);
 
 type DebugFrame = { t: number; blob: Blob; boxes: Box[] };
 // One completed analysis run, for comparing the cost of the debug instrumentation.
@@ -257,12 +260,16 @@ export default function App() {
   // A parsed, matched sidecar waiting for the viewer's yes. Held rather than applied because
   // applying throws away an analysis they may have been waiting on for twenty minutes.
   const [pendingSidecar, setPendingSidecar] = useState<MomentsFile | null>(null);
+  // A picked or dropped video waiting for the viewer's yes, because loading it would stop an
+  // analysis still in progress (ConfirmSwitch says why a finished one needs no confirm).
+  const [pendingSwitch, setPendingSwitch] = useState<File[] | null>(null);
   // Dragging a file anywhere over the player screen. The veil it raises is also the drop
   // target: dragleave on the shell fires every time the pointer crosses a child boundary, so
   // a veil that covers everything is the one element whose dragleave means "actually left".
   const [dragging, setDragging] = useState(false);
   // The top bar's "Load moments file" opens this; drag-and-drop was the only way in before.
   const momentsInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -448,7 +455,18 @@ export default function App() {
   // A sidecar that fails any check degrades to a normal analysis with the reason shown;
   // a wrong file must never mean a broken player.
   function loadFiles(files: File[]) {
-    const video = files.find((f) => f.type.startsWith("video/") || /\.(mp4|webm|mkv)$/i.test(f.name));
+    const video = files.find(isVideoFile);
+    // A new video replaces the open one. Mid-analysis that costs the viewer every minute the
+    // analysis has run, so it asks first; otherwise the pick itself was the decision.
+    if (video && fileRef.current && !done && error === null) {
+      setPendingSwitch(files);
+      return;
+    }
+    loadFilesNow(files);
+  }
+
+  function loadFilesNow(files: File[]) {
+    const video = files.find(isVideoFile);
     const sidecar = files.find((f) => /\.json$/i.test(f.name));
     if (!video) {
       if (!sidecar) return;
@@ -722,8 +740,25 @@ export default function App() {
         file={videoUrl && !fatal ? fileName : null}
         status={chip}
         onAbout={() => setAboutOpen(true)}
-        onChangeVideo={reset}
+        onChangeVideo={() => videoInputRef.current?.click()}
         onLoadMoments={canDrop ? () => momentsInputRef.current?.click() : undefined}
+      />
+      {/* "Change" opens a picker rather than dropping you back on the landing screen. It used
+          to call reset() straight away: one click and the lecture, its playhead and any
+          running analysis were gone, with nothing to go back to. Now dismissing the picker
+          changes nothing, and picking a file is the decision. The pick goes through the same
+          loadFiles as a drop, so a video picked mid-analysis gets the same confirm. */}
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*,.json"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          if (files.length > 0) loadFiles(files);
+          e.target.value = "";
+        }}
       />
       {/* The picker feeds the same loadFiles as a drop, so the file goes through one set of
           checks and one confirm however it arrived. Value is cleared after each pick or
@@ -761,6 +796,12 @@ export default function App() {
           </div>
         </div>
       )}
+      <ConfirmSwitch
+        next={pendingSwitch?.find(isVideoFile)?.name ?? null}
+        current={fileName}
+        onCancel={() => setPendingSwitch(null)}
+        onConfirm={() => { if (pendingSwitch) loadFilesNow(pendingSwitch); setPendingSwitch(null); }}
+      />
       <ConfirmSidecar
         file={pendingSidecar}
         analyzing={!done}

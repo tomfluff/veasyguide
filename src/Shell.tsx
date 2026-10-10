@@ -28,8 +28,8 @@ export function TopBar({
   file?: string | null;
   status?: ReactNode;
   onAbout: () => void;
-  // Back to the landing screen to pick a different file. Optional: the landing screen
-  // itself has no video to change.
+  // Pick a different file (App opens a picker; dismissing it changes nothing). Optional: the
+  // landing screen itself has no video to change.
   onChangeVideo?: () => void;
   // Open a .veasyguide.json for the video already loaded. Optional for the same reason.
   onLoadMoments?: () => void;
