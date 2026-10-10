@@ -1197,14 +1197,14 @@ in the column, so the reorder was about how the pair reads, not about room.
 ## D31 — Four player buttons name themselves on hover and focus, and get keys
 
 **Decision** (aac5b37). Appearance, the moments list, Snapshot size and Move snapshot show a
-styled tooltip, `PlayerTip`, with the control's name and a keycap. It opens on pointer hover
-and on keyboard `focus-visible`, and it replaces the native `title` those buttons had (or the
+styled tooltip, `PlayerTip`, with the control's name and a keycap. It opens on pointer hover and
+on keyboard `focus-visible`, and it replaces the native `title` those buttons had (or the
 nothing they had). New keys: A opens Appearance; L is the moments list; C and S move and resize
 the pinned snapshot. A "Single-key shortcuts" switch in the moments sidebar's footer turns off
 every printable-character key (`letterShortcuts` in `ViewSettingsStore`, default on). Space and
 the arrow keys stay on regardless. The tip meets WCAG 1.4.13 since dda1bdb: it can be hovered,
-stays up while hovered, and Escape dismisses it. The other bar controls are deliberately left for later
-(TODOS.md, "Keyboard reach for every player control").
+stays up while hovered, and Escape dismisses it. The other bar controls are deliberately left
+for later (TODOS.md, "Keyboard reach for every player control").
 
 **What was wrong.** A user on Windows saw no names and no shortcuts on these controls. Appearance
 and the moments list had no visible name at all, only an `aria-label` that a screen reader
@@ -2190,8 +2190,9 @@ moment is also reachable by [ and ], by Previous and Next, and by the sidebar's 
 **Decision** (cb3c512). Below a measured breakpoint the top bar keeps three things: the mark,
 the analysis status as a bare number, and one Menu button. The menu holds the full file name as
 a label that is not interactive, then Change video, Load moments file, Dark theme, About,
-Project page and Code on GitHub. Above the breakpoint the desktop bar is pixel-identical to before; only the file-name chip
-gained the ability to shrink, down to a 6rem floor, before the row overflows. The avatar is dropped from the narrow bar, since the footer has it. Below 32em
+Project page and Code on GitHub. Above the breakpoint the desktop bar is pixel-identical to
+before; only the file-name chip gained the ability to shrink, down to a 6rem floor, before the
+row overflows. The avatar is dropped from the narrow bar, since the footer has it. Below 32em
 the tagline and the file-name chip go too; the `h1` stays, visually hidden, so headings
 navigation still finds it.
 
