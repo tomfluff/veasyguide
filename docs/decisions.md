@@ -1624,6 +1624,9 @@ after the browser's own chrome): 477px with the loop, 622 after eaceeb5, 688 wit
 the now-line, 713 with the 28px bar, and 782 with the measured chrome. These are code-lead's
 numbers; an independent re-measure is pending.
 
+**Closed by D35.** The horizontal page scroll at 320px and 800px wide, which predates this entry
+and came from the top bar rather than the player, is fixed there (cb3c512).
+
 **Closed by D34.** Two items that were open here were settled by the owner after trying cd5a242.
 The empty space reserved under the now-line at narrow widths (393px of bar at 320px wide) is gone
 with the now-line itself (482f7eb). The two-row controls on short windows, where the owner was
@@ -1637,8 +1640,7 @@ fits one row down to a 486px player, and every desktop size measured is one row 
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
-- Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
-  nav, not the player, and is in TODOS.md.
+
 
 ---
 
@@ -1812,3 +1814,47 @@ wide: 89, 89, 121 and 153px, against 140, 222, 312 and 393px with the now-line's
   the unmeasured question of whether that makes the page scroll.
 - 2.5.5 AAA is given up, as above. If testing with motor-impaired or high-zoom users shows the
   28px targets are a problem, that is the decision to revisit.
+
+---
+
+## D35 — On narrow windows the top bar folds into one menu
+
+**Decision** (cb3c512). Below a measured breakpoint the top bar keeps three things: the mark,
+the analysis status as a bare number, and one Menu button. The menu holds the full file name
+as a label that is not interactive, then Change video, Load moments file, Theme, About,
+Project page and GitHub. Above the breakpoint the desktop bar is unchanged, except that the
+file-name chip now shrinks first, down to a 6rem floor. The avatar is dropped from the narrow
+bar, since the footer has it. Below 32em the tagline and the file-name chip go too; the `h1`
+stays, visually hidden, so headings navigation still finds it.
+
+**What was wrong.** It predates the round, and it was in TODOS.md. The bar's single row
+overflowed below its natural width and pushed the whole page sideways. With a lecture open the
+page was 860px wide in a 320px window; on the landing screen, 478px. On a phone the player's
+left edge was cut off, as in the owner's screenshot, and so it was at 400% zoom, which is the
+case WCAG 1.4.10 (Reflow) is about and the case this app is for. "Moments file" wrapped onto
+two lines.
+
+**Keeping what the bar said.** The status chip keeps its full sentence in the accessibility tree,
+visually hidden, so a screen reader still hears "Finding moments… 84%" and not "84%". The wide
+and narrow variants are switched with `display: none`, so neither is announced twice.
+
+**The menu.** One 44px button opening Mantine's `Menu`, which brings the roles, arrow keys,
+Escape and focus return. It calls `stopPlayerHotkeys`, because the player's hotkeys listen on
+the whole document and would otherwise take keys meant for the menu (the same fix D31 applied
+to buttons outside the player).
+
+**Breakpoints are measured, and set in em** so they move with the reader's font size. With a
+lecture open it is 62.5em (1000px at 16px): the full row needs 988px with the file name at its
+floor. On the landing screen it is 42em (672px): the row needs 638px, plus about 30px that the
+fallback font overshoots by before the web font loads.
+
+**Rejected.**
+- Hiding items one at a time at several breakpoints. More states to test, and a long file name
+  would still overflow.
+- Letting the bar wrap onto two lines. It makes the top bar taller, and since D32's cap now
+  measures the top bar (`--chrome-top`), a taller bar is a smaller video.
+
+**Numbers** (code-lead's). Page `scrollWidth` before and after: landing at 320, 375 and 414px
+wide, 478, 457 and 478px became 320, 375 and 414; with a lecture at 320 to 800px wide, 860px
+became the viewport width; 1280px at 400% zoom (320 CSS px), 860 became 320.
+<!-- TODO(verify-lead): independent re-measure. -->

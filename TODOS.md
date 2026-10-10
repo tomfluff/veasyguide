@@ -4,29 +4,6 @@ Deferred work, with enough context to pick it up cold. Newest first.
 
 ---
 
-## Horizontal page scroll on narrow windows, from the top nav
-
-**What:** At 320px and at 800px wide, the page scrolls horizontally. The overflow comes from the
-top nav, not the player. Measured in a 320px viewport: the analysis chip ends at x=551, the nav
-at x=797, and the page's `scrollWidth` is 859. Identical on main@d2e19c3. A second, independent run
-measured a `scrollWidth` of 916. The two runs were not compared, so what makes the difference is
-not known.
-
-**Why:** WCAG 1.4.10 (Reflow) asks for no two-dimensional scrolling at 320 CSS px, the width a
-1280px window has at 400% zoom. That zoom is this app's audience. A viewer who has zoomed in
-has to scroll sideways to reach the top bar's controls, Change and Load moments file among them.
-
-**Context:** Found while measuring D32 (9e5fdbf). It predates the feedback round. The player
-itself reflows: D32 made the in-flow bar the default, which used to be a `max-width: 520px`
-media query, and the player width has a 20rem floor below which the page scrolls vertically.
-
-**Pros:** Closes the last known reflow failure on the player screen.
-**Cons:** The top bar is crowded (file name, status chip, Change, Load moments file, About); it
-needs a wrapping or overflow-menu decision, not just CSS.
-**Blocked by:** nothing.
-
----
-
 ## Keyboard reach for every player control
 
 **What:** Give every control in the player bar the treatment D31 gave the moments list,
@@ -35,8 +12,8 @@ key, shown on hover and on keyboard focus, and a key where it has none. That cov
 play/pause, mute, speed, magnify, pin, previous/next moment, fullscreen and collapse. Replace
 the remaining native `title` tooltips with the same component: Previous moment, Next moment,
 Playback speed, the Magnify and Pin toggles, the sidebar's Export, and both footer switches.
-Fullscreen, Mute and Collapse/Expand have only an `aria-label`, so they have no visible name at
-all. Add a `?` key that opens a panel listing every shortcut. Consider scoping the letter keys
+Fullscreen and the fullscreen-only Collapse/Expand have only an `aria-label`, so they have no
+visible name at all. (Volume got a tip with D34's popover.) Add a `?` key that opens a panel listing every shortcut. Consider scoping the letter keys
 to the player instead of the document, as an alternative or complement to the "Single-key
 shortcuts" switch.
 
