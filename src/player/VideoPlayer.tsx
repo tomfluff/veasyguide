@@ -221,7 +221,7 @@ const VideoPlayer = (props: Props) => {
   const chromeTimeRef = useRef(-1);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
-  // Tracked only so the resume card knows when to step under the bar (see .resume-slot).
+  // Tracked only so the resume card knows to wait while it is open (see .resume-slot).
   const [speedOpen, setSpeedOpen] = useState(false);
   const [previewJumped, setPreviewJumped] = useState(false);
   // For the "Magnifier on · 1.7×" chip; same 1 + strength display the Appearance sheet uses.
@@ -961,22 +961,23 @@ const VideoPlayer = (props: Props) => {
           after the bar it sat behind every moment mark in the lane (each a tab stop — 36 on a
           36-moment lecture) before a keyboard user could reach Resume. Positioned over the
           picture's box: the whole container less the bar where the bar sits below it
-          (windowed), the whole container in fullscreen, where the bar overlays. */}
+          (windowed); in fullscreen, where the bar overlays, the picture above the bar. */}
       <Box
         className={classNames("resume-slot", {
-          // Over the bar only where the bar can cover it (fullscreen), and never while one of the
-          // bar's own popovers is open: those live inside the bar's layer, and a card above it
-          // covered half the Appearance sheet, the volume range and the speed menu at 320px.
-          "over-bar": isFullscreen && !appearanceOpen && !volumeOpen && !speedOpen,
+          // While the fullscreen moments list or any of the bar's popovers is open, the offer
+          // waits: hidden, but still mounted (the live region stays), and back when they close
+          // if it is still unanswered. Those all open over the picture, where the card is; with
+          // both up, one would cover the other and its focusable controls.
+          waiting: (isFullscreen && momentsOpen) || appearanceOpen || volumeOpen || speedOpen,
         })}
         role="status"
-        // Fullscreen: the whole picture, and the card stacks ABOVE the bar (.over-bar). Under it,
-        // a tall expanded bar (1280x720 at 400%: 122px of a 180px screen) covered both buttons;
-        // stopping the card's area above the bar instead left 53px, too little for the card at
-        // all. Over the bar, the offer is always answerable; at any ordinary size the centred
-        // card does not reach the bar, and at the extreme it covers part of it only until it
-        // is answered — and Space, a seek or a click on the picture answer it too.
-        style={{ bottom: isFullscreen ? 0 : barHeight }}
+        // The card's area is the picture LESS the bar, always — never under it, never over it, by
+        // layout rather than by stacking (the pinned snapshot's rule). Windowed the bar is below
+        // the picture; in fullscreen it overlays the picture's bottom, so the area stops a gap
+        // above it, and the card compacts to fit (player.css). An earlier version lifted the card
+        // ABOVE the bar instead, and every layer that opens over the picture — the bar's popovers,
+        // the fullscreen list, a focused bar control — then had to be argued with one by one.
+        style={{ bottom: isFullscreen ? barHeight + 8 : barHeight }}
       >
         {props.resumeOffer && (
           <div

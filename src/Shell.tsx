@@ -89,6 +89,16 @@ export function TopBar({
     document.addEventListener("fullscreenchange", close);
     return () => document.removeEventListener("fullscreenchange", close);
   }, []);
+  // And when the window widens past the breakpoint (App.css, "Narrow top bar"): the trigger is
+  // hidden by CSS there, but a menu opened before would stay open, portalled and holding focus.
+  useEffect(() => {
+    const mq = window.matchMedia(file ? "(min-width: 62.5em)" : "(min-width: 42em)");
+    const onChange = () => {
+      if (mq.matches) setMenuOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [file]);
   return (
     // Two layouts in one bar, switched by CSS (App.css, "Narrow top bar"): the full row, and a
     // compact one — mark, status, one Menu — for windows the full row does not fit. The row

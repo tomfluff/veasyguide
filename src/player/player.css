@@ -949,29 +949,29 @@
 
 /* The resume offer (D33): a card centred on the video, over the picture, so it moves nothing.
    The slot is the always-mounted live region; it takes no clicks itself, so outside the card the
-   video behaves as ever. Above the pinned snapshot (35) and the fullscreen moments list (40),
-   under the control bar (50) — whose popovers (Appearance, volume, speed) live in its layer and
-   must draw over the card. In FULLSCREEN, though, the bar overlays the picture, and at 1280x720
-   and 400% zoom an expanded bar is two-thirds of the screen: under it the card's buttons could
-   not be clicked at all. So there, and only while none of those popovers is open, the card
-   rises above the bar (.over-bar), covering part of it only at that extreme and only until
-   answered. Windowed the slot ends above the bar, so the two never meet. A near-opaque dark
-   card with an amber edge, so it reads the same on a white slide and a black one. At a 320px-wide
-   window it may cover much of a 180px-tall picture, but it never leaves it: capped to its area
-   and scrolling inside if it must. */
+   video behaves as ever. Its box is the picture LESS the control bar (set inline), so the card
+   never meets the bar; z 45 keeps it above the pinned snapshot (35) and under the bar (50) and
+   its popovers. A near-opaque dark card with an amber edge, so it reads the same on a white
+   slide and a black one. It may cover much of a small picture, but never leaves its box: it
+   compacts in a short one (the container query below) and, at the last extreme — fullscreen
+   at 1280x720 and 400% with the bar expanded leaves ~50px — scrolls inside itself, where a
+   focused button scrolls into view. */
 .resume-slot {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0; /* bottom: inline, the bar's height when it sits below the picture */
+  right: 0; /* bottom: inline, clear of the control bar */
   z-index: 45;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 8px;
   pointer-events: none;
+  container-type: size;
 }
-.resume-slot.over-bar { z-index: 55; }
+/* visibility, not display: the slot is the live region and must stay in the tree; only the
+   card is hidden (and so out of the tab order) while the list or a bar popover is open. */
+.resume-slot.waiting .resume-card { visibility: hidden; }
 .resume-card {
   pointer-events: auto;
   max-width: min(26rem, 100%);
@@ -1011,4 +1011,12 @@
   .resume-q { margin-bottom: 6px; font-size: 1rem; }
   .resume-actions { gap: 6px; }
   .resume-actions button { min-height: 32px; padding: 0 12px; }
+}
+/* Compact where the card's box is short — a phone-width picture, or a fullscreen screen with
+   the bar up — by the box's own height, since that, not the window, is what has to hold it. */
+@container (max-height: 150px) {
+  .resume-card { padding: 6px 8px; }
+  .resume-q { margin-bottom: 4px; font-size: 0.9375rem; }
+  .resume-actions { gap: 4px; }
+  .resume-actions button { min-height: 28px; padding: 0 10px; font-size: 0.875rem; }
 }
