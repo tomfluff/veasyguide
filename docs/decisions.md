@@ -1099,6 +1099,10 @@ making it necessary. The landing screen exists to get a first file in; once a vi
 the only reason to go back there was to pick another one, and a picker does that without
 unloading anything first.
 
+**Space on the dialog's buttons did nothing** at first; Enter worked. The player's document-level
+Space hotkey took the key. Found by the Codex review and fixed in the same round (dda1bdb, see
+D31).
+
 **Verified** (headless Chromium 145, 1366x768). Dismissing the picker leaves the file and the
 analysis untouched. A pick or a drop mid-analysis opens "Switch to another video?" with "Keep
 watching" focused, and Esc, the backdrop and Enter all keep the lecture. Once the analysis has
@@ -1127,9 +1131,6 @@ right after the video and sidecar load. After a reload, opening the video alone 
 analysis in 923ms, where a fresh analysis of it takes about 4s or more.
 
 **Still open.**
-- Space does nothing on the ConfirmSwitch buttons; Enter works. A keyboard user who activates
-  buttons with Space, as many do, finds the dialog's buttons dead. Found by the Codex review;
-  fix pending.
 - `cachePut` is best-effort and swallows failures (a full quota, storage blocked). If the
   write failed, a finished analysis is gone after a switch, with no confirm.
 - The cache restores the analysis, not the playhead. Reopening a finished video started at
@@ -1246,7 +1247,7 @@ React context (`player/tipRoot.ts`) holding the element from a callback ref merg
   and the tip would stay over the video.
 - `aria-describedby` is suppressed. floating-ui's tooltip role would make a screen reader read
   the name twice, since the `aria-label` already says it.
-- 200ms open delay, immediate close. Font 1rem, not Mantine's default 0.875rem, because the people who need the
+- 200ms open delay, immediate close (300ms since the 1.4.13 fix below). Font 1rem, not Mantine's default 0.875rem, because the people who need the
   tip are the people who need it bigger. Dark `#12161d`, like the bar.
 
 **Names changed with it.** Appearance is now "Appearance: highlight and magnifier"; plain
@@ -1302,22 +1303,47 @@ working for everyone. It is recorded in TODOS.md as something to weigh, not done
   that is read from the code, not measured.
 - Auto-hide in fullscreen with the pointer resting on Appearance: the tip shows from 0 to 1.2s
   and is gone at 1.6s, the same moment the bar's opacity reaches 0. This was first reported as
-  a pass ("no tip left hanging"), and the measurement stands, but it is a defect: see Still
-  open.
+  a pass ("no tip left hanging"). The measurement was right and the reading was wrong: it was a
+  WCAG 1.4.13 failure, fixed below.
 - 320x320: the sidebar is 240px, D28's 15rem floor. "Notify scene changes" sits at 713-737px and
   "Single-key shortcuts" at 745-769px, both inside the panel (540 to 780). The page scrolls to
   them (`scrollHeight` 852), and both are reachable. Same at 320x568, 600x400, 899x500 and
   899x700, where the cap is 40vh = 280px.
 - A real screen reader was not run.
 
+**Fixed in the same round: the tip failed WCAG 1.4.13** (dda1bdb). Content that appears on hover
+or focus must be hoverable, persistent and dismissible, and the first version met only the
+third.
+- Not persistent. In fullscreen it vanished at 1.6s with the auto-hiding bar while the pointer
+  was still resting on the button: the auto-hide measurement above, first misread as a pass and
+  caught by an independent Codex review. The fullscreen idle-hide now skips while the bar or a
+  tip is hovered. Measured: resting 3.5s in fullscreen keeps both the tip and the bar.
+- Not hoverable. The tip had `pointer-events: none`, so it could not be reached: walking the
+  pointer from the button toward it in 6px steps, it was present up to y=623 and gone from
+  y=617, before the pointer arrived. A magnifier user, who has to move across a tip to read it
+  at their zoom, lost it on the way. It now has `pointer-events: auto` and a 300ms close delay,
+  and floating-ui cancels the close when the pointer enters the tip. Measured: the same 6px walk
+  never loses it.
+- Dismissible: Escape closes it, through Mantine's `useDismiss`.
+
+These fix measurements are code-lead's; verify-lead's independent re-measure is pending.
+
+The close delay changes the timing reported above, which was "immediate close". The open delay
+is unchanged.
+
+**Fixed in the same round: Space was taken by the player.** Buttons outside the player that did
+not call `stopPlayerHotkeys` let Space bubble to the player's document-level hotkey, which
+played or paused the video instead of pressing the button. Space on D33's Resume played from
+0:00 and dismissed the offer; Space on D29's "Switch video" did nothing. Enter worked in both,
+which is why nobody had noticed. Now guarded: the resume strip, the strips' ✕ buttons, the
+header's Change and Moments file buttons, and all three modal dialogs (both confirms and About).
+The dialogs stop every key, because the player is inert behind a modal anyway (dda1bdb).
+
+**And two tests that could not fail.** The "on by default" tests for `letterShortcuts` and D28's
+`sceneNotice` asserted the value their own `beforeEach` had just set. They now read
+`getInitialState()`, so flipping a default fails them (dda1bdb).
+
 **Still open.**
-- **The tip fails WCAG 1.4.13 (Content on Hover or Focus)** on two of its three conditions.
-  It is not persistent: in fullscreen it vanishes at 1.6s with the bar while the pointer is
-  still on the button, which is the measurement above, first misread as a pass and caught by an
-  independent Codex review. And it is not hoverable: the tip has `pointer-events: none`, so
-  moving the pointer from the button toward it in 6px steps, it is present up to y=623 and gone
-  from y=617, before the pointer reaches it. A magnifier user, who has to move across a tip to
-  read it, loses it on the way. Fix pending from code-lead; to be re-measured.
 - Previous moment, Next moment, Playback speed, the Magnify toggle, the Pin toggle, the
   sidebar's Export, and both footer switches still use a native `title`. The Single-key
   shortcuts switch's `title` is where the list of keys it covers lives. Fullscreen, Mute and
@@ -1355,7 +1381,8 @@ bar means shrinking the video, and doing that only while the bar shows re-lays o
 on every reveal (rejected below). So the bar overlays, and the cost is kept small instead: it
 starts collapsed (54px measured at 1400x900), and it hides after a short idle even while paused,
 because a paused frame is one someone is reading. The idle delay is still 2000ms, and the bar
-still never hides while keyboard focus is inside it. Measured: opacity 0 by 2.6s idle while
+still never hides while keyboard focus is inside it, or, since dda1bdb, while the pointer is
+over the bar or one of its tips (D31). Measured: opacity 0 by 2.6s idle while
 paused, the 2000ms delay plus the fade. Entering fullscreen always collapses the bar, and
 leaving restores the windowed state both ways, expanded to expanded and collapsed to collapsed,
 even when the viewer expanded it while in fullscreen. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
@@ -1516,15 +1543,21 @@ After a seek to 124s and a reload, the stored entry held 124 and the strip read 
 02:04?", and Enter on Resume landed at exactly 124.00s. The strip is 68px tall at 1366x768. A real screen reader was not run, so "announced"
 rests on the tree, not on hearing it.
 
+**Two defects found by the Codex review, fixed in the same round** (dda1bdb).
+- Space on Resume played from 0:00. The player's document-level Space hotkey took the key, and
+  pressing play counts as an answer, so the strip went away with the saved place unused: a
+  keyboard user who activates buttons with Space got the opposite of what they chose. Enter
+  worked. The strip now stops player hotkeys (D31 has the full list of what was guarded).
+- Opening and closing Appearance erased the saved place. Paused at 0:00, between moments, the
+  sheet's preview jump went through `onSeeked` like a viewer's seek: it dismissed the offer,
+  marked the video as touched, and leaving afterwards saved 0:00 over the bookmark, turning
+  `{t: 20}` into `{}`. The guard "nothing is saved until the viewer has played or seeked" was
+  fooled because the player could not tell its own seeks from the viewer's. It now marks them
+  (`byViewer = false`), and if the page goes away mid-preview, App saves the position from before
+  the preview. Measured: `{t: 21.2}` survives opening and closing Appearance and leaving
+  mid-preview, and a viewer at 15s who leaves mid-preview saves 15, not the preview's 25.8.
+
 **Still open.**
-- **Space on Resume skips the bookmark.** It plays from 0:00 instead of resuming; Enter works.
-  Pressing play counts as an answer, so the strip goes away with the saved place unused. A
-  keyboard user who presses Space to activate buttons gets the opposite of what they chose.
-  Found by the Codex review; fix pending.
-- **Opening and closing Appearance can erase the saved place.** Paused at 0:00, between
-  moments, opening and closing the sheet turned the stored `{t: 20}` into `{}`. The guard against
-  saving 0:00 over the real place ("nothing is saved until the viewer has played or seeked") does
-  not cover this path. Found by the Codex review; cause and fix pending.
 - At 320x320 the strip wraps to 154px and stacks its buttons, which pushes the video's top to
   237px. The picture starts mostly below the fold until the viewer answers. Answering, or
   pressing play, removes it.
