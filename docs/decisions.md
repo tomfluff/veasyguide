@@ -1867,7 +1867,39 @@ That is above 2.5.8's 24px, and below the 44px the strip had.
 - Buttons are 86x36 and 209x36px. Tab order: the header, the scrubber, Play, Volume, Speed,
   Magnify, Pin, Appearance, Fullscreen, then Resume, then Start.
 
+**Two fixes from that re-measure** (27a0859).
+- At 320px wide the picture is about 149px tall and the card was 11px taller than its room, so
+  it scrolled inside itself with its second button half hidden. Below 30em the card now packs
+  tighter: 32px buttons and less padding. Re-measured independently: at 320x640 the card is
+  256x120.8 inside a 264x148.5 picture, at 375x700 it is 311x121 inside 319x179, and nothing
+  scrolls inside it at either. The buttons there are 82x32 and 205x32px.
+- Start's border is now `#8a95a6`: 5.54:1 against the card on a white slide and 6.37:1 on
+  black, where it was 2.97:1.
+
+**Fixed after the fifth Codex review** (37535ac).
+- `viewerSeek()` cancelled the preview but left the player's own-seek marker set. Ownership is
+  matched by landing time, so a viewer seek landing within 0.05s of the pending preview target,
+  before its `seeked`, would be taken for the player's own: the resume offer stayed up and the
+  bookmark went stale. `viewerSeek()` now clears the marker before it seeks.
+- **The card was last in the tab order, which made it hard to reach by keyboard.** It came after
+  the whole bar, and the moment lane gives every mark a tab stop, so a keyboard user on a long
+  lecture tabbed through dozens of marks to reach Resume. This reverses c8ec242's "after the bar"
+  above. The card's live region is now the player's first child, positioned over the picture's
+  box (the container less the bar where the bar sits below it, the whole of it in fullscreen), so
+  it draws exactly where it did. Re-measured independently on a lecture with 32 lane marks:
+  Resume is tab stop 8 at 1366px wide, right after the header's links, and stop 2 at 320px, right
+  after Menu, with Start next. The card's centre is the picture's centre within 0.1px, and the
+  player's box still takes exactly one value per session at 1366x650, 1366x768 and 320x640. In
+  fullscreen the slot covers the whole screen and the card is centred. The live region is mounted
+  about 3.4s before the card. A click on the picture outside the card plays and dismisses it; the
+  Space, Enter and click-on-card results are unchanged.
+
 **Still open.**
+- In fullscreen at 320x180 with the bar expanded, the bar overlaps the resume card by 91.4px
+  and both buttons are unclickable. Found by the sixth Codex review, reproduced; with code-lead.
+- Leaving the page 50ms after closing Appearance stores the preview's position (47.8s) instead
+  of the viewer's (30s). Leaving at 0ms or 300ms stores 30s. Found by the sixth Codex review,
+  reproduced; with code-lead.
 
 - The position lives in one browser's `localStorage`. A different browser, a private window or
   cleared site data starts at 0:00, with no offer.
@@ -1992,14 +2024,21 @@ announcements, on entering and on re-entering, both "Moment 8 of 36…". Playing
 gave exactly 6 updates for 6 moment starts, windowed and in fullscreen, at least 480ms apart. The
 magnifier's region is a second `role="status"`: Z gave "Magnifier on, 1.5 times.", ↑ gave
 "Magnifier on, 1.6 times.", and Z again "Magnifier off.", with no change at all to the moment
-region throughout. **Not measured:** re-entry while playing, a backfill renumbering staying
-quiet, and strength changes staying silent while the magnifier is off.
+region throughout. Re-entry while playing, measured later: playing from 83s, "Moment 8" at 84.7s; ← to 83.5s gives
+"Moment 7"; playing on re-enters 8 and announces it again. A backfill renumbering staying quiet
+could not be exercised as intended (Still open has why). Strength changes while the magnifier is
+off do not exist as a path: ↑ and ↓ always turn the magnifier on (↑ also steps the strength),
+which is how main behaves too.
 
 **The moment marks stay under 24px, on purpose.** The lane's marks are 8-23px wide by 14px tall,
 under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent exception: every
 moment is also reachable by [ and ], by Previous and Next, and by the sidebar's rows.
 
 **Still open.**
+- A moment found by the analysis under a paused playhead is not selected until the time
+  changes: no status, no highlight. After a nudge it is announced ("Moment 35 of 37…"). That
+  predates the round, and main does the same; it is also why "a backfill renumbering stays
+  quiet" could not be measured.
 
 - Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32
   measured the result: the page scrolls on narrow windows, as page content, not overflow.
