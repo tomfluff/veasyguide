@@ -1157,13 +1157,13 @@ rows a pair — what colour, then how strong — and "Opacity" under "Fill" read
 repeating the noun.
 
 **Rejected: "Fill opacity" as the visible label.** It is the accurate name, but at the label
-size it would wrap in the 62px column, pushing the slider onto its own line and breaking the
-row rhythm of the group. That was the reasoning when the change was made. The width of "Fill
-opacity" itself was never measured. "Opacity" alone renders at 44px and "Fill" at 17px, so
-with a space between them they add up to about 65px, over the column's 62px. That sum is
-arithmetic on two measured words, not a measurement of the label. The accessible names were already "Fill colour" and "Fill opacity" and are
-unchanged, so a screen-reader user hears the full name either way; only the visible label is
-shortened.
+size it would wrap in the 62px column, pushing the slider onto its own line and breaking the row
+rhythm of the group. That was the reasoning when the change was made. The width of "Fill
+opacity" itself was never measured. "Opacity" alone renders at 44px and "Fill" at 17px, so with
+a space between them they add up to about 65px, over the column's 62px. That sum is arithmetic
+on two measured words, not a measurement of the label. The accessible names were already "Fill
+colour" and "Fill opacity" and are unchanged, so a screen-reader user hears the full name either
+way; only the visible label is shortened.
 
 **The magnifier was there and nobody found it.** Its settings were a tab inside the box's
 Fine-tune screen. The root's only row said "Fine-tune" and opened the box, so a viewer looking
@@ -1250,8 +1250,9 @@ React context (`player/tipRoot.ts`) holding the element from a callback ref merg
   and the tip would stay over the video.
 - `aria-describedby` is suppressed. floating-ui's tooltip role would make a screen reader read
   the name twice, since the `aria-label` already says it.
-- 200ms open delay, immediate close (300ms since the 1.4.13 fix below). Font 1rem, not Mantine's default 0.875rem, because the people who need the
-  tip are the people who need it bigger. Dark `#12161d`, like the bar.
+- 200ms open delay, immediate close (300ms since the 1.4.13 fix below). Font 1rem, not Mantine's
+  default 0.875rem, because the people who need the tip are the people who need it bigger. Dark
+  `#12161d`, like the bar.
 
 **Names changed with it.** Appearance is now "Appearance: highlight and magnifier"; plain
 "Appearance" read as the app's theme. The corner button's `aria-label` now starts "Move
@@ -1384,21 +1385,20 @@ minus the video's bottom is 0.00px at 1366x768, 1920x1080, 1536x864 at DPR 1.25,
 
 **The cost: a smaller picture on short windows.** The bar's height now comes off the height
 available to the video, not off the video. At 1366x768 with moments, the expanded bar is 139.8px
-(scrubber, moment lane, now-line, controls), and the video drops from 1028px to 832px wide,
-19% narrower. With the bar collapsed it was 987px, until collapse was
-removed from the window (below). At 1400x900 the video stays 1062px wide,
-because there the available width limits it before the height cap does: the new cap works out
-to about 1067px there. The user chose the bar below the video; this is the price of that
-choice, recorded here so it is a known trade and not a surprise. As first shipped, collapsing
-the bar got most of the size back; that is no longer offered in the window. Moving the
-now-line into the sidebar was weighed as another way back and rejected (below), so the cost is
-accepted, not pending. The 832px is exact arithmetic for a 139.8px bar. It has to be re-checked
-once the feedback loop under Still open is fixed, because the loop makes the bar taller than
-that on some windows. After the fix (eaceeb5, below) the cap subtracts a constant 140px, which
-gives the same 832px by arithmetic. D34 then cut the constant to an 89px bar, and 50ac023 (below)
-replaced the guessed 160px of page chrome with the measured chrome, so neither 832 nor any
-later arithmetic for 1366x768 describes the current build, and that size has not been
-re-measured since.
+(scrubber, moment lane, now-line, controls), and the video drops from 1028px to 832px wide, 19%
+narrower. With the bar collapsed it was 987px, until collapse was removed from the window
+(below). At 1400x900 the video stays 1062px wide, because there the available width limits it
+before the height cap does: the new cap works out to about 1067px there. The user chose the bar
+below the video; this is the price of that choice, recorded here so it is a known trade and not
+a surprise. As first shipped, collapsing the bar got most of the size back; that is no longer
+offered in the window. Moving the now-line into the sidebar was weighed as another way back and
+rejected (below), so the cost is accepted, not pending. The 832px is exact arithmetic for a
+139.8px bar. It has to be re-checked once the feedback loop under Still open is fixed, because
+the loop makes the bar taller than that on some windows. After the fix (eaceeb5, below) the cap
+subtracts a constant 140px, which gives the same 832px by arithmetic. D34 then cut the constant
+to an 89px bar, and 50ac023 (below) replaced the guessed 160px of page chrome with the measured
+chrome, so neither 832 nor any later arithmetic for 1366x768 describes the current build.
+Re-measured at cb3c512: the video is 992px wide at a 1366x768 viewport.
 
 **Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
 bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
@@ -1406,11 +1406,12 @@ on every reveal (rejected below). So the bar overlays, and the cost is kept smal
 starts collapsed (54px measured at 1400x900), and it hides after a short idle even while paused,
 because a paused frame is one someone is reading. The idle delay is still 2000ms, and the bar
 still never hides while keyboard focus is inside it, or, since dda1bdb, while the pointer is
-over the bar or one of its tips (D31). Measured: opacity 0 by 2.6s idle while
-paused, the 2000ms delay plus the fade. **That measurement holds only when fullscreen was
-entered by key, or when something has blurred focus since** (see Still open). Entering fullscreen always collapses the bar. As
-first shipped, leaving restored the windowed state both ways, measured expanded to expanded and
-collapsed to collapsed; since c1785ae there is no windowed collapsed state to restore. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
+over the bar or one of its tips (D31). Measured: opacity 0 by 2.6s idle while paused, the 2000ms
+delay plus the fade. **That measurement holds only when fullscreen was entered by key, or when
+something has blurred focus since** (see Still open). Entering fullscreen always collapses the
+bar. As first shipped, leaving restored the windowed state both ways, measured expanded to
+expanded and collapsed to collapsed; since c1785ae there is no windowed collapsed state to
+restore. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
 and the `.paused` force-visible rule is gone.
 
 **Rejected.**
@@ -1590,13 +1591,19 @@ come from windows where the loop settled at once.
 The cap now subtracts a constant: one row of bar, `108px + 2rem`, which is 140px at a 16px root
 font size. `--bar-h` is gone. The lesson worth keeping: **a size must not depend on something it
 causes.** Measured video width, before and after: 1366x650, 477 to 622px; 1280x600 at DPR 1.5,
-320 to 533px (it had hit the 20rem floor); 1920x960, 2048x1030, 1707x840 and 1600x700
-unchanged.
+320 to 533px (it had hit the 20rem floor); 1920x960, 2048x1030, 1707x840 and 1600x700 unchanged.
+
+Re-measured independently at eaceeb5: zero size changes across 10 cases, so the loop is gone.
+But at 1366x650, 1280x600 at DPR 1.5 and 800x600 the controls wrapped into two rows (a 220px
+bar), taller than the 140px the cap assumed, and the page scrolled by 41-43px. D34's one-row bar
+removed that.
 
 **Fixed: the fullscreen bar never hid after a mouse click** (eaceeb5). Any focus inside the bar
 blocked the idle hide, so clicking the Fullscreen button parked focus on "Exit fullscreen" and
 the bar stayed up for good. Now only `:focus-visible` focus blocks it, plus an open Appearance
-sheet or speed menu, which live inside the bar. Not yet re-measured independently.
+sheet or speed menu, which live inside the bar. Re-measured independently: after a mouse click
+on Fullscreen the bar hides at 2176ms. Keyboard focus in the bar keeps it at opacity 1, and so
+does an Appearance sheet opened with the mouse.
 
 **Fixed: the cap guessed the page chrome** (50ac023). The owner reported about 100px of empty
 window under the player and the sidebar. The cap subtracted a flat 160px for everything around
@@ -1619,10 +1626,22 @@ The video and the moments list are now one centred block.
 Video width before (1605098) and after: 1920x960, 1222 to 1333px; 2048x1030, 1222 to 1458;
 1707x840, 1051 to 1120; 1600x700, 802 to 871; 1366x650, 713 to 782; 1280x600 at DPR 1.5, 624 to
 693. The owner's 1333x750 at DPR 1.5 gives 960. In every case the player ends 24px above the
-footer. Over the whole round, at a 1366x650 viewport (what a 1366x768 screen leaves
-after the browser's own chrome): 477px with the loop, 622 after eaceeb5, 688 without
-the now-line, 713 with the 28px bar, and 782 with the measured chrome. These are code-lead's
-numbers; an independent re-measure is pending.
+footer. Over the whole round, at a 1366x650 viewport (what a 1366x768 screen leaves after the
+browser's own chrome): 477px with the loop, 622 after eaceeb5, 688 without the now-line, 713
+with the 28px bar, and 782 with the measured chrome. Re-measured independently at cb3c512 (where
+both were measured, 50ac023 gave the same widths): 1333.3px at 1920x960, 782.2 at 1366x650,
+693.3 at 1280x600 at DPR 1.5, 960 at 1333x750 at DPR 1.5. Also 992 at 1366x768, 1457.8 at
+2048x1030 at DPR 1.25 and 1937.8 at 3440x1300. At every size the video's width is exactly the
+smaller of the stage width and the height bound (ratio 1.000), and the page does not scroll
+vertically. Unlike the earlier "fits the window" checks, that test fails if the video comes out
+smaller than the space allows. The resume strip pushes the page down by 78px (68px of strip plus
+the gap) and the video stays 992px wide: nothing is resized. "Ends 24px above the footer" and
+the sidebar's centring were not measured separately; both are consistent with the numbers above.
+
+**Narrow windows scroll, by design.** At 560px wide and below the page scrolls vertically:
+86px at 560x700, 67px at 320x640, 0 at 400x800, and 252px at 800x600 and 900x600, where the
+sidebar stacks below the player. That is page content arriving below, not overflow. The bar
+still wraps there (121px at 400px wide, 153px at 320px), taller than the 89px the cap assumes.
 
 **Closed by D35.** The horizontal page scroll at 320px and 800px wide, which predates this entry
 and came from the top bar rather than the player, is fixed there (cb3c512).
@@ -1634,9 +1653,10 @@ to choose between a pillarboxed video and accepting two rows, no longer happen: 
 fits one row down to a 486px player, and every desktop size measured is one row (1605098).
 
 **Still open.**
-- The cap assumes a one-row bar (89px since D34). Where the bar still wraps (121px at 400px wide,
-  153px at 320px), the video and bar together are taller than the cap allows for. Whether that
-  makes the page scroll at those sizes has not been measured.
+- The cap's one-row bar is a fixed 89px, and it does not follow the reader's font size. With
+  a 20px root font the bar is 96px, and at 1707x880 at DPR 1.5 the page scrolls by 7px. The
+  only desktop case found, but it is the reader who enlarged the text who gets it.
+
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
@@ -1671,9 +1691,9 @@ the buttons unmount, focus goes to the player's Play/Pause button. Left alone, i
 `<body>`, and a keyboard user would have to tab back into the page from the top.
 
 **Only once the video can play.** On a fresh analysis the strip waits for `canPlay`, which is
-true once the analysis is done or has covered the first 10s (`PLAYBACK_LEAD`). An offer to jump somewhere you cannot play yet is a dead button. Resuming far
-ahead on a fresh analysis seeks into video that has not been analyzed yet, and D12's
-segment restart already handles that.
+true once the analysis is done or has covered the first 10s (`PLAYBACK_LEAD`). An offer to jump
+somewhere you cannot play yet is a dead button. Resuming far ahead on a fresh analysis seeks
+into video that has not been analyzed yet, and D12's segment restart already handles that.
 
 **Announced.** The strip renders inside a `role="status"` region that is always mounted. A live
 region inserted together with its content is not announced, which is the same rule the player's
@@ -1710,8 +1730,8 @@ load, and the strip is inserted into that existing node at 279-328ms, which is t
 region needs. The accessibility tree shows status, polite, atomic. Resume is 90x44px and "Start
 from the beginning" 213x44px. Focus stays where it was (on `<body>` after a load), as intended.
 After a seek to 124s and a reload, the stored entry held 124 and the strip read "Resume at
-02:04?", and Enter on Resume landed at exactly 124.00s. The strip is 68px tall at 1366x768. A real screen reader was not run, so "announced"
-rests on the tree, not on hearing it.
+02:04?", and Enter on Resume landed at exactly 124.00s. The strip is 68px tall at 1366x768. A
+real screen reader was not run, so "announced" rests on the tree, not on hearing it.
 
 **Two defects found by the Codex review, fixed in the same round** (dda1bdb).
 - Space on Resume played from 0:00. The player's document-level Space hotkey took the key, and
@@ -1807,11 +1827,31 @@ needed about 672px. The one-row bar is 89px, and D32's width cap subtracts that 
 140px, then 103px after the now-line went). At 1280x600 at DPR 1.5 the video went from 533px
 wide (eaceeb5) to 599px (482f7eb) to 624px (1605098). Bar height at 1400, 560, 400 and 320px
 wide: 89, 89, 121 and 153px, against 140, 222, 312 and 393px with the now-line's reserved space.
-<!-- TODO(verify-lead): independent re-measure. -->
+
+**Re-measured independently** (at cb3c512). Bar height held constant through analysis,
+playback at 4x, the magnifier on and off and a speed step, with zero size changes in every
+case: 89px at 1400 and 560px wide and at every desktop size, 121px at 400px wide and at both
+zoom cases (683x384 at DPR 2, 341x192 at DPR 4), 153px at 320px. The narrowest player confirmed
+as one row is 504px, at a 560px window; the exact 486px threshold was not searched for.
+- The hidden status is `role="status"` (polite by role), 1x1px, with no hidden ancestor. At 4x
+  it announced 5 updates in 9s windowed, and 4 in fullscreen with the bar collapsed.
+- Every bar and pin button is 28x28px (speed 80x28), with no overlaps. No focus ring is clipped
+  by an `overflow` ancestor or the viewport, at 1366px and 320px wide.
+- Volume: hover does not open the popover; Enter and Space do. Focus lands on the range, which
+  is vertical with up as louder (its top gives 1.0, its bottom 0).
 
 **Still open.**
 - Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32 has
   the unmeasured question of whether that makes the page scroll.
+- The volume button's tip never shows on hover, and it is drawn at (46, 65) for a button at
+  (152, 678). Found by the second Codex review, confirmed; with code-lead.
+- The vertical range has no fallback for browsers without vertical range support. Raised by
+  the second Codex review; plausible, not measurable here.
+- The hidden status updates at both a moment's start and its end, and two updates can land
+  100ms apart (seen at 1.8s and 1.9s). A screen reader may cut the first off. Low; with
+  code-lead.
+- The moment lane's marks are 8-23px wide by 14px tall, under 2.5.8's 24px. That predates this
+  round, and whether 2.5.8's spacing exception covers them was not checked.
 - 2.5.5 AAA is given up, as above. If testing with motor-impaired or high-zoom users shows the
   28px targets are a problem, that is the decision to revisit.
 
@@ -1820,12 +1860,13 @@ wide: 89, 89, 121 and 153px, against 140, 222, 312 and 393px with the now-line's
 ## D35 — On narrow windows the top bar folds into one menu
 
 **Decision** (cb3c512). Below a measured breakpoint the top bar keeps three things: the mark,
-the analysis status as a bare number, and one Menu button. The menu holds the full file name
-as a label that is not interactive, then Change video, Load moments file, Theme, About,
-Project page and GitHub. Above the breakpoint the desktop bar is unchanged, except that the
-file-name chip now shrinks first, down to a 6rem floor. The avatar is dropped from the narrow
-bar, since the footer has it. Below 32em the tagline and the file-name chip go too; the `h1`
-stays, visually hidden, so headings navigation still finds it.
+the analysis status as a bare number, and one Menu button. The menu holds the full file name as
+a label that is not interactive, then Change video, Load moments file, Dark theme, About,
+Project page and Code on GitHub. Above the breakpoint the desktop bar keeps its contents, and
+the file-name chip now shrinks first, down to a 6rem floor. It is not pixel-identical to before,
+though (below). The avatar is dropped from the narrow bar, since the footer has it. Below 32em
+the tagline and the file-name chip go too; the `h1` stays, visually hidden, so headings
+navigation still finds it.
 
 **What was wrong.** It predates the round, and it was in TODOS.md. The bar's single row
 overflowed below its natural width and pushed the whole page sideways. With a lecture open the
@@ -1857,4 +1898,26 @@ fallback font overshoots by before the web font loads.
 **Numbers** (code-lead's). Page `scrollWidth` before and after: landing at 320, 375 and 414px
 wide, 478, 457 and 478px became 320, 375 and 414; with a lecture at 320 to 800px wide, 860px
 became the viewport width; 1280px at 400% zoom (320 CSS px), 860 became 320.
-<!-- TODO(verify-lead): independent re-measure. -->
+
+**Re-measured independently** (at cb3c512).
+- `scrollWidth` equals the viewport at 320, 375, 414, 600, 800, 1000 and 1280px wide, on landing
+  and with a lecture, and at 1280px at 400% zoom (320x180 at DPR 4).
+- The Menu button is 44x44px. Enter opens it. The arrow keys go Change video, Load moments file,
+  Dark theme, About, Project page, Code on GitHub, and wrap. Escape closes it and returns focus
+  to Menu. Space on Dark theme toggles the theme without playing the video. Change video opens
+  the picker.
+- The chip's accessible text is the full "Finding moments… 1%"; the short form is `aria-hidden`.
+- Breakpoints with the browser's font size set to 20px (em media queries follow the browser's
+  default, not CSS): the Menu replaces the full bar between 1300 and 1240px (62.5em = 1250px),
+  and the file-name chip goes between 650 and 630px (32em = 640px). At 16px: between 1010 and
+  990px, and between 520 and 500px. All hold.
+
+**Correction: the desktop bar did change.** The entry first said that above the breakpoint "the
+desktop bar is unchanged". It is not: at 1366px wide, 6131 of the header's 61470 pixels differ.
+The file-name chip is now a fixed pill about 240px wide, where it used to hug the file name, so
+Change and Moments file sit about 150px further right.
+
+**Still open.** From the second Codex review, both confirmed and with code-lead:
+- About opened from the Menu loses focus to `<body>` when it closes, instead of returning it.
+- Opening the Menu and then pressing F leaves the menu open but invisible outside the
+  fullscreen element. It is not a focus trap.
