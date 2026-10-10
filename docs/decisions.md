@@ -1070,8 +1070,8 @@ is not ready yet, rather than commenting on the lecture — and it stays uncondi
 
 ## D29 — "Change" opens a file picker, and only a running analysis asks before it goes
 
-**Decision** (747b91f). The top bar's Change button no longer calls `reset()`. It opens a file picker
-that feeds the same `loadFiles` a drop does, so dismissing the picker changes nothing and
+**Decision** (747b91f). The top bar's Change button no longer calls `reset()`. It opens a file
+picker that feeds the same `loadFiles` a drop does, so dismissing the picker changes nothing and
 picking a file is the decision. Loading a different video while an analysis is still running
 goes through a confirm first (`ConfirmSwitch`). Dropping a video on the player screen goes
 through the same gate, because it goes through the same `loadFiles`.
@@ -1897,10 +1897,11 @@ That is above 2.5.8's 24px, and below the 44px the strip had.
 **Fixed after the sixth Codex review** (7fc8c45).
 - In fullscreen the bar could cover the card. At 1280x720 at 400% zoom (a 320x180 screen) the
   expanded bar is 122px of the screen's 180, and it overlapped the card by 91.4px, so neither
-  button could be clicked. In fullscreen the card now stacks above the bar (z 55). Rejected: reserving room above the
-  bar, which left 53px, too little for the card. This was described as fullscreen-only, with
-  "windowed, the card and the bar never meet". That was wrong on both counts: the slot is z 55
-  in every mode, and windowed the bar's popovers do meet the card (Still open).
+  button could be clicked. In fullscreen the card now stacks above the bar (z 55). Rejected:
+  reserving room above the bar, which left 53px, too little for the card. This was described as
+  fullscreen-only, with "windowed, the card and the bar never meet". That was wrong on both
+  counts: the slot is z 55 in every mode, and windowed the bar's popovers do meet the card
+  (Still open).
 - Leaving the page about 50ms after closing Appearance stored the preview's position (47.8s)
   instead of the viewer's (30s); at 0ms or 300ms it stored 30s. A save in the window before the
   restore landed read the preview's time. The preview jump now carries the playhead's
