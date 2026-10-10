@@ -21,6 +21,7 @@ import {
   useViewSettingsStore,
   setGroupByScene,
   setSceneNotice,
+  setLetterShortcuts,
 } from "./stores/ViewSettingsStore";
 
 type Props = {
@@ -55,6 +56,7 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
   const groupByScene = useViewSettingsStore((s) => s.groupByScene);
   const sceneNotice = useViewSettingsStore((s) => s.sceneNotice);
+  const letterShortcuts = useViewSettingsStore((s) => s.letterShortcuts);
   const currIndex = current ? activities.indexOf(current) : -1;
   // Both halves matter: a still-running analysis has no file to serialize yet, and a
   // finished one with nothing in it has nothing worth saving.
@@ -276,24 +278,25 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
             ))
           : activities.map(row)}
       </div>
-      {/* Below the list, not in the header. It is a standing preference about the video, not a
-          control over the rows above it — and the header is already carrying the heading, the
+      {/* Below the list, not in the header. These are standing preferences about the player,
+          not controls over the rows above — and the header is already carrying the heading, the
           position readout, Export and the arrangement switch.
 
-          A switch rather than the Notify/Quiet pair it replaces: on/off is what this is, and a
-          segmented control that renders both states as buttons makes a viewer read two words to
-          find out which one is current. The switch says it in its position, and Mantine gives it
-          `role="switch"` with the label wired to the input, so pressing the words works too.
+          Switches rather than the Notify/Quiet pair the first one replaced: on/off is what these
+          are, and a segmented control that renders both states as buttons makes a viewer read
+          two words to find out which one is current. A switch says it in its position, and
+          Mantine gives it `role="switch"` with the label wired to the input, so pressing the
+          words works too.
 
-          Gated on more than one scene for the same reason the arrangement switch is: with a
-          single scene there is no cut to cross and the notice can never fire. */}
-      {groups.length > 0 && (
-        <div className="side-foot">
-          {/* Label only, no description line. On a window under 900px the sidebar is capped at
-              40vh, and a three-line description pushed the footer past that cap — where the
-              panel's `overflow: hidden` cut the switch off entirely, in exactly the reflow case
-              DESIGN.md commits to supporting. The label says what it does; the sentence went to
-              the title, which is a hint rather than the only way to understand the control. */}
+          Label only, no description lines. On a window under 900px the sidebar is capped at
+          max(40vh, 15rem), and a three-line description pushed the footer past that cap — where
+          the panel's `overflow: hidden` cut the switch off entirely, in exactly the reflow case
+          DESIGN.md commits to supporting. Each label says what it does; the longer sentence is
+          in the title, a hint rather than the only way to understand the control. */}
+      <div className="side-foot">
+        {/* Gated on more than one scene for the same reason the arrangement switch is: with a
+            single scene there is no cut to cross and the notice can never fire. */}
+        {groups.length > 0 && (
           <Switch
             size="md"
             checked={sceneNotice}
@@ -301,8 +304,20 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
             label="Notify scene changes"
             title="Shows a pill at the top of the video when the slide or camera cuts"
           />
-        </div>
-      )}
+        )}
+        {/* WCAG 2.1.4: a shortcut that is one printable character must be possible to turn
+            off. Speech input types words, and every letter in a word would otherwise fire
+            whatever player key it lands on. Ungated, unlike the switch above — the keys exist
+            whatever the lecture looks like. Here, beside the list, because the moments panel
+            is the one part of the working screen that is always open, windowed or not. */}
+        <Switch
+          size="md"
+          checked={letterShortcuts}
+          onChange={(e) => setLetterShortcuts(e.currentTarget.checked)}
+          label="Single-key shortcuts"
+          title="F, M, Z, P, A, L, C, S, [ ] and < >. Space and the arrow keys always work."
+        />
+      </div>
     </aside>
   );
 }

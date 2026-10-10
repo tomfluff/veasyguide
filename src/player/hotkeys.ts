@@ -6,8 +6,9 @@
 // is a DOCUMENT-level listener, so it fires for these too — a focused control would double-act
 // (Space both clicks the button AND toggles play) unless the control stops the event here.
 //
-// Everything NOT in this set (F, M, Z, P, [, ], <, >) is deliberately left to bubble, so those
-// shortcuts keep working wherever focus happens to sit — the way YouTube's do. The guard is
+// Everything NOT in this set (F, M, Z, P, A, L, C, S, [, ], <, >) is deliberately left to
+// bubble, so those shortcuts keep working wherever focus happens to sit — the way YouTube's do,
+// and unless the viewer has switched single-key shortcuts off (WCAG 2.1.4). The guard is
 // scoped to the keys the focused element actually uses, never a blanket stopPropagation on all
 // keys, which is what silently killed every shortcut while focus was in the moments sidebar.
 //

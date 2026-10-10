@@ -27,6 +27,7 @@ import {
   useElementSize,
   useDisclosure,
   useHotkeys,
+  type HotkeyItem,
   useMergedRef,
   useMouse,
   useTimeout,
@@ -73,6 +74,8 @@ import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
 import { stopPlayerHotkeys } from "./hotkeys";
+import PlayerTip from "./PlayerTip";
+import { PlayerTipRoot } from "./tipRoot";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
 import {
   useViewSettingsStore, setPlaybackRate,
@@ -118,10 +121,13 @@ const FLASH_SPEED = 250;
 const SCENE_NOTICE_MS = 2500;
 
 // The keys that must NOT summon the control bar, because the control they operate is not in it:
-// zoom is drawn on the video with its own indicator, and [ / ] are navigation. Kept as one set
-// so the hotkey table and the container's onKeyDown cannot drift apart and disagree. Both `z`
-// and `Z` — the container sees the raw event.key, so Shift and CapsLock both reach it.
-const NO_REVEAL_KEYS = new Set(["z", "Z", "p", "P", "ArrowUp", "ArrowDown", "[", "]"]);
+// zoom is drawn on the video with its own indicator, [ / ] are navigation, and C / S move and
+// resize the pinned snapshot, whose buttons live on the panel itself. Kept as one set so the
+// hotkey table and the container's onKeyDown cannot drift apart and disagree. Both `z` and `Z`
+// — the container sees the raw event.key, so Shift and CapsLock both reach it.
+const NO_REVEAL_KEYS = new Set([
+  "z", "Z", "p", "P", "c", "C", "s", "S", "ArrowUp", "ArrowDown", "[", "]",
+]);
 
 // Seconds of analysis before playback unlocks. Lives here because the pre-playback gate
 // PROMISES this number on screen ("the first 10 seconds"), and App gates `canPlay` on it —
@@ -136,6 +142,11 @@ const VideoPlayer = (props: Props) => {
   // child), but only by accident — anything else placed in that flow would break the
   // container measurement while the video measurement stays correct.
   const containerRef = useRef<HTMLDivElement>(null);
+  // The same element again, as STATE, for the tooltips to portal into (tipRoot.ts). A ref
+  // would not do: the tips render before the container has mounted, and only a re-render
+  // hands them the element once it exists.
+  const [tipRoot, setTipRoot] = useState<HTMLDivElement | null>(null);
+  const containerMergedRef = useMergedRef(containerRef, setTipRoot);
   const {
     ref: videoSizeRef,
     width: boxWidth,
@@ -178,6 +189,9 @@ const VideoPlayer = (props: Props) => {
   const sceneNotice = useViewSettingsStore((s) => s.sceneNotice);
   const pinSize = useViewSettingsStore((s) => s.pinSize);
   const pinCorner = useViewSettingsStore((s) => s.pinCorner);
+  // WCAG 2.1.4: every single-character shortcut can be switched off (the sidebar's footer).
+  // A speech-input user saying an ordinary word otherwise fires a dozen player actions.
+  const letterShortcuts = useViewSettingsStore((s) => s.letterShortcuts);
   const insideMomentRef = useRef<Activity | null>(null); // raw in-moment tracking (no lead/linger)
   // Pinned snapshot: a full-res crop of a moment's final ink, captured from the live video
   // element the instant playback crosses the moment's end (the end frame is what's on screen
@@ -198,6 +212,10 @@ const VideoPlayer = (props: Props) => {
     collapsed,
     fullscreen: isFullscreen,
   });
+  // A tip outliving its bar would float over the lecture beside nothing: the bar fades out
+  // under a pointer that has stopped moving, and with pointer-events off it never sees the
+  // mouseleave that would close the tip.
+  const barHidden = hideControls && isPlaying;
 
   // Hooks and interactivity
   const { ref: timelineContainerRef, x: timelineX } = useMouse<HTMLDivElement>();
@@ -243,26 +261,49 @@ const VideoPlayer = (props: Props) => {
     showControls();
     fn();
   };
+  // Two tables, because WCAG 2.1.4 draws the line between them. Space and the arrows are not
+  // character keys — a spoken word never produces them — and they are how the player is driven
+  // at all without a pointer, so they are always on. Every printable-character key is in the
+  // second table, which the viewer can switch off.
   useHotkeys([
     ["Space", reveal(() => handlePlayPause())],
-    ["F", reveal(() => handleFullscreen())],
-    ["M", reveal(() => handleMute())],
     ["ArrowLeft", reveal(() => handleTimeShift(-5))],
     ["ArrowRight", reveal(() => handleTimeShift(5))],
     // No reveal — the magnifier is drawn on the video and has its own indicator; the bar has
-    // no zoom control to show you. Kept in step with NO_REVEAL_KEYS below.
-    ["Z", () => handleZoom()],
-    ["P", () => handlePin()],
+    // no zoom control to show you. Kept in step with NO_REVEAL_KEYS above.
     ["ArrowUp", () => handleZoomShift(0.1)],
     ["ArrowDown", () => handleZoomShift(-0.1)],
-    // Mantine matches on event.key, which for these is literally "[" and "]" — not the
-    // KeyboardEvent.code names ("BracketLeft"/"BracketRight"), which never match.
-    ["[", () => handleStepMoment(-1)],
-    ["]", () => handleStepMoment(1)],
-    // Shift+comma/period arrive as "<"/">" in event.key — but the Shift modifier must ALSO
-    // be declared, or Mantine rejects the match for having an undeclared modifier down.
-    ["shift+<", reveal(() => handleRateStep(-1))],
-    ["shift+>", reveal(() => handleRateStep(1))],
+    ...(letterShortcuts
+      ? ([
+          ["F", reveal(() => handleFullscreen())],
+          ["M", reveal(() => handleMute())],
+          ["Z", () => handleZoom()],
+          ["P", () => handlePin()],
+          // Appearance and the moments list both open from the bar, so both reveal it: a
+          // hidden bar is opacity 0 and pointer-events none, and the sheet is anchored inside it.
+          ["A", reveal(() => handleAppearanceOpen(!appearanceOpen))],
+          ["L", () => handleMomentsKey()],
+          // The snapshot's own buttons, as keys. Only while something is pinned — with no panel
+          // there is nothing to move, and silently rewriting a stored preference the viewer
+          // cannot see change would be worse than doing nothing. No reveal: the panel is not in
+          // the bar, and it shows its own change. Read from the store, not the render closure,
+          // so key-repeat cycles rather than recomputing one step from a stale value.
+          ["C", () => {
+            if (pinnedRef.current) setPinCorner(nextPinCorner(useViewSettingsStore.getState().pinCorner));
+          }],
+          ["S", () => {
+            if (pinnedRef.current) setPinSize(nextPinSize(useViewSettingsStore.getState().pinSize));
+          }],
+          // Mantine matches on event.key, which for these is literally "[" and "]" — not the
+          // KeyboardEvent.code names ("BracketLeft"/"BracketRight"), which never match.
+          ["[", () => handleStepMoment(-1)],
+          ["]", () => handleStepMoment(1)],
+          // Shift+comma/period arrive as "<"/">" in event.key — but the Shift modifier must ALSO
+          // be declared, or Mantine rejects the match for having an undeclared modifier down.
+          ["shift+<", reveal(() => handleRateStep(-1))],
+          ["shift+>", reveal(() => handleRateStep(1))],
+        ] as HotkeyItem[])
+      : []),
   ]);
 
   // The rates every mainstream player offers, plus a study-slow 0.5. Stepping clamps at the
@@ -541,6 +582,44 @@ const VideoPlayer = (props: Props) => {
     }
   };
 
+  // The moments list, one toggle for the button and the L key. Opening it collapses the bar, so
+  // the list gets the height the expanded bar would have taken.
+  const toggleMomentsOverlay = () => {
+    if (!momentsOpen) handleCollapsed.open();
+    handleMomentsOpen.toggle();
+  };
+
+  // L means "take me to the moments", which is a different thing in the two layouts. In
+  // fullscreen the list is an overlay the key opens and closes, exactly like its button (and
+  // the bar is revealed, since that button lives in it). Windowed, the list is already on the
+  // page, so there is nothing to open: the key moves focus to it — to the row playing now, so
+  // the reader starts where the lecture is, else to the first row that can take focus.
+  const handleMomentsKey = () => {
+    const container = containerRef.current;
+    if (isFullscreen) {
+      showControls();
+      // Closing from inside the list would drop focus on <body> as the overlay unmounts —
+      // hand it back to the toggle, as Escape does.
+      const inside = !!container?.querySelector(".moments-side.overlay")?.contains(document.activeElement);
+      toggleMomentsOverlay();
+      if (momentsOpen && inside) {
+        container?.querySelector<HTMLButtonElement>('button[aria-label="Moments list"]')?.focus();
+      }
+      return;
+    }
+    const side = document.querySelector<HTMLElement>(".moments-side:not(.overlay)");
+    if (!side) return;
+    // "Can take focus" means enabled AND rendered: a row inside a folded scene is in the DOM
+    // but has no box, and focus() on it silently does nothing. A folded scene's own summary
+    // is the fallback, since that is where its rows are.
+    const rows = [
+      side.querySelector<HTMLElement>('.side-row[aria-current="true"]'),
+      ...side.querySelectorAll<HTMLElement>(".side-row:not(:disabled)"),
+      side.querySelector<HTMLElement>(".side-scene summary"),
+    ];
+    rows.find((r) => r && r.getClientRects().length > 0)?.focus();
+  };
+
   useEffect(() => {
     const sync = () => {
       if (document.fullscreenElement) handleIsFullscreen.open();
@@ -648,9 +727,10 @@ const VideoPlayer = (props: Props) => {
   const gatePct = (analyzedSec / PLAYBACK_LEAD) * 100;
 
   return (
+    <PlayerTipRoot.Provider value={tipRoot}>
     <Box
       className={videoContainerClasses}
-      ref={containerRef}
+      ref={containerMergedRef}
       onMouseMove={showControls}
       // The reveal triggers that make auto-hide safe. Pointer movement alone would delete the
       // moments and the controls for a keyboard or screen-reader user; focus and keypress
@@ -988,17 +1068,22 @@ const VideoPlayer = (props: Props) => {
             onChange={handleAppearanceOpen}
             trapFocus
           >
-            <Popover.Target>
-              <UnstyledButton
-                className="collapse-end"
-                onClick={() => handleAppearanceOpen(!appearanceOpen)}
-                onKeyDown={stopPlayerHotkeys}
-                aria-label="Appearance"
-                aria-expanded={appearanceOpen}
-              >
-                <IconSparkles />
-              </UnstyledButton>
-            </Popover.Target>
+            {/* The name says what is IN the sheet. "Appearance" alone read as the app's theme,
+                and the sparkles glyph says nothing at all. */}
+            <PlayerTip label="Appearance: highlight and magnifier" hotkey="A" disabled={appearanceOpen || barHidden}>
+              <Popover.Target>
+                <UnstyledButton
+                  className="collapse-end"
+                  onClick={() => handleAppearanceOpen(!appearanceOpen)}
+                  onKeyDown={stopPlayerHotkeys}
+                  aria-label="Appearance: highlight and magnifier"
+                  aria-keyshortcuts={letterShortcuts ? "A" : undefined}
+                  aria-expanded={appearanceOpen}
+                >
+                  <IconSparkles />
+                </UnstyledButton>
+              </Popover.Target>
+            </PlayerTip>
             {/* One guard for the whole sheet: every control inside it is a <button> or a
                 range, and Space/arrows on those would otherwise bubble to the player hotkeys
                 and toggle play or seek while you are adjusting a slider. */}
@@ -1011,18 +1096,19 @@ const VideoPlayer = (props: Props) => {
               because opening the overlay collapses the bar — hiding the button that closes
               it inside the very collapse it causes would strand the viewer. */}
           {isFullscreen && (
-            <UnstyledButton
-              className="collapse-end"
-              onClick={() => {
-                if (!momentsOpen) handleCollapsed.open();
-                handleMomentsOpen.toggle();
-              }}
-              onKeyDown={stopPlayerHotkeys}
-              aria-label="Moments list"
-              aria-expanded={momentsOpen}
-            >
-              <IconListDetails />
-            </UnstyledButton>
+            <PlayerTip label="Moments list" hotkey="L" disabled={momentsOpen || barHidden}>
+              <UnstyledButton
+                className="collapse-end"
+                onClick={toggleMomentsOverlay}
+                onKeyDown={stopPlayerHotkeys}
+                // Exactly this string: onEscape finds the button by it to hand focus back.
+                aria-label="Moments list"
+                aria-keyshortcuts={letterShortcuts ? "L" : undefined}
+                aria-expanded={momentsOpen}
+              >
+                <IconListDetails />
+              </UnstyledButton>
+            </PlayerTip>
           )}
           {/* collapse-end: the controls that stay to the RIGHT of the scrubber when the bar
               collapses to a single line. See the Collapsed block in player.css. */}
@@ -1174,23 +1260,29 @@ const VideoPlayer = (props: Props) => {
             </Text>
             {/* Cycles, not menus: a picker would open over the very video the panel is
                 already covering. Each label names where the next press lands, so the
-                choice is knowable without sight and without trying it. */}
-            <UnstyledButton
-              aria-label={`Snapshot size: ${PIN_SIZE_NAMES[pinSize]}. Change to ${PIN_SIZE_NAMES[nextPinSize(pinSize)]}.`}
-              title={`Snapshot size: ${PIN_SIZE_NAMES[pinSize]}`}
-              onClick={() => setPinSize(nextPinSize(pinSize))}
-              onKeyDown={stopPlayerHotkeys}
-            >
-              {pinSize === "l" ? <IconArrowsDiagonalMinimize2 size={20} /> : <IconArrowsDiagonal size={20} />}
-            </UnstyledButton>
-            <UnstyledButton
-              aria-label={`Snapshot corner: ${PIN_CORNER_NAMES[pinCorner]}. Move to ${PIN_CORNER_NAMES[nextPinCorner(pinCorner)]}.`}
-              title={`Snapshot corner: ${PIN_CORNER_NAMES[pinCorner]}`}
-              onClick={() => setPinCorner(nextPinCorner(pinCorner))}
-              onKeyDown={stopPlayerHotkeys}
-            >
-              <IconLayoutDistributeHorizontal size={20} />
-            </UnstyledButton>
+                choice is knowable without sight and without trying it. The accessible
+                names START with the words the tip shows (WCAG 2.5.3), so a speech-input
+                user can say what they see. */}
+            <PlayerTip label="Snapshot size" hotkey="S">
+              <UnstyledButton
+                aria-label={`Snapshot size: ${PIN_SIZE_NAMES[pinSize]}. Change to ${PIN_SIZE_NAMES[nextPinSize(pinSize)]}.`}
+                aria-keyshortcuts={letterShortcuts ? "S" : undefined}
+                onClick={() => setPinSize(nextPinSize(pinSize))}
+                onKeyDown={stopPlayerHotkeys}
+              >
+                {pinSize === "l" ? <IconArrowsDiagonalMinimize2 size={20} /> : <IconArrowsDiagonal size={20} />}
+              </UnstyledButton>
+            </PlayerTip>
+            <PlayerTip label="Move snapshot" hotkey="C">
+              <UnstyledButton
+                aria-label={`Move snapshot: now ${PIN_CORNER_NAMES[pinCorner]}. Move to ${PIN_CORNER_NAMES[nextPinCorner(pinCorner)]}.`}
+                aria-keyshortcuts={letterShortcuts ? "C" : undefined}
+                onClick={() => setPinCorner(nextPinCorner(pinCorner))}
+                onKeyDown={stopPlayerHotkeys}
+              >
+                <IconLayoutDistributeHorizontal size={20} />
+              </UnstyledButton>
+            </PlayerTip>
             <UnstyledButton aria-label="Dismiss pinned snapshot" onClick={handleUnpin} onKeyDown={stopPlayerHotkeys}>
               <IconX size={20} />
             </UnstyledButton>
@@ -1231,6 +1323,7 @@ const VideoPlayer = (props: Props) => {
       )}
       <SVGFilters />
     </Box>
+    </PlayerTipRoot.Provider>
   );
 };
 

@@ -145,6 +145,33 @@
 }
 .bar-speed-v { font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 
+/* The name-and-key tips on the bar's icon buttons and the snapshot's (PlayerTip.tsx). Dark like
+   the bar for the same reason its menus are: they open ON the video. Body-size text rather than
+   Mantine's 0.875rem — the native title these replaced was too small to read at the zoom levels
+   this app is used at, and a smaller tip would repeat that. Scoped under .video-container (the
+   tips portal into it) so the rule outranks Mantine's own single-class one whatever order the
+   stylesheets load in. */
+.video-container .player-tip {
+  background: #12161d;
+  color: var(--d-text);
+  border: 1px solid var(--d-line);
+  font-size: 1rem;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.video-container .player-tip kbd {
+  min-width: 1.6em;
+  padding: 0 6px;
+  border: 1px solid #5c6879;
+  border-radius: var(--r-sm);
+  background: #21262f;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+}
+
 /* The bar's menus are dark like the bar, not like the page: they open ON the video. */
 .bar-pop {
   background: #12161d;

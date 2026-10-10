@@ -4,7 +4,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { useViewSettingsStore, setSceneNotice, setGroupByScene } from "./ViewSettingsStore";
+import {
+  useViewSettingsStore,
+  setSceneNotice,
+  setGroupByScene,
+  setLetterShortcuts,
+} from "./ViewSettingsStore";
 
 const read = (rel: string) =>
   readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
@@ -70,5 +75,63 @@ describe("the scene-change notice setting", () => {
     const player = read("../player/VideoPlayer.tsx");
     expect(player).toMatch(/getState\(\)\.sceneNotice/);
     expect(player).toMatch(/sceneNoticeVisible && sceneNotice/);
+  });
+});
+
+describe("the single-key shortcuts setting", () => {
+  beforeEach(() => setLetterShortcuts(true));
+
+  it("is on for anyone who has never touched it", () => {
+    // The keys are how a keyboard user drives the player; switching them off is the
+    // exception WCAG 2.1.4 asks for, not the default.
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(true);
+  });
+
+  it("turns off and back on again", () => {
+    setLetterShortcuts(false);
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(false);
+    setLetterShortcuts(true);
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(true);
+  });
+
+  it("does not disturb the other view settings, nor they it", () => {
+    setSceneNotice(false);
+    setLetterShortcuts(false);
+    expect(useViewSettingsStore.getState().sceneNotice).toBe(false);
+    expect(useViewSettingsStore.getState().pinSize).toBe("m");
+    setSceneNotice(true);
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(false);
+  });
+
+  it("lives outside the store the Appearance presets overwrite", () => {
+    expect(read("./HighlightSettingsStore.ts")).not.toMatch(/letterShortcuts/);
+    expect(read("../player/presets.ts")).not.toMatch(/letterShortcuts/);
+  });
+
+  it("gates every printable-character key and leaves Space and the arrows alone", () => {
+    // Space and the arrows are not character keys — speech input never produces them — and
+    // they are how the player is driven at all without a pointer.
+    const player = read("../player/VideoPlayer.tsx");
+    const table = player.slice(player.indexOf("useHotkeys(["), player.indexOf("]);", player.indexOf("useHotkeys([")));
+    const [always, gated] = table.split("...(letterShortcuts");
+    expect(gated).toBeDefined();
+    for (const k of ["Space", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+      expect(always).toContain(`["${k}"`);
+    }
+    for (const k of ["F", "M", "Z", "P", "A", "L", "C", "S", "[", "]", "shift+<", "shift+>"]) {
+      expect(always).not.toContain(`["${k}"`);
+      expect(gated).toContain(`["${k}"`);
+    }
+  });
+
+  it("is a switch in the sidebar's footer that shows whatever the lecture looks like", () => {
+    // Unlike the scene-notice switch, it is not gated on there being scenes: the keys exist
+    // in every lecture.
+    const side = read("../MomentsSidebar.tsx");
+    expect(side).toMatch(/label="Single-key shortcuts"/);
+    const foot = side.slice(side.indexOf('className="side-foot"'));
+    expect(foot.indexOf("Single-key shortcuts")).toBeGreaterThan(0);
+    // The footer itself is no longer behind the scenes gate.
+    expect(side).not.toMatch(/groups\.length > 0 && \(\s*<div className="side-foot"/);
   });
 });
