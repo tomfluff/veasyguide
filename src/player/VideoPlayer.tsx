@@ -668,8 +668,12 @@ const VideoPlayer = (props: Props) => {
   const handleTimeShift = (shift: number) => {
     const video = videoRef.current;
     if (!video || !props.canPlay) return;
+    // From the ELEMENT, like handleStepMoment and for the same reason: `currTime` is throttled
+    // state that only catches up when a frame is presented, so while paused, or on quick
+    // repeated presses, it is stale — three presses of ← became one, and a press right after
+    // a seek jumped from wherever the state last was (measured: 30s → 0s).
     const oldValue = video.currentTime;
-    const newValue = Math.max(0, Math.min(totalTime, currTime + shift));
+    const newValue = Math.max(0, Math.min(totalTime, oldValue + shift));
     video.currentTime = newValue;
 
     if (oldValue < newValue) {
