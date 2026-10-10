@@ -1,12 +1,24 @@
 // Copyright (C) 2026 Yotam Sechayk
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_PARAMS, type Activity, type AnalysisMeta, type AnalysisParams, type Box, type Range, type Scene, type WorkerMsg } from "./analyzer/types";
 import { coverage, isAnalyzed } from "./analyzer/ranges";
 import { validActivities } from "./analyzer/select";
 import { buildMomentsFile, keyOf, momentsMarkdown, parseMomentsFile, sidecarMatchesFile, videoKey, type MomentsFile } from "./analyzer/momentsFile";
 import { cacheGet, cachePut } from "./utils/analysisCache";
+import { loadPosition, resumeStore, savePosition } from "./player/resume";
+import {
+  initialBookmark,
+  bookmarkTime,
+  bookmarkViewerSeek,
+  bookmarkPlay,
+  bookmarkPreviewStart,
+  bookmarkPreviewEnd,
+  bookmarkSeeked,
+  bookmarkToSave,
+} from "./player/bookmark";
+import { stopPlayerHotkeys } from "./player/hotkeys";
 import { thumbRect } from "./analyzer/snippets";
 import { convertSecondsToTimecode } from "./utils/misc";
 import type { SnippetOutMsg, SnippetReq } from "./analyzer/snippetWorker";
@@ -17,6 +29,7 @@ import { TopBar, Footer } from "./Shell";
 import { feedbackMailto } from "./feedback";
 import About from "./About";
 import ConfirmSidecar from "./ConfirmSidecar";
+import ConfirmSwitch from "./ConfirmSwitch";
 import ActivityGallery from "./ActivityGallery";
 import "./App.css";
 
@@ -38,6 +51,8 @@ const SNIPPETS = QUERY.get("snippets") === "1";
 const FORCE_CPU = QUERY.get("cpu") === "1";
 // In-memory cap for stored analyzer frames (~25 KB each => ~150 MB worst case).
 const MAX_DEBUG_FRAMES = 6000;
+
+const isVideoFile = (f: File) => f.type.startsWith("video/") || /\.(mp4|webm|mkv)$/i.test(f.name);
 
 type DebugFrame = { t: number; blob: Blob; boxes: Box[] };
 // One completed analysis run, for comparing the cost of the debug instrumentation.
@@ -253,16 +268,31 @@ export default function App() {
   // landing (fatal) or mean a stopped analysis (partial) — this is neither.
   const [notice, setNotice] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  // Where the viewer left off last time (player/resume.ts), read once per opened video and
+  // OFFERED — never applied on its own. null once answered, or when there is nothing to offer.
+  const [resumeAt, setResumeAt] = useState<number | null>(null);
+  const resumeKeyRef = useRef<string | null>(null);
+  const resumeDurRef = useRef(0);
+  const resumeReadForRef = useRef<string | null>(null);
+  // The place to come back to (player/bookmark.ts): changed only by the viewer's intent —
+  // playing through, their seeks, Resume — never by the player's own preview moves. A ref, so
+  // a save on pagehide reads it synchronously, whatever is in flight.
+  const bookmarkRef = useRef(initialBookmark());
+  const lastResumeSaveRef = useRef(0);
   const [aboutOpen, setAboutOpen] = useState(false);
   // A parsed, matched sidecar waiting for the viewer's yes. Held rather than applied because
   // applying throws away an analysis they may have been waiting on for twenty minutes.
   const [pendingSidecar, setPendingSidecar] = useState<MomentsFile | null>(null);
+  // A picked or dropped video waiting for the viewer's yes, because loading it would stop an
+  // analysis still in progress (ConfirmSwitch says why a finished one needs no confirm).
+  const [pendingSwitch, setPendingSwitch] = useState<File[] | null>(null);
   // Dragging a file anywhere over the player screen. The veil it raises is also the drop
   // target: dragleave on the shell fires every time the pointer crosses a child boundary, so
   // a veil that covers everything is the one element whose dragleave means "actually left".
   const [dragging, setDragging] = useState(false);
   // The top bar's "Load moments file" opens this; drag-and-drop was the only way in before.
   const momentsInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // Draw a stored analyzer frame (composite + its node boxes + timestamp) to the canvas.
   async function renderDebugFrame(i: number) {
@@ -422,6 +452,7 @@ export default function App() {
   }
 
   function loadFile(file: File) {
+    leaveVideoForResume();
     setCurrentTime(0);
     setFileName(file.name);
     setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
@@ -442,13 +473,30 @@ export default function App() {
     setXRealtime(0); setFramesCount(0); setViewIdx(-1);
     setError(null); setErrorDismissed(false); setCurrMoment(null);
     hydrateFrom(f);
+    // A matched moments file is a finished analysis of this video like any other, so it is
+    // cached like one: the next open of the video restores it instead of starting from zero,
+    // and switching away from it is as safe (no confirm) as switching away from a run that
+    // finished here. Here and in the drop-both path, NOT in hydrateFrom — a cache hit also
+    // hydrates through that, and would rewrite its own entry on every reopen. (D29)
+    void cachePut(keyOf(f), f);
   }
 
   // .veasyguide.json moments sidecar (analyze once, share the file — see momentsFile.ts).
   // A sidecar that fails any check degrades to a normal analysis with the reason shown;
   // a wrong file must never mean a broken player.
   function loadFiles(files: File[]) {
-    const video = files.find((f) => f.type.startsWith("video/") || /\.(mp4|webm|mkv)$/i.test(f.name));
+    const video = files.find(isVideoFile);
+    // A new video replaces the open one. Mid-analysis that costs the viewer every minute the
+    // analysis has run, so it asks first; otherwise the pick itself was the decision.
+    if (video && fileRef.current && !done && error === null) {
+      setPendingSwitch(files);
+      return;
+    }
+    loadFilesNow(files);
+  }
+
+  function loadFilesNow(files: File[]) {
+    const video = files.find(isVideoFile);
     const sidecar = files.find((f) => /\.json$/i.test(f.name));
     if (!video) {
       if (!sidecar) return;
@@ -507,6 +555,7 @@ export default function App() {
         return;
       }
       // Same pre-run reset analyze() does, minus the worker — then hydrate from the file.
+      leaveVideoForResume();
       workerRef.current?.terminate();
       workerRef.current = null;
       fileRef.current = video;
@@ -520,6 +569,8 @@ export default function App() {
       setFileName(video.name);
       setVideoUrl((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(video); });
       hydrateFrom(sidecarFile);
+      // Cached for the same reason applySidecar caches it.
+      void cachePut(keyOf(sidecarFile), sidecarFile);
     });
   }
 
@@ -548,6 +599,7 @@ export default function App() {
   // not just forgotten: it may still be grinding through a file we are done with, and the next
   // analyze() would leave two of them competing for the decoder.
   function reset() {
+    leaveVideoForResume();
     workerRef.current?.terminate();
     workerRef.current = null;
     snipRef.current?.terminate();
@@ -570,8 +622,13 @@ export default function App() {
     if (!import.meta.env.DEV) return;
     const name = new URLSearchParams(location.search).get("test");
     if (!name) return;
-    fetch(`/_test/${name}`)
-      .then((r) => r.blob())
+    // BASE_URL, not "/": the app is served under /app/, so a root-relative path 404s and the
+    // 404 page's body arrives here as an "unsupported format" video.
+    fetch(`${import.meta.env.BASE_URL}_test/${name}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`?test=${name}: ${r.status}`);
+        return r.blob();
+      })
       .then((b) => loadFile(new File([b], name, { type: b.type || "video/mp4" })))
       .catch((e) => setError(String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -579,7 +636,14 @@ export default function App() {
 
   // Seeking somewhere unanalyzed: tell the worker to abandon what it's doing and
   // analyze from here, so the viewer's position always wins.
-  function onSeeked(t: number) {
+  function onSeeked(t: number, byViewer = true) {
+    // A seek of the viewer's own answers the resume offer too, and is somewhere worth saving.
+    // The player's own preview jump is neither: it used to dismiss the offer, mark the video
+    // touched and then save 0:00 on the way out — erasing the bookmark it never showed them.
+    // The landing: clears any pending seek (and, for a seek the player did not start itself —
+    // the browser's own media keys — records it as the viewer's).
+    bookmarkRef.current = bookmarkSeeked(bookmarkRef.current, t, byViewer);
+    if (byViewer) setResumeAt(null);
     if (done || !workerRef.current) return;
     if (!isAnalyzed(ranges, t)) {
       workerRef.current.postMessage({ type: "seek", t });
@@ -590,9 +654,82 @@ export default function App() {
   // which only feed the HUD.
   const lastTimeRef = useRef(-1);
   function onTimeChange(t: number) {
+    bookmarkRef.current = bookmarkTime(bookmarkRef.current, t);
+    // Throttled to every ~5s of wall time: a write per presented frame would be pointless
+    // churn, and pause, pagehide and a switch all flush the exact position anyway.
+    if (bookmarkRef.current.touched && performance.now() - lastResumeSaveRef.current > 5000) flushResume();
     if (Math.abs(t - lastTimeRef.current) < 0.2) return;
     lastTimeRef.current = t;
     setCurrentTime(t);
+  }
+
+  // Reads refs only, so the pagehide listener below can hold one copy for the app's lifetime.
+  const flushResume = useCallback(() => {
+    const store = resumeStore();
+    const key = resumeKeyRef.current;
+    const place = bookmarkToSave(bookmarkRef.current);
+    if (!store || !key || place === null) return;
+    lastResumeSaveRef.current = performance.now();
+    savePosition(store, key, place, resumeDurRef.current);
+  }, []);
+
+  // Before this video goes away: save where the viewer is, then forget the video, so nothing
+  // the next one does is written under this one's key.
+  function leaveVideoForResume() {
+    flushResume();
+    resumeKeyRef.current = null;
+    resumeReadForRef.current = null;
+    bookmarkRef.current = initialBookmark();
+    setResumeAt(null);
+  }
+
+  // pagehide, not beforeunload: it is the one that fires on mobile and with the back-forward
+  // cache. visibilitychange as well, because a mobile tab that is backgrounded and then killed
+  // never gets a pagehide at all.
+  useEffect(() => {
+    const onHide = () => flushResume();
+    const onVis = () => { if (document.visibilityState === "hidden") flushResume(); };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [flushResume]);
+
+  // The video's identity is known once its meta is (size + duration + frame size — the cache's
+  // key). Read the saved position THEN, once per opened video, before anything the viewer does
+  // here can overwrite it. It is only SHOWN once playback is possible (see the strip).
+  const resumeKey = meta && fileRef.current
+    ? videoKey(fileRef.current.size, meta.duration, meta.videoWidth, meta.videoHeight)
+    : null;
+  useEffect(() => {
+    if (!resumeKey || !meta) return;
+    resumeKeyRef.current = resumeKey;
+    resumeDurRef.current = meta.duration;
+    if (resumeReadForRef.current === videoUrl) return;
+    resumeReadForRef.current = videoUrl;
+    const store = resumeStore();
+    setResumeAt(store ? loadPosition(store, resumeKey, meta.duration) : null);
+  }, [resumeKey, meta, videoUrl]);
+
+  // The strip's buttons unmount as they are pressed, which would drop keyboard focus on <body>.
+  // Hand it to the player's play button instead: that is where someone who just chose where
+  // to start goes next.
+  function focusPlayer() {
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>(".video-controls-container .controls > button")?.focus()
+    );
+  }
+
+  function onPlayingChange(playing: boolean) {
+    if (playing) {
+      // Pressing play IS an answer to the offer: they chose to watch from where they are.
+      bookmarkRef.current = bookmarkPlay(bookmarkRef.current);
+      setResumeAt(null);
+    } else {
+      flushResume();
+    }
   }
 
   // The moments, filtered and sorted, computed ONCE and shared. This lives in App rather than
@@ -689,9 +826,17 @@ export default function App() {
   const chip = videoUrl && !fatal && (
     <span className={done ? "chip ready" : "chip"} role="status">
       <span className="chip-dot" />
-      {done
-        ? `${activities.length} moment${activities.length === 1 ? "" : "s"}`
-        : `Finding moments… ${progressPct.toFixed(0)}%`}
+      {/* Two wordings: the compact top bar shows only the number. The long one stays in the
+          accessibility tree in both layouts (visually hidden when compact), so the status
+          region announces a sentence, never a bare "87%". */}
+      <span className="chip-long">
+        {done
+          ? `${activities.length} moment${activities.length === 1 ? "" : "s"}`
+          : `Finding moments… ${progressPct.toFixed(0)}%`}
+      </span>
+      <span className="chip-short" aria-hidden="true">
+        {done ? activities.length : `${progressPct.toFixed(0)}%`}
+      </span>
     </span>
   );
 
@@ -722,8 +867,25 @@ export default function App() {
         file={videoUrl && !fatal ? fileName : null}
         status={chip}
         onAbout={() => setAboutOpen(true)}
-        onChangeVideo={reset}
+        onChangeVideo={() => videoInputRef.current?.click()}
         onLoadMoments={canDrop ? () => momentsInputRef.current?.click() : undefined}
+      />
+      {/* "Change" opens a picker rather than dropping you back on the landing screen. It used
+          to call reset() straight away: one click and the lecture, its playhead and any
+          running analysis were gone, with nothing to go back to. Now dismissing the picker
+          changes nothing, and picking a file is the decision. The pick goes through the same
+          loadFiles as a drop, so a video picked mid-analysis gets the same confirm. */}
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*,.json"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          if (files.length > 0) loadFiles(files);
+          e.target.value = "";
+        }}
       />
       {/* The picker feeds the same loadFiles as a drop, so the file goes through one set of
           checks and one confirm however it arrived. Value is cleared after each pick or
@@ -761,6 +923,12 @@ export default function App() {
           </div>
         </div>
       )}
+      <ConfirmSwitch
+        next={pendingSwitch?.find(isVideoFile)?.name ?? null}
+        current={fileName}
+        onCancel={() => setPendingSwitch(null)}
+        onConfirm={() => { if (pendingSwitch) loadFilesNow(pendingSwitch); setPendingSwitch(null); }}
+      />
       <ConfirmSidecar
         file={pendingSidecar}
         analyzing={!done}
@@ -785,7 +953,7 @@ export default function App() {
                 Everything before that still works — highlights and magnification simply stop
                 past that point.
               </span>
-              <button type="button" onClick={() => setErrorDismissed(true)} aria-label="Dismiss">
+              <button type="button" onClick={() => setErrorDismissed(true)} onKeyDown={stopPlayerHotkeys} aria-label="Dismiss">
                 ✕
               </button>
             </div>
@@ -793,7 +961,7 @@ export default function App() {
           {notice && (
             <div className="strip" role="status">
               <span>{notice}</span>
-              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss">
+              <button type="button" onClick={() => setNotice(null)} onKeyDown={stopPlayerHotkeys} aria-label="Dismiss">
                 ✕
               </button>
             </div>
@@ -812,6 +980,33 @@ export default function App() {
               selectOpts={selectOpts}
               onSeeked={onSeeked}
               onTimeChange={onTimeChange}
+              onPlayingChange={onPlayingChange}
+              // The resume offer (D33), drawn ON the video by the player. Only once playback is
+              // possible: on a fresh analysis that is when the first seconds are ready, and an
+              // offer to jump somewhere you cannot yet play is a button that does nothing.
+              resumeOffer={
+                resumeAt !== null && canPlay
+                  ? {
+                      at: resumeAt,
+                      onResume: () => {
+                        // Recorded now, not when the seek lands: leaving in between used to
+                        // save 0:00 and delete the bookmark the viewer had just accepted.
+                        bookmarkRef.current = bookmarkViewerSeek(bookmarkRef.current, resumeAt);
+                        seekFnRef.current(resumeAt, true);
+                        setResumeAt(null);
+                        focusPlayer();
+                      },
+                      onRestart: () => {
+                        setResumeAt(null);
+                        focusPlayer();
+                      },
+                    }
+                  : null
+              }
+              onViewerSeek={(t) => { bookmarkRef.current = bookmarkViewerSeek(bookmarkRef.current, t); }}
+              onPreviewStart={() => { bookmarkRef.current = bookmarkPreviewStart(bookmarkRef.current); }}
+              onPreviewEnd={(back) => { bookmarkRef.current = bookmarkPreviewEnd(bookmarkRef.current, back); }}
+              onPreviewTaken={(t) => { bookmarkRef.current = bookmarkSeeked(bookmarkRef.current, t, true); }}
               onActivityChange={setCurrMoment}
               thumbs={thumbs}
               seekFnRef={seekFnRef}

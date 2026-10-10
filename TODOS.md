@@ -4,6 +4,69 @@ Deferred work, with enough context to pick it up cold. Newest first.
 
 ---
 
+## Arrow keys in the segmented choices
+
+**What:** Make every segmented choice in the app (the `Choice` pattern: the Appearance sheet's
+options, "Preview on", and the others built the same way) a proper radio group: one tab stop,
+with the arrow keys moving the selection.
+
+**Why:** Today each option is its own tab stop and the arrow keys do nothing. The controls
+expose `role="radio"` and `aria-checked`, so a screen-reader user is told they are in a radio
+group and then finds that radio-group keys do not work. A keyboard user tabs through every option
+of every group. Found during the feedback round's final review, on "Preview on" (D36); it
+predates the round.
+
+**Context:** WAI-ARIA's radio group pattern: Tab enters the group on the checked option, the
+arrows move and select, and Space selects. The fix belongs in the shared `Choice` component, not
+per control.
+
+**Pros:** One fix for every group; fewer tab stops in a sheet that is already deep.
+**Cons:** Changes keyboard behaviour viewers may have learned; needs checking against the
+sheet's own key guard, which already takes the arrows (D33).
+**Blocked by:** nothing.
+
+---
+
+## Keyboard reach for every player control
+
+**What:** Give every control in the player bar the treatment D31 gave the moments list,
+Appearance and the snapshot's size and corner buttons: a visible tooltip with its name and
+key, shown on hover and on keyboard focus, and a key where it has none. That covers
+play/pause, mute, speed, magnify, pin, previous/next moment, fullscreen and collapse. Replace
+the remaining native `title` tooltips with the same component: Previous moment, Next moment,
+Playback speed, the Magnify and Pin toggles, the sidebar's Export, and both footer switches.
+Fullscreen and the fullscreen-only Collapse/Expand have only an `aria-label`, so they have no
+visible name at all. (Volume got a tip with D34's popover.) Add a `?` key that opens a panel listing every shortcut. Consider scoping the letter keys
+to the player instead of the document, as an alternative or complement to the "Single-key
+shortcuts" switch.
+
+**Why:** The feedback round fixed the four controls a user named, but the same gap is on every
+other icon in the bar. A native `title` appears only on hover, after a delay, and never on
+focus, so a keyboard user tabbing through the bar sees no name and no key, which is exactly the
+failure D31 fixed. The full key list is in About, a dialog away from the player; nothing in the
+player itself teaches a key except hovering, which is the one thing the keyboard and magnifier
+users this app is for do not do.
+
+**Context:** D31 records the tooltip pattern (portalled into the player container so it shows
+in fullscreen) and the WCAG 2.1.4 switch. The hotkeys are registered with Mantine's
+`useHotkeys`, which listens on the document, so a letter key fires wherever focus is — that is
+what WCAG 2.1.4 is about. Scoping them to "focus is inside the player" would satisfy 2.1.4's
+third option (active only when the component has focus) without a setting, but it changes
+behaviour for everyone: a key pressed after clicking the sidebar would stop working. The
+container's `onKeyDown` and `NO_REVEAL_KEYS` already have to agree with the hotkey table; a
+shortcut panel should read from the same table rather than restate it.
+
+**Pros:** One consistent way to learn every control. The `?` panel is the conventional place
+for this (YouTube, GitHub, Gmail), so viewers look for it. Scoping could retire the switch.
+**Cons:** A tooltip on every bar control is more motion near the video on each Tab press; the
+delay needs tuning so tabbing through quickly does not flash a trail of tips. Scoping keys to
+the player is a behaviour change that needs its own decision entry. Keys are running out: F, M,
+Z, P, A, L, C, S, [, ] and < > are taken.
+**Blocked by:** nothing. `PlayerTip` and its portal target (`player/tipRoot.ts`) landed with
+D31 (aac5b37) and are ready to reuse.
+
+---
+
 ## Measure detector precision on a corpus of real lectures
 
 **What:** Count valid/total activities across several real lectures and look at what the
@@ -24,35 +87,6 @@ false positives have in common.
 **Pros:** Tells you whether the headline feature is trustworthy before users rely on it.
 **Cons:** Needs a corpus of real lectures that hasn't been assembled.
 **Blocked by:** nothing. Deliberately deferred during the 2026-07-13 eng review.
-
----
-
-## Player geometry landmine: the overlays are pinned to the container, not the video
-
-**What:** `player.css:32-35` hard-codes `aspect-ratio: 16/9` on the `<video>`, and the three
-overlay layers (`.video-highlights`, `.video-magnification`, `.video-overlay`) are all
-`position:absolute; width:100%; height:100%` of `.video-container` rather than of the video's
-actual box.
-
-**Why it's a landmine:** The letterbox math in `VideoPlayer.tsx:147-161`
-(`leftShift` / `topShift` / `scaleRatio`) works today **only because the container box and the
-video element box happen to be the same rectangle** — the video is the only in-flow child. The
-real invariant is "measure the box the video actually occupies," not "measure the container."
-Any future layout change that decouples them (a docked panel *in flow*, a sidebar, a second
-in-flow child) breaks that silently. The symptom is the highlight and the magnifier drifting off
-the instructor's pen — worst for exactly the low-vision users this app exists for, and invisible
-in any test that doesn't compare pixels.
-
-**Why it's not fixed now:** The 2026-07-13 eng review chose to dock the new panel into
-`.video-controls-container` (already `position:absolute; bottom:0`), which sidesteps the whole
-problem and touches no geometry.
-
-**The fix when someone needs it:** Measure the `<video>` element itself rather than the
-container; replace `aspect-ratio: 16/9` with `height:100%; width:100%; object-fit:contain`;
-re-parent the three overlay layers into the video's box. Then the math is invariant to layout.
-
-**Blocked by:** nothing. Do it before any change that puts a second element in the player
-container's flow.
 
 ---
 

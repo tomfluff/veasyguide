@@ -56,7 +56,11 @@ export async function cachePut(key: string, file: MomentsFile): Promise<void> {
   await new Promise<void>((resolve) => {
     try {
       const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put({ key, savedAt: file.savedAt, file });
+      // Stamped with when it was CACHED, not the file's own savedAt. They are the same for an
+      // analysis that just finished here, but a moments file a classmate made months ago
+      // carries their date — and eviction keeps the newest by this index, so the file the
+      // viewer loaded a minute ago would have been the first thing thrown out. (D29)
+      tx.objectStore(STORE).put({ key, savedAt: new Date().toISOString(), file });
       tx.oncomplete = () => resolve();
       tx.onerror = () => resolve();
     } catch {

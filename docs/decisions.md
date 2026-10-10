@@ -611,6 +611,9 @@ with the image shrinking (`min-height: 0`) rather than pushing the caption out o
 Verified across all 12 size×corner combinations: each clears the bar, stays in the
 viewport, and keeps every button hittable.
 
+*Later (D32):* windowed, the bar now sits below the video, so the bar-height cap applies only
+in fullscreen. D31 also gave the two cycles keys (C and S) after all, at the user's request.
+
 ---
 
 ## D21 — A pin holds the moment you pinned; it does not follow the lecture
@@ -748,6 +751,9 @@ silently changes how the whole lecture plays — the exact bug the visible-magni
 already fixed once ("keyboard-only, state invisible"). At 1× it is a bare icon; off-default
 it goes amber with the rate, the same state language as the magnifier toggle and the NOW
 mark.
+
+*Later (D34):* the rate is now always shown, "1×" included, in a fixed-width button, so a rate
+change cannot wrap the bar. Off-default still goes amber.
 
 ---
 
@@ -1059,3 +1065,1353 @@ for nothing.
 
 **Not covered.** The "Analyzing this part…" cue is a different thing — it reports that the app
 is not ready yet, rather than commenting on the lecture — and it stays unconditional.
+
+---
+
+## D29 — "Change" opens a file picker, and only a running analysis asks before it goes
+
+**Decision** (747b91f). The top bar's Change button no longer calls `reset()`. It opens a file
+picker that feeds the same `loadFiles` a drop does, so dismissing the picker changes nothing and
+picking a file is the decision. Loading a different video while an analysis is still running
+goes through a confirm first (`ConfirmSwitch`). Dropping a video on the player screen goes
+through the same gate, because it goes through the same `loadFiles`.
+
+**What was wrong.** Change sent the viewer straight back to the landing screen. One click,
+and the lecture, its playhead and any analysis in progress were gone, with nothing to go back
+to: the landing screen has no "return to what I was watching". A user reported exactly that.
+The button's label promised a choice and its behaviour made the choice for you before you had
+seen any alternative.
+
+**Why the confirm is only mid-analysis.** A finished analysis is already in the IndexedDB
+cache (`utils/analysisCache.ts`, keyed by size, duration and frame size), so opening that
+video again restores it at once and nothing is lost by switching. A running one is not cached
+until `done` arrives, and switching away throws away every minute it has spent. The dialog
+asks only when there is something to lose, and its second paragraph says what: "Only a
+finished analysis is kept. Open this video again later and it starts over." A confirm on
+every switch would train the viewer to click through it, which is how a confirm stops working
+the one time it matters.
+
+**Same pattern as D23.** A native `<dialog>` for focus trapping, Esc and a backdrop; Esc and
+the backdrop both mean cancel; "Keep watching" is autofocused, because the risk is a stray
+Enter destroying twenty minutes of work, not the cost of one more click. The picker's value
+is cleared after each pick, or choosing the same file twice in a row would fire nothing the
+second time.
+
+**Rejected: keep `reset()` behind a confirm.** That would make the loss deliberate without
+making it necessary. The landing screen exists to get a first file in; once a video is open,
+the only reason to go back there was to pick another one, and a picker does that without
+unloading anything first.
+
+**Space on the dialog's buttons did nothing** at first; Enter worked. The player's document-level
+Space hotkey took the key. Found by the Codex review and fixed in the same round (dda1bdb, see
+D31).
+
+**Verified** (headless Chromium 145, 1366x768). Dismissing the picker leaves the file and the
+analysis untouched. A pick or a drop mid-analysis opens "Switch to another video?" with "Keep
+watching" focused, and Esc, the backdrop and Enter all keep the lecture. Once the analysis has
+finished (a 12s clip, done in 4.4s), a pick switches with no dialog.
+
+**A hole in "finished means cached", fixed in the same round** (2a6e16f). It predates this
+entry. An analysis that came from a moments file was finished (`done` is set by `hydrateFrom`)
+but never cached, because only the worker's `done` path called `cachePut`. Switching away from
+one asked nothing, which this entry's own reasoning allows only for cached analyses, and
+reopening the video re-analyzed from scratch. The `.veasyguide.json` was still on the viewer's
+disk, so dropping it again would have recovered the moments, but "nothing is lost" was not true.
+
+`cachePut` now also runs in `applySidecar` and in the video-plus-sidecar branch of
+`loadFilesNow`. It does not run in `hydrateFrom`, because a cache hit restores through
+`hydrateFrom` too, and would rewrite its own entry on every reopen.
+
+The fix exposed a second bug. The cache keeps the newest 20 entries, ordered by a `savedAt`
+index, and that `savedAt` was the **file's**: the time the analysis was made, not the time it
+was cached. For a sidecar a classmate made months ago, the entry just written was the oldest in
+the cache and the first one evicted. The record's `savedAt` is now the time it was cached (an
+ISO string, the same type as before, so it orders correctly against existing entries). The
+file's own `savedAt` is untouched inside `file`.
+
+Measured on a fresh headless profile with a 12s clip and its sidecar: the cache entry exists
+right after the video and sidecar load. After a reload, opening the video alone restored the
+analysis in 923ms, where a fresh analysis of it takes about 4s or more.
+
+**Still open.**
+- `cachePut` is best-effort and swallows failures (a full quota, storage blocked). If the
+  write failed, a finished analysis is gone after a switch, with no confirm.
+- The cache restores the analysis, not the playhead. Reopening a finished video started at
+  0:00. *Later in the same round:* D33 offers to resume where the viewer left off.
+
+---
+
+## D30 — The fill pair reads Fill / Opacity, and the magnifier gets its own way in
+
+**Decision** (03c963e). In the Appearance sheet's box group, the fill colour comes first, labelled
+"Fill", with the slider under it labelled "Opacity". The sheet's root has two rows where it had
+one: "Fine-tune the highlight" (showing the active preset) and "Fine-tune the magnifier"
+(showing the current zoom, e.g. "2.0×"). The tab and the screen title say "Magnifier" rather
+than "Zoom", and the tabs run Box, Pointer, Motion, Ink, Magnifier — the highlight's groups
+together, the magnifier last, with Ink between them because it spans both.
+
+**"Fill" was read as an amount.** The slider was labelled "Fill" and sat above "Fill colour",
+so a percentage beside the word "Fill" read as how much of the box is filled, not how strongly
+the colour shows. A user asked for it to say Opacity. Putting the colour first makes the two
+rows a pair — what colour, then how strong — and "Opacity" under "Fill" reads that way without
+repeating the noun.
+
+**Rejected: "Fill opacity" as the visible label.** It is the accurate name, but at the label
+size it would wrap in the 62px column, pushing the slider onto its own line and breaking the row
+rhythm of the group. That was the reasoning when the change was made. The width of "Fill
+opacity" itself was never measured. "Opacity" alone renders at 44px and "Fill" at 17px, so with
+a space between them they add up to about 65px, over the column's 62px. That sum is arithmetic
+on two measured words, not a measurement of the label. The accessible names were already "Fill
+colour" and "Fill opacity" and are unchanged, so a screen-reader user hears the full name either
+way; only the visible label is shortened.
+
+**The magnifier was there and nobody found it.** Its settings were a tab inside the box's
+Fine-tune screen. The root's only row said "Fine-tune" and opened the box, so a viewer looking
+for the magnifier's strength had to guess that the box's screen also held it. A user reported
+not knowing it could be adjusted at all. Both rows lead to the same tabbed screen; each just
+opens its own group, so nothing is duplicated and nothing moved. "Zoom" became "Magnifier"
+because the control bar's toggle already says "Magnify (Z)" and "Magnify the highlighted
+area", so the sheet was the one place calling the feature something else. The store keys
+(`zoom_strength`, `zoom_motion`) and the screen id `zoom` are unchanged; only words a viewer
+reads moved.
+
+**Cost, measured** (headless Chromium 145, 1366x768, DSF 1, Atkinson Hyperlegible loaded). The
+root's content grows from 289.42px to 320.83px with the second row; the sheet's outer box, with
+its border, goes from 291.4px to 322.8px. Every drill screen (Box, Pointer, Motion, Ink,
+Magnifier) is 351.1px outer, the same as before, so the root is still shorter than the screens
+under it. The promise the sheet was built on, "you go DEEPER, not longer, so the band of video
+it occludes never changes", still holds.
+
+The header comment's "a fixed 340x260" is wrong on both axes. The sheet renders 398px wide
+(396 plus a 1px border each side) and 351.1px tall on the drill screens. That predates this
+entry and is recorded rather than fixed here.
+
+*Later (D36):* the root screen's hint line became the "Preview on" choice. The root is now
+329.4px outer against the drill screens' 351.1px (327 and 349 without the 2px border), so the
+fixed band still holds.
+
+Rendered label widths in the 62px column: Border 37, Colour 37, Fill 17, Opacity 44, Shape 36,
+Size 25. All fit on one line. The five tabs end at 293px of a 372px row (79px spare), with no
+horizontal scroll. The Ink screen's "The highlight" / "The magnifier" choice renders both
+options on one line, 30px tall, in a 300px control. On the old layout "Fill colour" also fitted
+in the column, so the reorder was about how the pair reads, not about room.
+
+---
+
+## D31 — Four player buttons name themselves on hover and focus, and get keys
+
+**Decision** (aac5b37). Appearance, the moments list, Snapshot size and Move snapshot show a
+styled tooltip, `PlayerTip`, with the control's name and a keycap. It opens on pointer hover and
+on keyboard `focus-visible`, and it replaces the native `title` those buttons had (or the
+nothing they had). New keys: A opens Appearance; L is the moments list; C and S move and resize
+the pinned snapshot. A "Single-key shortcuts" switch in the moments sidebar's footer turns off
+every printable-character key (`letterShortcuts` in `ViewSettingsStore`, default on). Space and
+the arrow keys stay on regardless. The tip meets WCAG 1.4.13 since dda1bdb: it can be hovered,
+stays up while hovered, and Escape dismisses it. The other bar controls are deliberately left
+for later (TODOS.md, "Keyboard reach for every player control").
+
+**What was wrong.** A user on Windows saw no names and no shortcuts on these controls. Appearance
+and the moments list had no visible name at all, only an `aria-label` that a screen reader
+announces and a sighted viewer never sees. Size and corner had a native `title`, which uses a
+small system font that ignores page zoom, arrives after a slow fixed delay, never shows on
+keyboard focus, and did not appear for the user on Windows. It also does not appear over a
+fullscreen element.
+
+**This partly reverses a rule.** `AppearanceSheet.tsx` says "No tooltips: a hover tooltip is
+invisible to a keyboard user, a screen-reader user and anyone driving a magnifier". That rule's
+reason was tips shown only on hover. This tip also opens on keyboard focus, so a keyboard user
+gets it on Tab. The screen reader already has the name from the `aria-label`, and gets the key
+from `aria-keyshortcuts`. A magnifier user who tabs to the button finds the tip beside the focus
+ring, where their view already is. The rule still governs the sheet's own hints, which stay
+visible text inside the sheet, and the comment there now says so and points here (625956a).
+
+**It also reverses D20's "No new hotkeys".** D20 left the snapshot cycles without keys because
+"the keyboard map is already dense". The user asked for keys. C and S act only while something
+is pinned, and they do not reveal the bar (they are in `NO_REVEAL_KEYS`, like Z and P), so
+moving the snapshot does not put the bar over the video.
+
+**L does different things in the two modes, because there is different work to do.** In
+fullscreen it toggles the moments overlay, like the button. Windowed, the list is always on the
+page, so there is nothing to open, and L moves focus to the list's current row instead.
+
+**Where the tip is drawn.** It portals into the player container, which is shared through a
+React context (`player/tipRoot.ts`) holding the element from a callback ref merged with
+`containerRef`.
+- Rejected: portal to `<body>`. In fullscreen only the fullscreen element's subtree is drawn, so
+  the tip would vanish exactly where the bar is most used. D24's Speed menu sets
+  `withinPortal={false}` for the same reason.
+- Rejected: render inline. `.pin-panel` has `overflow: hidden`, which would clip the tips on the
+  snapshot's own buttons.
+
+**Details the library forced.**
+- The `Tooltip` wraps **outside** `Popover.Target`. `Popover.Target` forwards its props to its
+  child, and `Tooltip` spreads unknown props onto its floating box. Nested the other way, the
+  popover's anchor ref and ARIA land on the tip instead of the button.
+- `events: { hover, focus, touch: false }`. Mantine passes `visibleOnly` to floating-ui's
+  `useFocus`, so a Tab shows the tip and a mouse click does not. Touch is off because on touch
+  the tap is the click; a tip would flash on top of the popover it just opened.
+- The tip is disabled while its own popover or overlay is open, and while the bar is
+  auto-hidden. A hidden bar has `pointer-events: none`, so it never receives the `mouseleave`,
+  and the tip would stay over the video.
+- `aria-describedby` is suppressed. floating-ui's tooltip role would make a screen reader read
+  the name twice, since the `aria-label` already says it.
+- 200ms open delay, immediate close (300ms since the 1.4.13 fix below). Font 1rem, not Mantine's
+  default 0.875rem, because the people who need the tip are the people who need it bigger. Dark
+  `#12161d`, like the bar.
+
+**Names changed with it.** Appearance is now "Appearance: highlight and magnifier"; plain
+"Appearance" read as the app's theme. The corner button's `aria-label` now starts "Move
+snapshot: now top right. Move to bottom right.", so it contains the words its tip shows
+(WCAG 2.5.3, Label in Name). A voice-control user says what they see.
+
+**Why the switch (WCAG 2.1.4, Character Key Shortcuts).** A one-character shortcut must be
+possible to turn off or remap. Speech-input users trigger it by saying an ordinary word, and the
+player's keys are registered with Mantine's `useHotkeys`, which listens on the whole document,
+so they fire wherever focus is. Adding A, L, C and S grew the set to F M Z P A L C S [ ] < >,
+and all of them are gated. Space and the arrows are not character keys, and they are the only
+non-pointer way to drive the player at all. When the switch is off, the tips drop their keycap
+rather than advertise a key that does nothing. The setting lives in `ViewSettingsStore`, not
+`HighlightSettingsStore`, for the same preset reason as D28, and a test asserts that.
+
+**The sidebar footer now always renders.** It used to exist only for the scene-notice switch,
+which is gated on more than one scene (D28). The shortcuts switch applies to every video, so the
+footer is always there, as a flex column with an 8px gap. The scene-notice switch keeps its gate.
+About lists A, L, C and S, with a note that single-key shortcuts can be switched off.
+
+**Rejected: scoping the letter keys to player focus** instead of a switch. That is 2.1.4's third
+option, and it needs no setting, but a key pressed after clicking into the sidebar would stop
+working for everyone. It is recorded in TODOS.md as something to weigh, not done here.
+
+**Two older keyboard bugs, found while testing these keys.** Both predate this entry.
+- The bar's `onKeyDown` stopped propagation of every key, so every letter shortcut was dead
+  while focus sat on a bar control. That is the normal state right after clicking one: F did
+  nothing right after clicking Fullscreen. It now stops only what `stopPlayerHotkeys` says to
+  stop, the rule the sidebar already used, so `hotkeys.ts`'s "keys work wherever focus sits" is
+  true for the bar as well (8883cbd). video-lead found it while recording D31's keys.
+- ← and → seeked from `currTime`, a throttled state copy of the playhead, not from the video.
+  After a seek while paused that copy can be far behind: three presses of ← right after seeking
+  to 60s landed at 0.0s on main, and land at 45.0s now. They read `video.currentTime`, as the
+  comment on `handleStepMoment` already said they should (ba12eb9).
+
+**Measured** (headless Chromium 145, at aac5b37 plus 8883cbd).
+- Open delay: the tip is in the DOM 212-217ms after hover over three runs, against 200ms
+  configured, and fully opaque at 335-350ms once the fade has run.
+- Tab focus shows the tip on Appearance, windowed and in fullscreen, and on the Moments list
+  button in fullscreen (it exists only there). Snapshot size and Move snapshot were checked on
+  hover, at size small in all four corners. Every tip landed inside the player container and
+  the viewport, and in fullscreen inside the fullscreen element. **Not checked:** Tab focus onto
+  the two snapshot buttons.
+- A mouse click on Appearance opens the sheet with no tip. Clicking again closes it, and the
+  tip shows only while the pointer is still over the button. Once the pointer leaves, there is
+  no tip, though focus stays on the button. That is `visibleOnly` doing its job: the focus came
+  from a mouse, so it is not `focus-visible`.
+- With the switch off, A, F, M, Z, P, L and ] changed nothing (time, fullscreen, mute, sheet,
+  pin and magnifier all unchanged), while → still seeked 0 to 5s and Space still played. The
+  tip dropped its keycap and `aria-keyshortcuts` went to null. The off state survives a reload.
+  **Not pressed with the switch off:** C, S, [, < and >. They go through the same gate, but
+  that is read from the code, not measured.
+- Auto-hide in fullscreen with the pointer resting on Appearance: the tip shows from 0 to 1.2s
+  and is gone at 1.6s, the same moment the bar's opacity reaches 0. This was first reported as
+  a pass ("no tip left hanging"). The measurement was right and the reading was wrong: it was a
+  WCAG 1.4.13 failure, fixed below.
+- 320x320: the sidebar is 240px, D28's 15rem floor. "Notify scene changes" sits at 713-737px and
+  "Single-key shortcuts" at 745-769px, both inside the panel (540 to 780). The page scrolls to
+  them (`scrollHeight` 852), and both are reachable. Same at 320x568, 600x400, 899x500 and
+  899x700, where the cap is 40vh = 280px.
+- A real screen reader was not run.
+
+**Fixed in the same round: the tip failed WCAG 1.4.13** (dda1bdb). Content that appears on hover
+or focus must be hoverable, persistent and dismissible, and the first version met only the
+third.
+- Not persistent. In fullscreen it vanished at 1.6s with the auto-hiding bar while the pointer
+  was still resting on the button: the auto-hide measurement above, first misread as a pass and
+  caught by an independent Codex review. The fullscreen idle-hide now skips while the bar or a
+  tip is hovered. Measured: resting 3.5s in fullscreen keeps both the tip and the bar.
+- Not hoverable. The tip had `pointer-events: none`, so it could not be reached: walking the
+  pointer from the button toward it in 6px steps, it was present up to y=623 and gone from
+  y=617, before the pointer arrived. A magnifier user, who has to move across a tip to read it
+  at their zoom, lost it on the way. It now has `pointer-events: auto` and a 300ms close delay,
+  and floating-ui cancels the close when the pointer enters the tip. Measured: the same 6px walk
+  never loses it.
+- Dismissible: Escape closes it, through Mantine's `useDismiss`.
+
+Re-measured independently. On the 6px walk from the Appearance button onto its tip, the tip is
+present at all 8 steps and still there 400ms after landing on it. In fullscreen, with the
+pointer resting on the button, the bar's opacity is 1 and the tip is shown at every 500ms sample
+from 0 to 4.0s; once the pointer moves onto the picture, both hide. Escape dismisses a hovered
+tip, windowed and in fullscreen (fullscreen is kept), and a keyboard-focused tip. The tip lingers
+400ms after the pointer leaves the button, the 300ms close delay plus the transition. Tab still
+shows it, and a click followed by leaving still shows none.
+
+The close delay changes the timing reported above, which was "immediate close". The open delay
+is unchanged.
+
+**Fixed in the same round: Space was taken by the player** (dda1bdb). Buttons outside the player
+that did not call `stopPlayerHotkeys` let Space bubble to the player's document-level hotkey,
+which played or paused the video instead of pressing the button. Space on D33's Resume played
+from 0:00 and dismissed the offer; Space on D29's "Switch video" did nothing. Enter worked in
+both, which is why nobody had noticed. Now guarded: the resume strip, the strips' ✕ buttons, the
+header's Change and Moments file buttons, and all three modal dialogs (both confirms and About).
+The dialogs stop every key, because the player is inert behind a modal anyway (dda1bdb).
+Re-measured independently: Space on Resume lands at 124.00s from a stored 124, playing; Space on
+"Start from the beginning" stays at 0, paused, and removes the strip. Space on "Switch video"
+switches, Space on "Keep watching" closes the dialog and keeps the current video, and Escape and
+Enter still work. About blocks F, M, Z, A, L, ], Space and →. Space on the header's Change and
+Moments file buttons opens the picker and leaves the video paused.
+
+**And two tests that could not fail.** The "on by default" tests for `letterShortcuts` and D28's
+`sceneNotice` asserted the value their own `beforeEach` had just set. They now read
+`getInitialState()`, so flipping a default fails them (dda1bdb).
+
+**Still open.**
+- Previous moment, Next moment, Playback speed, the Magnify toggle, the Pin toggle, the
+  sidebar's Export, and both footer switches still use a native `title`. The Single-key
+  shortcuts switch's `title` is where the list of keys it covers lives. Fullscreen and
+  Collapse/Expand have only an `aria-label`, with no visible name at all. (Mute became the
+  Volume popover in D34, which has a tip.) All of these are the same defect this entry fixed for
+  four buttons. TODOS.md has the plan.
+
+---
+
+## D32 — The control bar sits below the video, except in fullscreen
+
+**Decision** (9e5fdbf). In the windowed player, the control bar is laid out under the video and
+never hides. In fullscreen it overlays the picture as before, but it now auto-hides even while
+paused, and it starts collapsed. Collapse exists only in fullscreen: the windowed bar is always
+expanded, and leaving fullscreen returns it to expanded. That last part was revised within the
+round (c1785ae); see "Revised: no collapse in the window" below. The windowed video is sized
+to fit the window less the measured top bar, footer and a one-row bar (50ac023, 3c3dfe5), and
+the bar's contents were cut to one slim row (D34), which is what finally made its height stop
+depending on its width.
+
+**What was wrong.** A user reported that the bar covered the bottom of the video. On a lecture,
+that is where the instructor writes last, at the foot of the slide, so the bar masked the
+newest writing, and the highlight and magnifier could sit under it. Measured on main@d2e19c3 at
+1400x900: on a 1062x597.4 video, the overlaid bar covered the bottom 139.8px expanded (23.4% of
+the picture) and 53px collapsed (8.9%). After the change it covers 0px. Windowed, the bar's top
+minus the video's bottom is 0.00px at 1366x768, 1920x1080, 1536x864 at DPR 1.25, and 320x640.
+
+**The cost: a smaller picture on short windows.** The bar's height now comes off the height
+available to the video, not off the video. At 1366x768 with moments, the expanded bar is 139.8px
+(scrubber, moment lane, now-line, controls), and the video drops from 1028px to 832px wide, 19%
+narrower. With the bar collapsed it was 987px, until collapse was removed from the window
+(below). At 1400x900 the video stays 1062px wide, because there the available width limits it
+before the height cap does: the new cap works out to about 1067px there. The user chose the bar
+below the video; this is the price of that choice, recorded here so it is a known trade and not
+a surprise. As first shipped, collapsing the bar got most of the size back; that is no longer
+offered in the window. Moving the now-line into the sidebar was weighed as another way back and
+rejected (below), so the cost is accepted, not pending. The 832px is exact arithmetic for a
+139.8px bar. It has to be re-checked once the feedback loop under Still open is fixed, because
+the loop makes the bar taller than that on some windows. After the fix (eaceeb5, below) the cap
+subtracts a constant 140px, which gives the same 832px by arithmetic. D34 then cut the constant
+to an 89px bar, and 50ac023 (below) replaced the guessed 160px of page chrome with the measured
+chrome, so neither 832 nor any later arithmetic for 1366x768 describes the current build.
+Re-measured at cb3c512: the video is 992px wide at a 1366x768 viewport.
+
+**Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
+bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
+on every reveal (rejected below). So the bar overlays, and the cost is kept small instead: it
+starts collapsed (54px measured at 1400x900), and it hides after a short idle even while paused,
+because a paused frame is one someone is reading. The idle delay is still 2000ms, and the bar
+still never hides while keyboard focus is inside it, or, since dda1bdb, while the pointer is
+over the bar or one of its tips (D31). Measured: opacity 0 by 2.6s idle while paused, the 2000ms
+delay plus the fade. **That measurement holds only when fullscreen was entered by key, or when
+something has blurred focus since** (see Still open). Entering fullscreen always collapses the
+bar. As first shipped, leaving restored the windowed state both ways, measured expanded to
+expanded and collapsed to collapsed; since c1785ae there is no windowed collapsed state to
+restore. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
+and the `.paused` force-visible rule is gone.
+
+**Rejected.**
+- Hide the bar only while paused. A viewer pauses to read, moves the mouse, and the bar comes
+  back over the very line they paused for.
+- Keep the overlay and start it collapsed. Shorter, but it still covers the bottom of the frame,
+  and the bottom is where the writing is.
+- In fullscreen, shrink the video whenever the bar shows. Every reveal changes the video's box,
+  so the highlight and magnifier recompute and jump under the viewer's eye each time the mouse
+  moves.
+- Move the now-line (the status line) into the sidebar's header, to win back windowed picture
+  size. Considered after collapse left the window, as the way to shorten the bar without a
+  control that resizes the player. The owner kept the line in the bar. The smaller windowed
+  picture (832 against 1028px wide at 1366x768) is an accepted trade, not an open defect.
+- Move the bar after the video in the DOM. The bar stays first in the DOM, and CSS `order: 2`
+  places it below. Moving it would change a tab order viewers already know, and would put the
+  pin panel's buttons ahead of the bar.
+
+**It resolves the geometry landmine.** TODOS.md carried a warning: the overlay layers were 100%
+of `.video-container`, and the letterbox math held only because the video was that container's
+only in-flow child. "Do it before any change that puts a second element in the player
+container's flow". This is that change. Every layer drawn on the picture now lives in
+`.video-stage` (`position: relative`), whose box is the `<video>` box. That covers
+`.video-highlights`, `.video-magnification`, `.video-overlay`, the pin panel and the fullscreen
+moments overlay. Left where they were, they would have stretched over the bar. Highlights and
+magnification also got an explicit `top: 0; left: 0`. Static position inside a block parent
+would have put them below the video, not on it.
+
+The highlight math did not change. It already measured the `<video>` element
+(`useElementSize` on the video), not the container, so the half of the TODOS fix about
+measuring is already done. The `object-fit: contain` change it proposed was not needed.
+Windowed, `aspect-ratio: 16/9` stays. In fullscreen the video is `height: 100%` with
+`aspect-ratio: auto`, and the browser letterboxes it, which is what `computeLetterbox` expects.
+The video is now `display: block`. An inline video leaves a baseline gap under itself, which
+would have offset every overlay by a few pixels.
+
+Measured at 1400x900: the stage, the video and all overlay layers share one 1062x597.4 box.
+
+**Alignment, measured from screenshots** against main@d2e19c3. The painted video rectangle was
+found from pixels. The highlight's box came from a with/without-overlay diff. The magnifier was
+compared by normalized cross-correlation against a synthetic zoom of the unmagnified frame.
+- 1920x1080, DPR 1, where the video's size is the same before and after: every number is
+  identical to 0.01px. Highlight edge outsets (left, top, right, bottom) are
+  6.83/1.04/6.31/3.31px windowed and 11/2.39/10/3.84px in fullscreen. The magnifier residual is
+  (−1, −4)px windowed and (0, −2)px in fullscreen, before and after alike.
+- 1366x768, DPR 1, where the picture shrinks: before, the outsets were 5.11/1.24/5.88/2.51px on
+  a 1028px picture. Scaled to 832px that predicts 4.14/1.00/4.76/2.03px, and after they are
+  4.27/0.83/5.00/2.55px, at most 0.5px from the prediction. Magnifier residual (−1, −2) before,
+  (0, −3) after. Fullscreen identical.
+- 1536x864, DPR 1.25: after, outsets are 5.76/0.96/6.48/3.36px windowed and 5.44/1.84/7.28/2.87px
+  with the bar collapsed; fullscreen identical to before. The magnifier residual is (1.6, −1.6)
+  after against (0, 0) before, on different picture sizes. At zoom 1, as a control, it is
+  (0.8, −0.8) after and (0, −0.8) before.
+
+Largest change against before: the highlight within 0.5px at DPR 1 and 1.1px at DPR 1.25, the
+magnifier within 2 device pixels. All of it is inside the residual main already shows, up to
+4px at 2.5x zoom, which looks like a bias in the measurement from the dark bottom rows of the
+test frame rather than a real offset. Nothing here moved the overlays off the picture.
+
+**Offsets that assumed the bar was on the picture.** The pin panel's `bottom` and `max-height`
+(D20's `calc(100% - barHeight - 24px)` and `barHeight + 12`) and the preview-jump pill now
+subtract the bar height only in fullscreen (`barOverlap = isFullscreen ? barHeight : 0`).
+Windowed, they become `calc(100% - 24px)` and a 12px inset, the same as the top corners.
+The moments overlay exists only in fullscreen, so it keeps `barHeight`. D20's note that "a tall
+panel grew UNDER the bar" now describes fullscreen only.
+
+**Player sizing.** The width cap was `calc((100vh - 160px) * 16/9)`, which assumed the bar sat on
+the video. It is now `max(20rem, calc((100vh - 160px - var(--bar-h, 0px)) * 16/9))`, where
+`--bar-h` is the measured bar height set inline (0 in fullscreen), so the video and the bar
+together fit the window. That measured height turned out to be a feedback loop, and was replaced
+by a constant within the round (eaceeb5, "Fixed: the width cap fed on itself" below). The
+flat 160px was itself a guess, replaced by measured chrome (50ac023, "Fixed: the cap guessed
+the page chrome" below). The 20rem floor exists because at 320x320 the formula alone gives a
+video under 20px wide. Below the floor the page scrolls, which is what a page is for.
+Measured at 1400x900: the player's bottom edge is at 802px, inside the 900px window, and the
+sidebar spans the player's full 737.2px height. At 1366x768, 1920x1080 and 1536x864 at DPR 1.25
+nothing scrolls, and the player causes no horizontal overflow. At 320px wide the player is
+264px and fits. At 320x320 with the bar expanded it runs to 397px, past the window: that is the
+20rem floor, by design.
+
+*Correction, same round:* these "fits the window" checks measured that the player's bottom edge
+was inside the viewport. A video that has shrunk always passes that test, so they could not
+catch the player sizing itself too small, and they did not: the owner found the feedback loop
+under Still open on a desktop window. They prove that nothing overflows, not that the video is
+the right size.
+
+The old `@media (max-width: 520px)` block that already put the bar in flow (the WCAG 1.4.10
+reflow case) is now the default everywhere, and it is gone.
+
+**Revised: no collapse in the window** (c1785ae, the user's decision). As first shipped, the
+windowed bar kept its collapse button. With the bar in flow, the player's width cap subtracts
+the bar's measured height (`--bar-h`), so collapsing or expanding resized the whole player, and
+the interface jumped under the viewer.
+The collapse button now exists only in fullscreen, where the bar overlays the picture and its
+height moves nothing. Fullscreen still starts collapsed and the viewer can expand it. Leaving
+fullscreen always returns to the expanded bar. The refs that restored the windowed collapsed
+state on exit (`collapsedRef`, `windowedCollapsedRef`) are gone, and the `collapsed` class is
+also gated on `isFullscreen`, so a stray state cannot collapse a windowed bar. The state is
+never persisted. Opening the moments overlay still collapses the bar, which only ever happened
+in fullscreen. Measured at 1400x900: the windowed player is 1062x737 before fullscreen and after
+leaving it, with no collapse control in the window. Re-measured independently: no collapse
+control in the window, and the player held at 1062x737.17 through load, the Appearance sheet,
+a pin, the magnifier and a fullscreen round trip. Fullscreen enters collapsed at 54px; Expand
+gives 140.8px and Collapse 54px.
+
+**Fixed in the same round: the bar still resized the player on its own** (d3d2108). Removing
+collapse left two jumps. The moment lane and the now-line mounted only once the analysis had
+found a moment, and the now-line wrapped onto more lines as its text grew. The windowed bar is
+in flow and the width cap subtracts `--bar-h`, so each of these resized the player while the
+viewer was watching. Now the lane and a single now-line render from the first frame. The
+now-line reads "Looking for moments…" before any moment, and "No annotation moments found…"
+once an analysis finishes empty; the separate empty-state line is merged into it. The now-line
+is held to one line (`nowrap` and an ellipsis on the sentence, in CSS only, so its
+`role="status"` still announces the full text). The empty lane is `aria-hidden`. Previous and
+Next are always rendered, disabled until there is a moment, so their arrival cannot wrap the
+controls row.
+
+Bar height over a whole session (analysis, playback, magnifier, speed), before and after, on a
+clip with moments: 1400px wide, 81 then 140px became a constant 140px; 800px, 81 then 140 became
+140; 560px, 128 then 187 became 187; 400px, 128 then 259 then 234 became 234. A clip with no
+moments holds 140px and 234px. The price is that the player is sized for the full bar from the
+start, so before the first moment the picture is smaller than it was, and it no longer grows
+and then shrinks. The truncation applies only where wrapping actually changed the height:
+it did at 400px, and wider windows never truncate. Also fixed on the way: "1 moments so far"
+now reads "1 moment".
+
+**Correction: d3d2108 did not hold the player still.** The numbers above are real, but they
+come from one clip at four widths, where the bar did settle at one height. An independent
+re-measure found the player shrinking on other windows, at d3d2108:
+- 800x600: the player went from 744 to 533.7 to 450.1px wide as the analysis started, and the
+  bar from 140 to 186.8px.
+- At 200% zoom (683x384 CSS px at DPR 2): 398 to 320px wide.
+- At 400% zoom (341x192 at DPR 4): the bar went from 233.8 to 280.8px when the magnifier or
+  speed was used mid-playback.
+- Stable, as reported: the clip with moments at 400, 560 and 1400px wide (233.8, 186.8 and
+  139.8px), and the clip with none at 400 and 1400px.
+This is the bug the owner hit, below under Still open. "Constant through a whole session" was
+true only for the cases measured.
+
+**Corrected in the same round: the ellipsis hid text** (cd5a242, replacing d3d2108's
+one-line rule). Truncating the now-line at 400px held the bar still, but it did so by hiding the
+end of the sentence from exactly the reader who sees the app at that width, someone zoomed in.
+WCAG 1.4.10 (Reflow) does not allow losing content to reflow, and the screen reader getting the
+full text does not cover the sighted reader who doesn't.
+
+The now-line wraps freely again, and its height still does not change. It shares a CSS grid
+cell (`.now-slot`) with sizers that are `visibility: hidden` and `aria-hidden`, holding the
+longest content the line can ever show: a moment sentence with a three-digit moment number,
+"most of the slide" and this video's own duration as the timecode, plus the magnifier chip and
+"Next at". The cell is as tall as the tallest of them, so the row reserves the worst case at
+the current width from the first frame, with no JavaScript measuring anything.
+- Rejected: a fixed two-line height, team-lead's first suggestion. At 320px and 400px the worst
+  case needs about four lines, so two lines would clip it, which is the bug being fixed.
+- The empty-video sentence was shortened from "No annotation moments found in this video — the
+  highlight and magnifier have nothing to follow." (96 characters) to "No moments found — nothing
+  for the highlight to follow." The long one was itself the worst case, and reserved two extra
+  lines on every video for a state most videos never reach. It was later cut to just "No
+  moments found", at the owner's wording, and its sizer removed (9830653). The moment sentence
+  with both chips is now the only worst case. Heights are unchanged.
+
+Bar height, constant through a whole session with zero clipped samples: 140px at 1400 and 800
+wide, 222px at 560, 312px at 400, 393px at 320. With the ellipsis it was 140, 140, 187 and 234.
+The cost is empty space under a short sentence at narrow widths, and a smaller picture there.
+Nothing is hidden. "Nothing moves" was claimed for these widths, and it has not been
+re-checked against the feedback loop below, which the sizers are suspected of making worse.
+Whether the reserved space is acceptable is not decided (Still open).
+
+**Fixed: the width cap fed on itself** (eaceeb5). Introduced in this round, by 9e5fdbf's sizing
+formula, and found by the owner on his desktop: a video a quarter of the window wide, under a
+bar wrapped into three rows. The cap subtracted the bar's **measured** height, `--bar-h`. But the
+bar's height depends on the player's width, since a narrower bar wraps into more rows. So a tall
+bar made a narrower player, which made a taller bar, and the loop converged small. cd5a242's
+worst-case sizers made it worse, because they wrap sooner. The "fits the window" checks could not
+see it (see the correction under Player sizing), and d3d2108's "constant" numbers happened to
+come from windows where the loop settled at once.
+
+The cap now subtracts a constant: one row of bar, `108px + 2rem`, which is 140px at a 16px root
+font size. `--bar-h` is gone. The lesson worth keeping: **a size must not depend on something it
+causes.** Measured video width, before and after: 1366x650, 477 to 622px; 1280x600 at DPR 1.5,
+320 to 533px (it had hit the 20rem floor); 1920x960, 2048x1030, 1707x840 and 1600x700 unchanged.
+
+Re-measured independently at eaceeb5: zero size changes across 10 cases, so the loop is gone.
+But at 1366x650, 1280x600 at DPR 1.5 and 800x600 the controls wrapped into two rows (a 220px
+bar), taller than the 140px the cap assumed, and the page scrolled by 41-43px. D34's one-row bar
+removed that.
+
+**Fixed: the fullscreen bar never hid after a mouse click** (eaceeb5). Any focus inside the bar
+blocked the idle hide, so clicking the Fullscreen button parked focus on "Exit fullscreen" and
+the bar stayed up for good. Now only `:focus-visible` focus blocks it, plus an open Appearance
+sheet or speed menu, which live inside the bar. Re-measured independently: after a mouse click
+on Fullscreen the bar hides at 2176ms. Keyboard focus in the bar keeps it at opacity 1, and so
+does an Appearance sheet opened with the mouse.
+
+**Fixed: the cap guessed the page chrome** (50ac023). The owner reported about 100px of empty
+window under the player and the sidebar. The cap subtracted a flat 160px for everything around
+the player, and the real chrome is 126px: a 4px hairline, the 45px top bar, 16px and 24px of
+page padding, and the 37px footer. The top bar and footer now publish their measured heights as
+`--chrome-top` and `--chrome-foot` (a `ResizeObserver` in `Shell.tsx`), and one `--video-cap`
+in `index.css` derives the video's width from them, the page padding and the 89px one-row bar
+(D34). This is not the eaceeb5 loop again: neither bar's height depends on the player's width,
+so measuring them cannot feed back.
+
+The same commit replaces `.app.with-side`'s fixed `max-width: 1560px` with `--video-cap` plus
+the sidebar and padding. 1560 was wrong both ways. On tall windows it held the video narrower
+than the height allowed (1222px at 1920x1080). On short windows the page grew wider than the
+height-bound video, and the sidebar was stranded at the far edge, as in the owner's screenshot.
+The video and the moments list are now one centred block.
+- Rejected: counting the transient strips (resume, notices) in the cap. They would resize the
+  player as they appear and go, the jump this entry has spent the round removing. They push the
+  player down instead, and the page scrolls by their height while they are shown.
+
+Video width before (1605098) and after: 1920x960, 1222 to 1333px; 2048x1030, 1222 to 1458;
+1707x840, 1051 to 1120; 1600x700, 802 to 871; 1366x650, 713 to 782; 1280x600 at DPR 1.5, 624 to
+693. The owner's 1333x750 at DPR 1.5 gives 960. In every case the player ends 24px above the
+footer. Over the whole round, at a 1366x650 viewport (what a 1366x768 screen leaves after the
+browser's own chrome): 477px with the loop, 622 after eaceeb5, 688 without the now-line, 713
+with the 28px bar, and 782 with the measured chrome. Re-measured independently at cb3c512 (where
+both were measured, 50ac023 gave the same widths): 1333.3px at 1920x960, 782.2 at 1366x650,
+693.3 at 1280x600 at DPR 1.5, 960 at 1333x750 at DPR 1.5. Also 992 at 1366x768, 1457.8 at
+2048x1030 at DPR 1.25 and 1937.8 at 3440x1300. At every size the video's width is exactly the
+smaller of the stage width and the height bound (ratio 1.000), and the page does not scroll
+vertically. Unlike the earlier "fits the window" checks, that test fails if the video comes out
+smaller than the space allows. The resume strip pushed the page down by 78px (68px of strip
+plus the gap) while the video stayed
+992px wide: nothing was resized. Since c8ec242 the offer is a card on the video and pushes
+nothing (D33); the notices still push. "Ends 24px above the footer" and
+the sidebar's centring were not measured separately; both are consistent with the numbers above.
+
+**Narrow windows scroll, by design.** At 560px wide and below the page scrolls vertically:
+86px at 560x700, 67px at 320x640, 0 at 400x800, and 252px at 800x600 and 900x600, where the
+sidebar stacks below the player. That is page content arriving below, not overflow. The bar
+still wraps there (121px at 400px wide, 153px at 320px), taller than the 89px the cap assumes.
+
+**Fixed: the bar term did not follow the font size** (3c3dfe5). The cap's one-row bar was a
+fixed 89px. With a 20px root font the bar is 96px, and at 1707x880 at DPR 1.5 the page scrolled
+by 7px: the only desktop case found, and it fell on the reader who had enlarged the text. The
+term is now `--bar-one-row`, which the player publishes only while its controls fit on one row.
+This measures the bar again, which eaceeb5's lesson warns about, so the condition matters: the
+one-row height depends on the font size but not on the player's width, and a wrapped bar
+publishes nothing, so the player's width cannot feed back into it. At a 20px root it is 96px
+and the page no longer scrolls.
+
+Re-measured independently, with the browser's font size at 20px: at 1707x880 at DPR 1.5 the bar
+and `--bar-one-row` are both 96px, the page does not scroll, and the video is 1169.8px, exactly
+its stage (ratio 1.000). 1312px at 1920x960 and 970.7 at 1366x768, both ratio 1.000 with no
+scroll. At 16px every width is unchanged from cb3c512. At 20px there is exactly one width change
+per session (for example 983.1 to 970.7px, between 842 and 878ms after load), while the video's
+`readyState` is still 0, so it lands before the first frame is shown. After that, zero changes
+through analysis and playback.
+
+**Fixed after the third Codex review** (cba52ad). Leaving fullscreen with the bar expanded
+briefly published the fullscreen bar's height (90px), and the video went from 992 to 990.2px
+wide for 32ms. The bar's measured height (a `ResizeObserver`) and `isFullscreen` (an event)
+settle at different times, so for a frame the one did not match the other. Here it corrected
+itself; near the wrap threshold, a 1.8px narrowing could have tipped the bar into two rows and
+stuck. `--bar-one-row` is now read from the DOM at the one-row check itself, and never while in
+fullscreen.
+
+Re-measured independently, frame by frame through a fullscreen round trip with the bar expanded
+to 90px: at 1366x768 the video goes straight from 1366px (fullscreen) to 992, and at 1366x650
+from 1366 to 782.2, with no frame in between, and `--bar-one-row` stays 89px. A case within 1.8px
+of the wrap threshold was not constructed. At a 20px browser font the one width change before the
+first frame (above) is gone too: the video is 970.7px from its first measured frame, with
+`--bar-one-row` at 96px.
+
+**Closed by D35.** The horizontal page scroll at 320px and 800px wide, which predates this entry
+and came from the top bar rather than the player, is fixed there (cb3c512).
+
+**Closed by D34.** Two items that were open here were settled by the owner after trying cd5a242.
+The empty space reserved under the now-line at narrow widths (393px of bar at 320px wide) is gone
+with the now-line itself (482f7eb). The two-row controls on short windows, where the owner was
+to choose between a pillarboxed video and accepting two rows, no longer happen: the slimmer bar
+fits one row down to a 486px player, and every desktop size measured is one row (1605098).
+
+**Still open.**
+- `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
+  by the bar's height when the player replaces it. It grows downward and does not shift what the
+  viewer was looking at, but it is a jump.
+
+---
+
+## D33 — Reopening a video offers to resume; it never resumes on its own
+
+**Decision** (91a9849, revised in c8ec242). When a video opens and a saved position exists for
+it, the player asks "Resume at 12:34?" with two buttons, Resume and Start from the beginning.
+The player never jumps to the saved place without being asked. The question first shipped as a
+strip above the player, and now is a card centred on the video, laid out under the bar so the
+two never meet (3d8cdd4). The saved place is tracked as the viewer's intent, in one reducer, so
+leaving the page at any instant records the right place (2f9edd8). Most of this entry's later
+fixes concern the Appearance preview's jump, which since D36 runs only when the viewer chooses
+it.
+
+**Why.** D29 made switching videos safe for the analysis, but the place in the lecture was still
+lost: reopening any video started at 0:00, so coming back to a 90-minute lecture meant scrubbing
+to find where you were. That is a needle-in-a-timeline task, and it is hardest for a low-vision
+viewer reading a tiny timestamp next to a thin scrubber.
+
+**Why offered, not automatic.** Someone reopening a lecture may be continuing it, or starting
+over to revise for an exam, and the app cannot tell which. Guessing wrong in the automatic
+direction is the worse error. A sighted viewer sees the playhead mid-lecture and can drag it
+back. A screen-reader user gets silence, or speech, at a timestamp nobody explained. Asking costs
+one press.
+
+**A strip, not a modal** (as first shipped; see the revision below). It reused the amber `.strip`
+above the player. A modal would block the
+video for a question that can be ignored, and would take focus the viewer did not offer. Pressing
+play, seeking anywhere, or either button all count as an answer and remove the strip; the viewer
+does not have to deal with it before doing what they came to do. Focus is not moved to it, but
+Resume comes first in the tab order. Both buttons are at least 44px; Resume is filled
+(`var(--accent)`) and Start is outlined, so the likelier answer is the more visible one. When
+the buttons unmount, focus goes to the player's Play/Pause button. Left alone, it would fall to
+`<body>`, and a keyboard user would have to tab back into the page from the top.
+
+**Only once the video can play.** On a fresh analysis the strip waits for `canPlay`, which is
+true once the analysis is done or has covered the first 10s (`PLAYBACK_LEAD`). An offer to jump
+somewhere you cannot play yet is a dead button. Resuming far ahead on a fresh analysis seeks
+into video that has not been analyzed yet, and D12's segment restart already handles that.
+
+**Announced.** The strip renders inside a `role="status"` region that is always mounted. A live
+region inserted together with its content is not announced, which is the same rule the player's
+notices follow.
+
+**Storage: localStorage, not the analysis cache.** Key `veasyguide.resume`, holding
+`{ [videoKey]: { t, at } }`, with the newest 50 kept by last-saved time.
+- Rejected: storing it in the IndexedDB analysis cache (D29). The entry is two numbers. It has to
+  exist for videos whose analysis never finished and was never cached. And the most important
+  write happens on `pagehide`, where an async IndexedDB transaction may never commit, while a
+  `localStorage` write is synchronous.
+
+**When it writes.** About every 5s of wall time while playback advances, and also on pause, on
+`pagehide`, on `visibilitychange` to hidden, and before any switch or reset
+(`leaveVideoForResume`). `pagehide`, not `beforeunload`, because `pagehide` fires on mobile and
+when the page goes into the back/forward cache. `visibilitychange` too, because a backgrounded
+mobile tab can be killed without ever getting `pagehide`.
+
+**What it refuses to save.** Nothing is saved for a video until the viewer has played or seeked
+in it. Otherwise opening a lecture to check something and closing the tab would save 0:00 over
+the real place. Within 10s of the start (`RESUME_EDGE`) nothing is offered, and a save there
+clears the entry: someone who rewound to rewatch the introduction is no longer at their old
+place. Within 10s of the end the entry is cleared too, because there is nothing left to resume.
+
+**Tests and measurements.** `player/resume.ts` is a pure module with 9 unit tests: round-trip,
+both edges, newest wins, keep-50 eviction, eviction by last watched, tolerance of garbage in
+storage, and a quota error on write. Measured in headless Chromium: after saving at 61.9s, the
+reopened video offered "Resume at 01:01?". Resume took it to 62.2s, playing, with focus on
+Pause. Opening and closing the video without touching it kept the old entry. Seeking to 3s
+before the end and pausing cleared it.
+
+Checked again independently, at 8883cbd. The `role="status"` slot is in the DOM 50-64ms after
+load, and the strip is inserted into that existing node at 279-328ms, which is the order a live
+region needs. The accessibility tree shows status, polite, atomic. Resume is 90x44px and "Start
+from the beginning" 213x44px. Focus stays where it was (on `<body>` after a load), as intended.
+After a seek to 124s and a reload, the stored entry held 124 and the strip read "Resume at
+02:04?", and Enter on Resume landed at exactly 124.00s. The strip is 68px tall at 1366x768. A
+real screen reader was not run, so "announced" rests on the tree, not on hearing it.
+
+**Two defects found by the Codex review, fixed in the same round** (dda1bdb; the bookmark
+half superseded by 2f9edd8, "Final design" below).
+- Space on Resume played from 0:00. The player's document-level Space hotkey took the key, and
+  pressing play counts as an answer, so the strip went away with the saved place unused: a
+  keyboard user who activates buttons with Space got the opposite of what they chose. Enter
+  worked. The strip now stops player hotkeys (D31 has the full list of what was guarded).
+- Opening and closing Appearance erased the saved place. Paused at 0:00, between moments, the
+  sheet's preview jump went through `onSeeked` like a viewer's seek: it dismissed the offer,
+  marked the video as touched, and leaving afterwards saved 0:00 over the bookmark, turning
+  `{t: 20}` into `{}`. The guard "nothing is saved until the viewer has played or seeked" was
+  fooled because the player could not tell its own seeks from the viewer's. It now marks them
+  (`byViewer = false`), and if the page goes away mid-preview, App saves the position from before
+  the preview. Measured: `{t: 21.2}` survives opening and closing Appearance and leaving
+  mid-preview, and a viewer at 15s who leaves mid-preview saves 15, not the preview's 25.8.
+Re-measured independently with `{t: 20}` stored and the video reopened at 0:00: Appearance's
+preview jumps to 25.77s with the strip still shown, closing it returns to 0 with the strip still
+there, and the stored entry stays `{t: 20}`. Leaving mid-preview without touching anything keeps
+`{t: 20}`. A viewer at 15s who leaves mid-preview saves 15; at 4s the entry is cleared, which is
+the 10s start edge working as designed.
+
+**Fixed after the third Codex review** (cba52ad; superseded by 2f9edd8). The preview fix above
+went one step too far. Pressing ] from inside the Appearance sheet was undone when the sheet
+closed, and leaving then saved the position from before the preview (`{t: 30}`) instead of the
+moment the viewer had stepped to (52.8s). A seek by the viewer during a preview now cancels the
+preview's restore, and the stored entry is `{t: 52.8}`. Re-measured independently: paused at
+30s, the preview jumps to 47.8s, ] goes to 52.8s, and leaving stores `{t: 52.8}`.
+
+**Fixed after the fourth Codex review** (f2f2374; superseded by 2f9edd8). cba52ad's cancel was
+in the wrong place.
+- It ran on `seeked`, which is too late. A click on the scrubber is also a click outside the
+  Appearance sheet, and closing the sheet restored the pre-preview time before `seeked` arrived,
+  undoing the viewer's own seek. ] followed by Escape raced the same way. Paused at 30s with the
+  preview at 47.8s, a scrubber click at 100s ended at 30s and stored `{t: 30}`, confirmed in the
+  browser; a jump from a sidebar row happened to survive. Every viewer seek now goes through one
+  `viewerSeek()`, which cancels the preview synchronously, before the seek. The `onSeeked` check
+  stays as a backstop.
+- The preview's target (moment start plus the lead plus 0.2s) was not clamped. For a moment in
+  the last fraction of a second it pointed past the end, the browser clamped the seek, the
+  landing time fell outside the 0.05s match that marks a seek as the player's own, and the
+  player's own jump was taken for the viewer's, dismissing the resume offer. Found from the
+  code, not reproduced. The target is now clamped inside the moment and the video.
+
+Measured (code-lead's): during the preview, a scrubber click at 100s lands at 100.0s and stores
+100.0; ] then Escape lands at 52.8s and stores 52.8; closing the sheet without seeking still
+restores 30.0s. Re-measured independently, paused at 30s with the preview at 47.8s: a scrubber
+click at the 100s point lands at 99.95s with the sheet closed and stores 99.946; ] then Escape
+stores 52.8; closing the sheet by clicking Appearance again returns to 30.0s and stores 30; a
+sidebar row stores 120.9. ArrowRight inside the sheet does not seek at all, because the sheet's
+key guard takes the arrows; that is intended.
+
+**An older scrubber bug, found on the way.** A click on the scrubber seeked to the pointer's
+position as of the last render (`useMouse`'s state), not the click's own. A click without a
+mouse movement just before it landed wherever the pointer had last been seen: measured, at 0:00.
+It now reads the click's coordinates. This predates the round. Re-measured independently, with
+no preview open: a real click at the 200s point lands at 199.89s, and a synthetic press and
+release at the 60s point with no mouse movement first lands at 59.9s.
+
+**Revised: a card on the video** (c8ec242, the owner's decision after watching the demo). The
+strip pushed the whole player down when it appeared, which is the layout jump this round removed
+everywhere else (D32). At 320x320 it wrapped to 154px and pushed the video's top to 237px, so the
+picture started mostly below the fold. The offer is now a card centred on the video, inside
+`.video-stage`, and the player's box is identical with and without it, measured at 1366x650 and
+320x640. At 320px the card fits inside the 264px-wide picture.
+- Rejected: the strip, because it moves the page.
+- Rejected: a toast at page level. It would be detached from the player it is about, and
+  invisible in fullscreen.
+- Rejected: bottom left, above the bar. It would collide with the preview-jump pill and the
+  pin's two bottom corners.
+
+Centred keeps it clear of the notices at the top centre and of every pin corner. It is a
+near-opaque dark card with an amber edge, so its contrast is the same on a white slide and a black
+one. It sits above the pin (z 35) and the fullscreen moments list (z 40), and under the bar (z 50).
+It now works in fullscreen too, which the strip did not. The cost is that it covers the middle of
+the picture until the viewer answers, presses play or seeks.
+
+What was promised above still holds: offered, never automatic; Resume first; no focus taken, with
+the buttons in the tab order after the bar (on the strip they came before the player); the live
+region mounted before the card arrives; Space and Enter press its buttons; play, a seek or either
+button dismisses it. Clicks on the card stop there, so they cannot toggle playback underneath.
+The buttons are now 36px tall, not 44px, so the card fits a 180px-tall picture at 320px wide.
+That is above 2.5.8's 24px, and below the 44px the strip had.
+
+**Re-measured independently** (stored position 20s).
+- The player's box takes one value per session, sampled every frame from load, card or no
+  card: 782.2x529.0 at 1366x650, 992x647 at 1366x768, 264x301.5 at 320x640.
+- The card sits inside the picture at all three sizes: 339x100 and centred at 1366px wide. At
+  320px it fits within the video's box, and its content scrolls by 11px inside the card; the page
+  itself does not scroll either way.
+- In fullscreen it shows inside the fullscreen element. Its slot is at z 45, between the
+  fullscreen list (40) and the bar (50), and at 1366px the card and the list do not overlap.
+- Contrast, with the computed colours composited over the slide. On white: text 15.25:1, the
+  time 10.41:1, Resume 6.88:1, Start's label 15.25:1. On black: 17.52, 11.96, 6.88 and 17.52:1.
+  Start's 1px border is 2.97:1 against the card on white (3.41:1 on black), just under 1.4.11's
+  3:1. The button is identified by its label, not its border.
+- Space or Enter on Resume both land at 20.5s, playing, with focus on Pause. On Start, both stay
+  at 0, paused, with focus on Play. A click on the card's text leaves the video paused and the
+  card up. Space with focus elsewhere on the page plays from 0 and dismisses; → seeks to 5s and
+  dismisses; a click on the video plays and dismisses.
+- The `role="status"` slot is mounted at about 850ms, and the card is inserted into it about
+  3.3s later (4.15-4.28s).
+- Buttons are 86x36 and 209x36px. Tab order: the header, the scrubber, Play, Volume, Speed,
+  Magnify, Pin, Appearance, Fullscreen, then Resume, then Start.
+
+**Two fixes from that re-measure** (27a0859).
+- At 320px wide the picture is about 149px tall and the card was 11px taller than its room, so
+  it scrolled inside itself with its second button half hidden. Below 30em the card now packs
+  tighter: 32px buttons and less padding. Re-measured independently: at 320x640 the card is
+  256x120.8 inside a 264x148.5 picture, at 375x700 it is 311x121 inside 319x179, and nothing
+  scrolls inside it at either. The buttons there are 82x32 and 205x32px.
+- Start's border is now `#8a95a6`: 5.54:1 against the card on a white slide and 6.37:1 on
+  black, where it was 2.97:1.
+
+**Fixed after the fifth Codex review** (37535ac; the ownership half superseded by 2f9edd8).
+- `viewerSeek()` cancelled the preview but left the player's own-seek marker set. Ownership is
+  matched by landing time, so a viewer seek landing within 0.05s of the pending preview target,
+  before its `seeked`, would be taken for the player's own: the resume offer stayed up and the
+  bookmark went stale. `viewerSeek()` now clears the marker before it seeks.
+- **The card was last in the tab order, which made it hard to reach by keyboard.** It came after
+  the whole bar, and the moment lane gives every mark a tab stop, so a keyboard user on a long
+  lecture tabbed through dozens of marks to reach Resume. This reverses c8ec242's "after the bar"
+  above. The card's live region is now the player's first child, positioned over the picture's
+  box (the container less the bar where the bar sits below it, the whole of it in fullscreen), so
+  it draws exactly where it did. Re-measured independently on a lecture with 32 lane marks:
+  Resume is tab stop 8 at 1366px wide, right after the header's links, and stop 2 at 320px, right
+  after Menu, with Start next. The card's centre is the picture's centre within 0.1px, and the
+  player's box still takes exactly one value per session at 1366x650, 1366x768 and 320x640. In
+  fullscreen the slot covers the whole screen and the card is centred. The live region is mounted
+  about 3.4s before the card. A click on the picture outside the card plays and dismisses it; the
+  Space, Enter and click-on-card results are unchanged.
+
+**Fixed after the sixth Codex review** (7fc8c45; its z-order half superseded by 3d8cdd4 and
+its bookmark half by 2f9edd8, "Final rule" and "Final design" below).
+- In fullscreen the bar could cover the card. At 1280x720 at 400% zoom (a 320x180 screen) the
+  expanded bar is 122px of the screen's 180, and it overlapped the card by 91.4px, so neither
+  button could be clicked. In fullscreen the card now stacks above the bar (z 55). Rejected:
+  reserving room above the bar, which left 53px, too little for the card. This was described as
+  fullscreen-only, with "windowed, the card and the bar never meet". That was wrong on both
+  counts: the slot is z 55 in every mode, and windowed the bar's popovers do meet the card
+  (Still open).
+- Leaving the page about 50ms after closing Appearance stored the preview's position (47.8s)
+  instead of the viewer's (30s); at 0ms or 300ms it stored 30s. A save in the window before the
+  restore landed read the preview's time. The preview jump now carries the playhead's
+  destination, so a save in that window records 30s.
+
+Re-measured independently. At 320x180 at DPR 4 in fullscreen with the bar expanded (bar from
+y 59 to 181, card from y 29.6 to 150.4), the element at each button's centre is the button.
+Leaving at 0, 50 and 300ms after closing Appearance stores `{t: 30}` every time. Geometry, zero
+layout shift, every key, click and dismissal path, the tab order and the preview paths are
+unchanged from 37535ac.
+
+**Fixed after the seventh Codex review** (d3d32ca; superseded by 3d8cdd4, "Final rule"
+below). 7fc8c45 put the card's slot at z 55 in
+every mode, above the bar (50), and the bar's popovers live in the bar's layer. At 320x640
+windowed the card covered the popovers that opened under it: 3 of the Appearance sheet's 6
+controls, the volume range, and 4 of the 7 speed items. Nothing was covered at 1366px wide. The
+card is back under the bar (z 45) and rises above it (z 55) only in fullscreen, and only while
+none of the bar's popovers is open.
+
+Re-measured independently. At 320x640 windowed with the card up, none of the 6 Appearance
+controls, the 2 volume controls (range and Mute) or the 7 speed items is covered: the element at
+each one's centre is the control itself, and the slot is z 45. The same at 1366x768 and 1366x650.
+In fullscreen at 320x180 at DPR 4 with the bar expanded, both card buttons are hit with the slot
+at z 55, and at 375x667 and 667x375 at DPR 2 the card does not meet the bar. In fullscreen with
+the Appearance sheet, volume or speed open, the slot drops to z 45 and no popover control is
+covered; after Escape it returns to z 55 with the card's buttons reachable.
+
+**Final rule: the card never meets the bar** (3d8cdd4). The eighth Codex review found two more
+cases of the card covering something, both reproduced. In fullscreen it covered the moments list
+(z 40): 2 of 3 visible rows at 320x180 at DPR 4, and 2 of 8 at 375x667 at DPR 2. And at 320x180
+with the bar expanded, Play, Previous and Next moment and Volume took keyboard focus while hidden
+under the card, which fails WCAG 2.4.11 (Focus Not Obscured).
+
+The card now sits under the bar (z 45) and is laid out so the two never meet, the same way the
+pinned snapshot is. Its box is the picture minus the bar, with an 8px gap in fullscreen, where
+the bar overlays the picture. It compacts according to its own box's height (a container query),
+and scrolls inside itself only at the extreme: in fullscreen at 1280x720 at 400% zoom with the
+bar expanded, by about 50px. While the fullscreen moments list or any of the bar's popovers is
+open, the offer waits, hidden but still mounted, and comes back afterwards if it has not been
+answered.
+- Rejected: lifting the card above the bar (z 55), the approach of 7fc8c45 and d3d32ca above. It
+  fixed the tall-bar case, but it put the card over everything else that opens over the picture:
+  the bar's popovers (seventh review), then the fullscreen list and focused bar controls (eighth
+  review). Each needed its own patch, and every patch invited the next. Laying the card out
+  around the bar removes the whole class of collision, where z-order only reorders it.
+
+Re-measured independently at six sizes (1366x768, 1366x650, 320x640, 375x667 and 667x375 at
+DPR 2, 320x180 at DPR 4), each windowed, in fullscreen with the bar collapsed and in fullscreen
+with it expanded. The card and the bar share no area in any case, and the slot is z 45. Both card
+buttons are what a click at their centre hits when focused, and no focused bar control is hidden
+by the card. None of the Appearance, volume or speed controls is covered. With the fullscreen
+list open (8 rows at 375x667) the card is `visibility: hidden` and covers no row, and it comes
+back when the list closes. It also hides while Appearance is open and comes back after Escape or
+an outside click, with no change to its live region through either. Resume afterwards still
+lands at 124.1s. **Correction:** the in-card scroll at the extreme was given as about 50px. At
+320x180 at DPR 4 in fullscreen it measures 13px with the bar collapsed (card 57.6px tall) and
+29px with it expanded (card 42px tall).
+
+**Final design: the bookmark is a reducer, written by intent** (2f9edd8). The ninth Codex
+review found two more cases, both reproduced. Focus Resume, press A, then Escape, and focus fell
+to `<body>`, because the card had been hidden while Appearance was open; Space then played from
+0.56s and the offer went with its bookmark unused. And clicking Resume then leaving at once
+erased the stored entry (`{}` at 0 and 30ms; kept at 100ms and later).
+
+The second one was the third time the same class of bug had surfaced. The bookmark had been "the
+playhead, unless a flag says otherwise", with the flags set by events that arrive in no fixed
+order: a seek is only a request, and `seeked` and the next time report come later. The fourth,
+sixth and ninth reviews each found a window in which a save recorded the wrong place: the
+preview's time, the pre-preview time after the viewer had moved on, and 0:00 before a Resume
+landed, which deleted the bookmark. Each patch (dda1bdb, cba52ad, f2f2374, 37535ac, 7fc8c45)
+closed one window.
+
+`player/bookmark.ts` replaces them: a pure reducer holding one `place`, changed only by the
+viewer's intent (playing through, a viewer seek, Resume). Intent is written when it is
+requested, not when it lands. Time reports are ignored until one arrives near the pending seek,
+and ignored while the Appearance preview is parked. The preview's jump and its return never
+write it. `pagehide` and `visibilitychange` save it synchronously, so a save at any moment
+records the right place by construction, not by timing. 10 unit tests replay the fourth, sixth
+and ninth reviews' sequences.
+
+The focus half was a class too: closing a bar popover dropped focus on `<body>`. Appearance and
+speed now return focus to their trigger, as volume already did. Audited with them: the
+fullscreen list returns focus to its toggle, and the bar never auto-hides under keyboard focus.
+
+Re-measured independently. Resume then leaving stores `{t: 20}` at 0ms and 30ms (it was `{}`
+before), `{t: 20.05}` at 100ms and `{t: 20.43}` at 500ms. Resume, A, Escape puts focus back on
+the visible Resume, and Space then resumes at 20.34s. Every earlier sequence still holds: a
+scrubber click at 100s during the preview stores 99.95; ] then Escape stores 52.8; leaving 0, 50
+or 300ms after closing the preview stores 30, as does a plain close; a sidebar row stores
+120.84; Start goes to 0, paused, and removes the card; an untouched `{t: 20}` is kept; leaving
+mid-preview from 15s saves 15, and from 4s saves nothing (the start edge); playing from 40s to
+52s saves 52.03. Focus returns to the opening button for Appearance (on Escape and an outside
+click), speed (Escape and picking a rate) and volume (Escape).
+
+**Fixed after the tenth Codex review** (2fa3613).
+- Playback started during the Appearance preview, for example by a media key, was not taken
+  as the viewer's: played on to 62.1s, Escape jumped back to 30s and saved 30s (reproduced).
+  Play during the preview now cancels it, and the bookmark takes the place played from.
+- After a seek, the landing re-armed the pending seek instead of clearing it, so a late next
+  time report (at 3x, or in a throttled background tab) could leave the bookmark frozen. Found
+  from the code and not reproduced in a foreground tab, but small, so fixed rather than logged:
+  the landing now clears it (`bookmarkSeeked`), with a test.
+- Focus return was unconditional (Mantine's `returnFocus`). Clicking a sidebar row while
+  Appearance or speed was open dragged focus back to the popover's button, and Space then
+  reopened it (reproduced). Focus now returns only when it was lost, and only to a visible
+  control. That rule also covers a low the same review raised from the code: focus returning
+  to a bar control that collapsing the fullscreen bar had hidden.
+
+Re-measured independently. Paused at 30s with the preview at 47.8s, playing on to 62.1s and
+then Escape leaves the time at 62.07s and stores 62.07. A sidebar row clicked with Appearance or
+speed open keeps focus on the row. Escape returns focus to the trigger (Appearance, speed,
+volume), and a speed pick to the speed button. Next moment, A, F, Escape lands on the visible
+Appearance button in fullscreen, where the collapse had hidden Next. Resume, A, Escape lands on
+Appearance with the card and `{t: 20}` kept. Resume then leaving at 0 or 30ms keeps `{t: 20}`,
+and a seek during playback at 3x saves the live place (116.37s).
+
+**Still open.**
+- Low, left by the stop rule: at 320x180 at DPR 4 in fullscreen with the bar expanded, the card is
+  42px tall and scrolls 29px inside itself. A keyboard user is fine, since focus scrolls each
+  button into view, but a mouse user does not see the buttons without scrolling the card.
+
+
+
+
+- The position lives in one browser's `localStorage`. A different browser, a private window or
+  cleared site data starts at 0:00, with no offer.
+- The key is `videoKey` (size, duration, frame size), the same as the cache. Two different files
+  that match on all of these would share a position. The cache already accepts that collision.
+
+---
+
+## D34 — The bar is one slim row: no visible status line, 28px buttons
+
+**Decision** (482f7eb, 1605098; the owner's call on both). The now-line, the status line in the
+bar, is no longer shown. It said which moment is current, where on the slide it is (the worded
+geometry from D19), its timecode and length, then "Magnifier on · 2.0×" when magnifying and
+"Next at" the following moment. Its announcement stays, as a visually hidden `role="status"`. The
+bar's buttons go from 44px to 28px, and volume moves from an always-visible slider into a
+popover. The bar is now one row at every desktop size measured.
+
+**The owner's words, after trying cd5a242:** "Remove this, I think it makes things bad." Earlier
+he had said that low-vision viewers cannot read the line well anyway.
+
+**Why the now-line went.**
+- It cost a row. In the windowed player the bar's height comes off the picture (D32), so every
+  row of bar is a strip of lecture the viewer does not get.
+- It made the bar's height depend on how its sentence wrapped. That dependency fed D32's width
+  cap loop, and cd5a242's worst-case sizers existed only to fight it, at the price of empty
+  space on narrow windows.
+- It repeated what is already on screen: the lit mark in the moment lane, the current row in the
+  moments list, the timecode, and the magnifier button's amber state.
+
+**This reverses a rule, and it should be read as reversed.** The removed code said the
+magnifier's state was shown "as persistent TEXT, not just the transient on-video icon: a
+low-vision user cannot be asked to notice a subtle glyph to know what mode their player is in."
+After this change the visible signal is the amber Magnify button, and the text is spoken but
+not shown. The owner's judgement is that the line was not readable for that same reader, so it
+was not doing the job the rule asked of it.
+
+**What is kept.** The same sentence, the magnifier state and "Next at" go into a visually hidden
+`role="status"`, mounted from the first frame so it is announced (a live region inserted with
+its content is not, D33). It is now announced in fullscreen with the bar collapsed too. Before,
+the collapsed bar hid the line with `display: none`, which also silenced it for screen readers.
+"No moments found" moves to the moments list's empty state, and the position readout stops
+repeating it.
+
+**Why 28px buttons, and what that gives up.** The owner set the sizes. Buttons go from 44px to
+28px and icons from 22px to 20px. 28px meets WCAG 2.5.8 (Target Size, Minimum, AA, 24px). It
+gives up 2.5.5 (Target Size, Enhanced, AAA, 44px), deliberately. The code comments say "28px by
+the owner's call; 2.5.8 AA met", so a later reader does not mistake it for an oversight. The
+people this hurts most are those with tremor or low motor precision, and those using a magnifier
+at a high zoom, where a small target is also a small thing to find. What it buys is the one-row
+bar, and the picture height that comes with it.
+- The row gap goes from 3px to 4px. The focus ring reaches 5px out and the icon sits 4px inside
+  its button, so 4px keeps one button's ring off its neighbour's icon.
+- The pin caption and the bar's bottom padding are 6px, so `overflow: hidden` or the screen edge
+  cannot clip a focus ring.
+- The scrubber's hit zone and the moment marks' hit areas are unchanged.
+
+**Volume becomes a popover.** The 84px slider was always visible, and it was made that way on
+purpose, to avoid the usual hover-to-reveal slider. The popover opens on click, Enter or Space,
+never on hover, so that reason still holds. It holds a vertical native range and Mute. M still
+mutes, and the button has a "Volume" tip (D31).
+
+**Speed is a fixed width and always shows its rate**, "1×" included, where D24 showed the rate
+only when it was off-default.
+- Rejected: auto width. A rate change would change the button's width, which could wrap the row
+  and resize the player, the jump D32 spent the round removing.
+- Rejected: hiding "1×" in a fixed-width button. The room would be reserved anyway and sit empty.
+
+**Numbers** (code-lead's). One row of controls now fits down to a 486px player; before, it
+needed about 672px. The one-row bar is 89px, and D32's width cap subtracts that constant (it was
+140px, then 103px after the now-line went). At 1280x600 at DPR 1.5 the video went from 533px
+wide (eaceeb5) to 599px (482f7eb) to 624px (1605098). Bar height at 1400, 560, 400 and 320px
+wide: 89, 89, 121 and 153px, against 140, 222, 312 and 393px with the now-line's reserved space.
+
+**Re-measured independently** (at cb3c512). Bar height held constant through analysis,
+playback at 4x, the magnifier on and off and a speed step, with zero size changes in every
+case: 89px at 1400 and 560px wide and at every desktop size, 121px at 400px wide and at both
+zoom cases (683x384 at DPR 2, 341x192 at DPR 4), 153px at 320px. The narrowest player confirmed
+as one row is 504px, at a 560px window; the exact 486px threshold was not searched for.
+- The hidden status is `role="status"` (polite by role), 1x1px, with no hidden ancestor. At 4x
+  it announced 5 updates in 9s windowed, and 4 in fullscreen with the bar collapsed. Those
+  counts include the end-of-moment updates later removed (below).
+- Every bar and pin button is 28x28px (speed 80x28), with no overlaps. No focus ring is clipped
+  by an `overflow` ancestor or the viewport, at 1366px and 320px wide.
+- Volume: hover does not open the popover; Enter and Space do. Focus lands on the range, which
+  is vertical with up as louder (its top gives 1.0, its bottom 0).
+
+**Fixed after the second Codex review** (3c3dfe5).
+- The volume tip never showed on hover, and on focus it was drawn at (46, 65) for a button at
+  (152, 678). It wrapped the `Popover` component, which renders no element of its own, so it had
+  nothing to anchor to. It now wraps `Popover.Target`, the rule D31 recorded for `PlayerTip`
+  and that this one missed.
+- The vertical range had no fallback. Engines from before about 2024 (Chromium before 124)
+  draw a `writing-mode` range horizontally. A one-time probe measures an unstyled vertical range,
+  and if it is not taller than wide, the popover lays the slider out flat and
+  `aria-orientation` says horizontal. Rejected: `CSS.supports`, because `writing-mode` is
+  supported everywhere; only the form control's rendering differs.
+- The hidden status spoke at each moment's start and again at its end, so at speed two updates
+  landed about 100ms apart and a screen reader could cut the first off. It now speaks once, at
+  each moment's start. The "Next at" moment is taken from the list, because the playhead sits a
+  little before the start and would otherwise name the current moment as next. The magnifier
+  state is its own text node. Measured: 6 updates for 6 moments over 77s at 4x.
+
+Re-measured independently: the volume tip reads "Volume M" at (112, 632), above its button at
+(152, 678), on hover and on keyboard focus alike. The status gives exactly 6 updates for 6 moment
+starts over 77s at 4x, windowed and in fullscreen, none at moment ends; toggling the magnifier
+adds or removes a suffix. With the probe forced to fail, the popover shows a 120x24 horizontal
+range with `aria-orientation="horizontal"`. Clicking its right end gives 1.0 and its left end 0,
+and the keys work.
+
+**Fixed after the third Codex review** (cba52ad).
+- Re-entering a moment was silent. Coming back into the same moment after a gap, paused or not,
+  produced identical text, and identical text is no change for a live region. The status now
+  speaks on entering a moment: it is keyed on the moment itself, so its text node remounts on
+  each entry. A backfill that renumbers moments stays quiet.
+- The magnifier has its own live region. `role="status"` is atomic, so the shared region
+  re-read the whole moment sentence on every Z, and turning the magnifier off said nothing about
+  it. It now says "Magnifier on, N times." or "Magnifier off.", and announces strength changes
+  only while it is on.
+
+Re-measured independently. Paused, seeking from 87s to 100s and back to 88s gave two moment
+announcements, on entering and on re-entering, both "Moment 8 of 36…". Playing at 4x over 77s
+gave exactly 6 updates for 6 moment starts, windowed and in fullscreen, at least 480ms apart. The
+magnifier's region is a second `role="status"`: Z gave "Magnifier on, 1.5 times.", ↑ gave
+"Magnifier on, 1.6 times.", and Z again "Magnifier off.", with no change at all to the moment
+region throughout. Re-entry while playing, measured later: playing from 83s, "Moment 8" at
+84.7s; ← to 83.5s gives
+"Moment 7"; playing on re-enters 8 and announces it again. A backfill renumbering staying quiet
+could not be exercised as intended (see the older bugs below). Strength changes while the
+magnifier is off did not exist as a path: ↑ and ↓ both turned the
+magnifier on, as on main. That turned out to be a bug, fixed below (5c4bffd).
+
+**Two older bugs, found by these checks** (5c4bffd). Both are on main too.
+- ↓ with the magnifier off turned it on: "zoom out" zoomed in. It now does nothing.
+- A moment the analysis found under a paused playhead was never selected until the time moved:
+  no status, no highlight. After a nudge it was announced ("Moment 35 of 37…"). The current
+  moment is now re-selected when the list grows. This is also why "a backfill renumbering stays
+  quiet" could not be measured before.
+
+Re-measured independently. ↓ with the magnifier off leaves the strength at 0.5 and the magnifier
+off; main turns it on. ↑ from off still turns it on (0.5 to 0.6 over two presses). Paused at
+268s before the analysis reached it, the highlight and the current sidebar row appear once it
+does, with the time still 268s and no nudge. A backfill renumbering stays quiet: the moment
+region changed twice (cleared, then "Moment 1, bottom right, 04:28, 5.2 seconds.") and not again
+through to the end, at 37 moments.
+
+**The moment marks stay under 24px, on purpose.** The lane's marks are 8-23px wide by 14px tall,
+under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent exception: every
+moment is also reachable by [ and ], by Previous and Next, and by the sidebar's rows.
+
+**Still open.**
+- Low, left by the stop rule: if a moment is first selected while the analysis is still running
+  (for example, found under a paused playhead), the status region keeps its first sentence
+  ("Moment 1, …") after a backfill renumbers it to 35 of 37. Re-announcing is suppressed on
+  purpose, so it is not spoken again, but a screen-reader user reading it in browse mode finds a
+  stale number.
+
+
+- Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32
+  measured the result: the page scrolls on narrow windows, as page content, not overflow.
+- 2.5.5 AAA is given up, as above. If testing with motor-impaired or high-zoom users shows the
+  28px targets are a problem, that is the decision to revisit.
+
+---
+
+## D35 — On narrow windows the top bar folds into one menu
+
+**Decision** (cb3c512). Below a measured breakpoint the top bar keeps three things: the mark,
+the analysis status as a bare number, and one Menu button. The menu holds the full file name as
+a label that is not interactive, then Change video, Load moments file, Dark theme, About,
+Project page and Code on GitHub. Above the breakpoint the desktop bar is pixel-identical to
+before; only the file-name chip gained the ability to shrink, down to a 6rem floor, before the
+row overflows. The avatar is dropped from the narrow bar, since the footer has it. Below 32em
+the tagline and the file-name chip go too; the `h1` stays, visually hidden, so headings
+navigation still finds it.
+
+**What was wrong.** It predates the round, and it was in TODOS.md. The bar's single row
+overflowed below its natural width and pushed the whole page sideways. With a lecture open the
+page was 860px wide in a 320px window; on the landing screen, 478px. On a phone the player's
+left edge was cut off, as in the owner's screenshot, and so it was at 400% zoom, which is the
+case WCAG 1.4.10 (Reflow) is about and the case this app is for. "Moments file" wrapped onto
+two lines.
+
+**Keeping what the bar said.** The status chip keeps its full sentence in the accessibility tree,
+visually hidden, so a screen reader still hears "Finding moments… 84%" and not "84%". The wide
+and narrow variants are switched with `display: none`, so neither is announced twice.
+
+**The menu.** One 44px button opening Mantine's `Menu`, which brings the roles, arrow keys,
+Escape and focus return. It calls `stopPlayerHotkeys`, because the player's hotkeys listen on
+the whole document and would otherwise take keys meant for the menu (the same fix D31 applied
+to buttons outside the player).
+
+**Breakpoints are measured, and set in em** so they move with the reader's font size. With a
+lecture open it is 62.5em (1000px at 16px): the full row needs 988px with the file name at its
+floor. On the landing screen it is 42em (672px): the row needs 638px, plus about 30px that the
+fallback font overshoots by before the web font loads.
+
+**Rejected.**
+- Hiding items one at a time at several breakpoints. More states to test, and a long file name
+  would still overflow.
+- Letting the bar wrap onto two lines. It makes the top bar taller, and since D32's cap now
+  measures the top bar (`--chrome-top`), a taller bar is a smaller video.
+
+**Numbers** (code-lead's). Page `scrollWidth` before and after: landing at 320, 375 and 414px
+wide, 478, 457 and 478px became 320, 375 and 414; with a lecture at 320 to 800px wide, 860px
+became the viewport width; 1280px at 400% zoom (320 CSS px), 860 became 320.
+
+**Re-measured independently** (at cb3c512).
+- `scrollWidth` equals the viewport at 320, 375, 414, 600, 800, 1000 and 1280px wide, on landing
+  and with a lecture, and at 1280px at 400% zoom (320x180 at DPR 4).
+- The Menu button is 44x44px. Enter opens it. The arrow keys go Change video, Load moments file,
+  Dark theme, About, Project page, Code on GitHub, and wrap. Escape closes it and returns focus
+  to Menu. Space on Dark theme toggles the theme without playing the video. Change video opens
+  the picker.
+- The chip's accessible text is the full "Finding moments… 1%"; the short form is `aria-hidden`.
+- Breakpoints with the browser's font size set to 20px (em media queries follow the browser's
+  default, not CSS): the Menu replaces the full bar between 1300 and 1240px (62.5em = 1250px),
+  and the file-name chip goes between 650 and 630px (32em = 640px). At 16px: between 1010 and
+  990px, and between 520 and 500px. All hold.
+
+**Correction: the desktop bar did change.** The entry first said that above the breakpoint "the
+desktop bar is unchanged". It is not: at 1366px wide, 6131 of the header's 61470 pixels differ.
+The file-name chip is now a fixed pill about 240px wide, where it used to hug the file name, so
+Change and Moments file sit about 150px further right.
+
+That regression came from cb3c512 and was reverted to the old behaviour in 3c3dfe5: the chip
+hugs the file name again.
+
+**Fixed after the second Codex review** (3c3dfe5).
+- About opened from the Menu lost focus to `<body>` on close. A modal dialog returns focus to
+  whatever had it at `showModal()`, which was the menu item, unmounted by then. The item now
+  focuses the Menu button before opening About.
+- Opening the Menu and pressing F entered fullscreen and left the menu open but invisible,
+  outside the fullscreen element. The compact menu now closes on `fullscreenchange`.
+
+Re-measured independently: Menu, About, then Escape returns focus to Menu. Menu open, ↓, then F
+enters fullscreen with no menu rendered. The header matches d2e19c3 exactly at desktop sizes:
+0 of 61,470 pixels differ at 1366px wide and 0 of 86,400 at 1920px.
+
+**Fixed in the same round** (3d8cdd4). The eighth Codex review found, from the code, that the
+compact Menu stayed open, with its focus trap, if the window was widened past 62.5em while it was
+open, which hid its trigger. A low, but trivial, so it was fixed: the menu now closes when the
+window widens past its breakpoint.
+
+Re-measured independently: the Menu, open at 800px wide, closes when the window is widened to
+1300px.
+
+The breakpoint listener missed a window exactly 1000px wide, because it used the `min-width`
+twin of the CSS's `max-width` query, which differs by one pixel at the breakpoint. Found by the
+ninth Codex review from the code; it now listens to the CSS's own query (2f9edd8). Re-measured
+independently: opened at exactly 1000px and widened to 1001px, it closes, and from 999px to
+1001px too.
+
+**Still open.** A low, left by the stop rule:
+- Closing the Menu by widening the window leaves focus on `<body>`, not on a visible header
+  control. The menu returns focus to its trigger, and at that width the trigger is
+  `display: none`. The right target is the matching control in the full bar, which needs a
+  mapping from menu items to bar controls, so it is not a trivial fix.
+
+---
+
+## D36 — Appearance previews on a sample highlight by default; the jump is an opt-in
+
+**Decision** (7de7c8f; the owner's call). Tuning the highlight in the Appearance sheet no longer
+moves the playhead by default. A new setting on the sheet's root screen, "Preview on", offers
+"A sample highlight" (the default) and "The nearest moment". The sample is a square drawn on the
+video, through the real highlight component, in the part of the picture the sheet covers least,
+whenever no real moment is on screen. "The nearest moment" is the old behaviour: the player
+jumps to a moment so the viewer can see their changes, and returns when the sheet closes.
+
+**The owner's words.** First: "draw a sample highlight that also is not behind or blocked by
+the settings panel which could happen, so some square would be nice." Then, when the first plan
+was to remove the jump: "don't delete the existing functionality but make a new default".
+
+**Why the jump stopped being the default.** The jump predates this round (it arrived with
+cec95b0, 2026-07-13). It was a hidden move of the playhead that the viewer did not ask for, and
+this round added two things that care where the playhead is: the bookmark (D33) and the resume
+card. The collision surfaced in five Codex rounds in a row, the sixth to the tenth: the
+preview's time saved as the bookmark, the viewer's own seek undone when the sheet closed,
+ownership of a seek mistaken by landing time, focus lost when the card hid, and play during the
+preview undone. D33 records each fix. 2f9edd8 rebuilt the bookmark so it could not be fooled by
+timing, but the jump itself remained the thing every one of those bugs needed. With a sample
+square, opening Appearance moves nothing, so none of those interactions can arise in the
+default.
+
+**Rejected.**
+- Keep fixing the jump as the default. Five rounds had shown that each fix exposed the next
+  window; the reducer made the bookmark safe, but the jump still moved the playhead under the
+  resume card and the viewer's focus.
+- Skip the jump only while a resume offer is pending. It narrows the worst case without
+  removing it, and makes the preview behave differently depending on a state the viewer may not
+  have noticed.
+- Delete the jump. The owner wants both: a real moment is the truest preview when there is one
+  nearby.
+- Put the choice in a drill tab. The owner wants it on the root screen, where the viewer is when
+  they start tuning.
+
+**The sample.** A square 1/5 of the picture's height, drawn by `HighlightIndicator`, so border,
+fill, opacity, shape and filters all show as they will on a real moment. `player/sample.ts`
+places it where the sheet, and in fullscreen the bar, cover it least: inside the picture, clear
+of the notices at the top centre, preferring the upper left. It is re-placed on resize, on
+entering or leaving fullscreen, and when the sheet's height changes between tabs. It first
+carried an `aria-hidden` "Sample" tag, so a sighted viewer would not take it for a found moment;
+the owner had it removed (172fae3): "not needed, it's kind of obvious". A real moment on screen
+takes precedence, and the sample goes when the sheet closes. The magnifier does not target the
+sample; that was the simpler of the correct options. It pauses while the sample shows (5e3938d,
+below).
+
+**The setting.** `tuningPreview` in `ViewSettingsStore`, persisted, and kept out of the preset
+stores for the same reason as D28: a preset must not switch it back. The control replaces the
+hint line on the sheet's root, which is now 329.4px tall outside its border against the drill
+screens' 351.1px (327 and 349 inside; the root was 320.8 inside before), so D30's fixed band
+still holds.
+
+**The choice applies at once** (172fae3). As first shipped, a change to "Preview on" took
+effect only when the sheet was next opened. It now applies while the sheet is open: switching to
+the nearest moment jumps straight away, under the same conditions as on opening, and switching
+to the sample steps straight back. Both are preview moves, so flipping the setting never changes
+the bookmark (D33).
+
+**The "cyan pointer" was not a style.** The owner saw the sample's pointer tinted cyan and took it
+for a styling difference from a real moment. The computed styles are identical; the tint was the
+browser's selection highlight on the pointer's `<img>`. Everything drawn over the picture is now
+`user-select: none` and not draggable, which also stops a stray drag selecting the highlight on a
+real moment.
+
+**Tests.** 141 in total, including the setting's default, a persistence round trip, and 7
+placement tests.
+
+**Re-measured independently** (at 172fae3).
+- The default is the sample on a fresh profile, and choosing the nearest moment survives a
+  reload. No label wraps anywhere in the sheet.
+- The choice is a radiogroup with correct `aria-checked`, and Space selects. Its accessible name
+  is "Preview while tuning", while the visible label reads "Preview on".
+- The sample is drawn clear of the sheet on every tab, with zero overlap: windowed at 1366x768
+  (a 112px square), 1366x650 (88px), 1920x1080 (174px) and 800x600 (78px); in fullscreen at
+  1366x768 (154px), 1920x1080 (216px) and 667x375 at DPR 2 (75px), clear of the bar too. Square
+  to 0.00px. Each was re-measured after resizing, entering fullscreen and changing tab.
+- A real moment replaces it (at 26s the real 186x62 box shows); back at 2s the sample returns;
+  it is gone after the sheet closes.
+- In sample mode the playhead never moves: it stays at 0 through opening and closing, with the
+  resume card up and `{t: 20}` unchanged.
+- At identical settings, across all four presets, the sample and a real highlight have no
+  computed-style differences, and their crops look identical. No cyan pointer appears in a
+  headless browser; the Windows selection tint itself cannot be tested there.
+- Live switch with the sheet open: nearest moment goes to 25.77s with its notice, the sample
+  returns to 2s, nearest goes to 25.77s again, and closing returns to 2s.
+- Escape in a drill tab closes the sheet, as on d2e19c3.
+
+**Fixed after the eleventh Codex review** (5e3938d).
+- With the speed menu open, A then Tab sent focus out of the Appearance sheet to the speed
+  button: closing speed reclaimed focus even though Appearance had just taken it. Focus return
+  is now per popover, and each close reclaims focus only from its own dropdown.
+- With the magnifier on from an earlier moment, opening Appearance between moments hid the
+  sample entirely under the magnified frame. The magnifier now pauses while the sample shows: it
+  stays on, its button stays pressed, and it resumes when the sample goes. It is still not aimed
+  at the sample.
+
+Re-measured independently, the final round (clean). Speed open, then A, then Tab puts focus on
+"A sample highlight", inside the sheet, which stays open. With the magnifier on at 26s, seeking
+to a gap at 2s and opening Appearance shows the sample (112px, at 62,113) with the
+magnification layer at opacity 0 and the Magnify button still pressed. After Escape the layer is
+back at opacity 1, as it is on returning to the moment at 26s. Every earlier check re-ran
+unchanged on 5e3938d.
+
+**Still open.**
+- Low: at 375px wide and below, the 398px sheet covers the whole picture, so the sample cannot
+  be clear of it. By design.
+- Low: placement uses the moment's square, not the drawn extent, so at Size 200% the sample can
+  be clipped at the picture's top left. Found by the Codex review.
+- Low: a medium or large pin in the top left can cover the sample, because pins are not
+  obstacles to its placement. Found by the Codex review.
+- Low: `placeSample`'s fixed margins and 8px minimum break containment in degenerate, tiny
+  pictures. Found by the Codex review.
+- Low: the "Preview on" radios do not respond to the arrow keys; both are tab stops. The same
+  pattern runs through every segmented choice in the app, so it is in TODOS.md.
+- With "The nearest moment" chosen, every preview interaction in D33 is back in play. They are
+  fixed as recorded there, but that mode is where any remaining bug of that class would live.

@@ -14,8 +14,10 @@
 // the band of video it occludes never changes. That is the same trade every TV and streaming
 // player makes, for the same reason.
 //
-// Every hint is visible text. No tooltips: a hover tooltip is invisible to a keyboard user, a
-// screen-reader user and anyone driving a magnifier — which is the audience.
+// Every hint in the sheet is visible text, never a tooltip: a hover tooltip is invisible to a
+// keyboard user, a screen-reader user and anyone driving a magnifier — which is the audience.
+// (The bar's icon buttons do have tips, but those only NAME a button whose accessible name
+// already says the same, and they show on keyboard focus as well as hover: see D31.)
 import { useState } from "react";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import {
@@ -34,6 +36,7 @@ import {
 } from "../stores/MagnificationSettingsStore";
 import { PRESETS, applyPreset, matchPreset } from "./presets";
 import PresetTile from "./PresetTile";
+import { useViewSettingsStore, setTuningPreview } from "../stores/ViewSettingsStore";
 import "./appearance.css";
 
 type Screen = "root" | "box" | "pointer" | "zoom" | "motion" | "ink";
@@ -205,7 +208,7 @@ function InkScreen() {
           options={["highlight", "zoom"] as const}
           value={surface}
           onChange={setSurface}
-          labels={{ highlight: "The highlight", zoom: "The zoom" }}
+          labels={{ highlight: "The highlight", zoom: "The magnifier" }}
         />
       </Row>
       <div className="ap-chips">
@@ -243,13 +246,14 @@ export default function AppearanceSheet() {
   const mag = useMagnificationSettingsStore();
   const active = matchPreset(hl, mag);
   const [screen, setScreen] = useState<Screen>("root");
+  const tuningPreview = useViewSettingsStore((s) => s.tuningPreview);
 
   const inkCount = hl.filter_style.length + mag.filter_style.length;
 
   const TITLES: Record<Exclude<Screen, "root">, string> = {
     box: "The box",
     pointer: "The pointer",
-    zoom: "The zoom",
+    zoom: "The magnifier",
     motion: "Motion",
     ink: "Ink",
   };
@@ -257,7 +261,7 @@ export default function AppearanceSheet() {
   const TABS: Record<Exclude<Screen, "root">, string> = {
     box: "Box",
     pointer: "Pointer",
-    zoom: "Zoom",
+    zoom: "Magnifier",
     motion: "Motion",
     ink: "Ink",
   };
@@ -266,7 +270,19 @@ export default function AppearanceSheet() {
     return (
       <div className="ap-sheet">
         <p className="ap-title">Pick what you can see best</p>
-        <p className="ap-hint">The video above is the preview — it changes as you choose.</p>
+        {/* What the changes show on. It replaced the hint line that sat here ("The video above
+            is the preview…"): one row, so the first screen stays no taller than the drill-down
+            screens. The choice's own words say what each does. */}
+        <div className="ap-preview">
+          <span className="ap-preview-label">Preview on</span>
+          <Choice
+            label="Preview while tuning"
+            options={["sample", "jump"] as const}
+            value={tuningPreview}
+            onChange={setTuningPreview}
+            labels={{ sample: "A sample highlight", jump: "The nearest moment" }}
+          />
+        </div>
 
         <div className="ap-tiles" role="radiogroup" aria-label="Appearance preset">
           {PRESETS.map((p) => (
@@ -286,11 +302,22 @@ export default function AppearanceSheet() {
           {active ? active.hint : "Custom — your own settings."}
         </p>
 
-        <NavRow
-          label="Fine-tune"
-          value={active ? active.name : "Custom"}
-          onClick={() => setScreen("box")}
-        />
+        {/* Two ways in, one per surface. A single "Fine-tune" row led to the box, and the
+            magnifier's settings were a tab you only found once inside — viewers reported not
+            knowing the magnifier could be tuned at all. Same groups behind both rows; each
+            row just opens its own. */}
+        <div className="ap-navs">
+          <NavRow
+            label="Fine-tune the highlight"
+            value={active ? active.name : "Custom"}
+            onClick={() => setScreen("box")}
+          />
+          <NavRow
+            label="Fine-tune the magnifier"
+            value={`${(1 + mag.zoom_strength).toFixed(1)}×`}
+            onClick={() => setScreen("zoom")}
+          />
+        </div>
       </div>
     );
   }
@@ -306,7 +333,9 @@ export default function AppearanceSheet() {
       </div>
 
       <div className="ap-tabs" role="tablist" aria-label="Fine-tune group">
-        {(["box", "pointer", "zoom", "motion", "ink"] as const).map((s) => (
+        {/* The highlight's groups together, the magnifier last: Ink spans both surfaces and
+            sits between them. */}
+        {(["box", "pointer", "motion", "ink", "zoom"] as const).map((s) => (
           <button
             type="button"
             key={s}
@@ -341,7 +370,20 @@ export default function AppearanceSheet() {
                 onChange={(border_color) => setHighlightSettings({ border_color })}
               />
             </Row>
-            <Row label="Fill" value={`${Math.round(hl.fill_opacity * 100)}%`}>
+            {/* Colour first, then how strongly it shows. The slider was labelled "Fill" and
+                sat above "Fill colour", so a percentage beside the word "Fill" read as how
+                MUCH of the box is filled. "Opacity" directly under "Fill" reads as a pair;
+                "Fill opacity" would wrap in the 62px label column. The spoken names were
+                already right and stay as they are. */}
+            <Row label="Fill">
+              <Swatches
+                label="Fill colour"
+                colors={FILL_COLORS}
+                value={hl.fill_color}
+                onChange={(fill_color) => setHighlightSettings({ fill_color })}
+              />
+            </Row>
+            <Row label="Opacity" value={`${Math.round(hl.fill_opacity * 100)}%`}>
               <Range
                 label="Fill opacity"
                 min={0}
@@ -349,14 +391,6 @@ export default function AppearanceSheet() {
                 step={0.05}
                 value={hl.fill_opacity}
                 onChange={(fill_opacity) => setHighlightSettings({ fill_opacity })}
-              />
-            </Row>
-            <Row label="Fill colour">
-              <Swatches
-                label="Fill colour"
-                colors={FILL_COLORS}
-                value={hl.fill_color}
-                onChange={(fill_color) => setHighlightSettings({ fill_color })}
               />
             </Row>
             <Row label="Shape">

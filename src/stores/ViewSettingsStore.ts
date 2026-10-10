@@ -32,7 +32,21 @@ export type TViewSettings = {
   // Defaults to on. It is a cue some viewers rely on to know the slide changed under them,
   // and a feature that never appears is a feature nobody discovers well enough to want off.
   sceneNotice: boolean;
+  // Whether the player's single-character shortcuts (F, M, Z, P, A, L, C, S, [ ], < >) are on.
+  // WCAG 2.1.4: a shortcut that is one printable character must be possible to switch off,
+  // because speech-input users trigger them by saying ordinary words, and they fire wherever
+  // focus is. Space and the arrow keys are not character keys and stay on regardless — they
+  // are how the player is driven at all without a pointer.
+  letterShortcuts: boolean;
+  // What the Appearance sheet shows its changes on when no moment is on screen. "sample": a
+  // stand-in highlight drawn where the sheet does not cover it (player/sample.ts) — the
+  // default, because it leaves the viewer's place in the lecture alone. "jump": move the
+  // playhead to the nearest moment and back on close, the original behaviour. Here, not in the
+  // preset-overwritten stores, for the same reason as sceneNotice (D28).
+  tuningPreview: TuningPreview;
 };
+
+export type TuningPreview = "sample" | "jump";
 
 export const useViewSettingsStore = create<TViewSettings>()(
   persist(
@@ -45,6 +59,8 @@ export const useViewSettingsStore = create<TViewSettings>()(
       pinSize: "m",
       pinCorner: "tr",
       sceneNotice: true,
+      letterShortcuts: true,
+      tuningPreview: "sample",
     }),
     {
       name: "view-settings",
@@ -61,6 +77,12 @@ export const setPlaybackRate = (playbackRate: number) =>
 
 export const setSceneNotice = (sceneNotice: boolean) =>
   useViewSettingsStore.setState({ sceneNotice });
+
+export const setLetterShortcuts = (letterShortcuts: boolean) =>
+  useViewSettingsStore.setState({ letterShortcuts });
+
+export const setTuningPreview = (tuningPreview: TuningPreview) =>
+  useViewSettingsStore.setState({ tuningPreview });
 
 // Both controls are cycles, not pickers: one button each, no menu to open over the very
 // video the panel is already covering.

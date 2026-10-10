@@ -1,10 +1,16 @@
 // Copyright (C) 2026 Yotam Sechayk
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { useViewSettingsStore, setSceneNotice, setGroupByScene } from "./ViewSettingsStore";
+import {
+  useViewSettingsStore,
+  setSceneNotice,
+  setGroupByScene,
+  setLetterShortcuts,
+  setTuningPreview,
+} from "./ViewSettingsStore";
 
 const read = (rel: string) =>
   readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
@@ -15,7 +21,9 @@ describe("the scene-change notice setting", () => {
   it("is on for anyone who has never touched it", () => {
     // It is a cue some viewers rely on to know the slide changed under them, and a feature
     // that never appears is one nobody discovers well enough to want off.
-    expect(useViewSettingsStore.getState().sceneNotice).toBe(true);
+    // The store's INITIAL state, not getState(): beforeEach has just set it to true, so
+    // reading it back would pass whatever the default were.
+    expect(useViewSettingsStore.getInitialState().sceneNotice).toBe(true);
   });
 
   it("turns off and back on again", () => {
@@ -70,5 +78,108 @@ describe("the scene-change notice setting", () => {
     const player = read("../player/VideoPlayer.tsx");
     expect(player).toMatch(/getState\(\)\.sceneNotice/);
     expect(player).toMatch(/sceneNoticeVisible && sceneNotice/);
+  });
+});
+
+describe("the single-key shortcuts setting", () => {
+  beforeEach(() => setLetterShortcuts(true));
+
+  it("is on for anyone who has never touched it", () => {
+    // The keys are how a keyboard user drives the player; switching them off is the
+    // exception WCAG 2.1.4 asks for, not the default.
+    // The store's INITIAL state, not getState(): beforeEach has just set it to true, so
+    // reading it back would pass whatever the default were.
+    expect(useViewSettingsStore.getInitialState().letterShortcuts).toBe(true);
+  });
+
+  it("turns off and back on again", () => {
+    setLetterShortcuts(false);
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(false);
+    setLetterShortcuts(true);
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(true);
+  });
+
+  it("does not disturb the other view settings, nor they it", () => {
+    setSceneNotice(false);
+    setLetterShortcuts(false);
+    expect(useViewSettingsStore.getState().sceneNotice).toBe(false);
+    expect(useViewSettingsStore.getState().pinSize).toBe("m");
+    setSceneNotice(true);
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(false);
+  });
+
+  it("lives outside the store the Appearance presets overwrite", () => {
+    expect(read("./HighlightSettingsStore.ts")).not.toMatch(/letterShortcuts/);
+    expect(read("../player/presets.ts")).not.toMatch(/letterShortcuts/);
+  });
+
+  it("gates every printable-character key and leaves Space and the arrows alone", () => {
+    // Space and the arrows are not character keys — speech input never produces them — and
+    // they are how the player is driven at all without a pointer.
+    const player = read("../player/VideoPlayer.tsx");
+    const table = player.slice(player.indexOf("useHotkeys(["), player.indexOf("]);", player.indexOf("useHotkeys([")));
+    const [always, gated] = table.split("...(letterShortcuts");
+    expect(gated).toBeDefined();
+    for (const k of ["Space", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+      expect(always).toContain(`["${k}"`);
+    }
+    for (const k of ["F", "M", "Z", "P", "A", "L", "C", "S", "[", "]", "shift+<", "shift+>"]) {
+      expect(always).not.toContain(`["${k}"`);
+      expect(gated).toContain(`["${k}"`);
+    }
+  });
+
+  it("is a switch in the sidebar's footer that shows whatever the lecture looks like", () => {
+    // Unlike the scene-notice switch, it is not gated on there being scenes: the keys exist
+    // in every lecture.
+    const side = read("../MomentsSidebar.tsx");
+    expect(side).toMatch(/label="Single-key shortcuts"/);
+    const foot = side.slice(side.indexOf('className="side-foot"'));
+    expect(foot.indexOf("Single-key shortcuts")).toBeGreaterThan(0);
+    // The footer itself is no longer behind the scenes gate.
+    expect(side).not.toMatch(/groups\.length > 0 && \(\s*<div className="side-foot"/);
+  });
+});
+
+describe("the preview-while-tuning setting", () => {
+  it("defaults to the sample highlight", () => {
+    // The sample leaves the viewer's place in the lecture alone; jumping to a moment is the
+    // opt-in (Yotam: keep the old behaviour, make a new default).
+    expect(useViewSettingsStore.getInitialState().tuningPreview).toBe("sample");
+  });
+
+  it("switches, persists, and leaves the other settings alone", () => {
+    setTuningPreview("jump");
+    expect(useViewSettingsStore.getState().tuningPreview).toBe("jump");
+    expect(useViewSettingsStore.getState().letterShortcuts).toBe(true);
+    setTuningPreview("sample");
+  });
+
+  it("lives outside the stores the Appearance presets overwrite", () => {
+    expect(read("./HighlightSettingsStore.ts")).not.toMatch(/tuningPreview/);
+    expect(read("../player/presets.ts")).not.toMatch(/tuningPreview/);
+  });
+});
+
+describe("persisting the preview-while-tuning setting", () => {
+  it("is written to and read back from localStorage", async () => {
+    // Vitest runs in node, without localStorage, and zustand's persist only attaches when a
+    // storage exists at creation — so stub one and load a fresh copy of the store.
+    const mem = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, v),
+      removeItem: (k: string) => void mem.delete(k),
+    });
+    vi.resetModules();
+    const fresh = await import("./ViewSettingsStore");
+    fresh.setTuningPreview("jump");
+    expect(JSON.parse(mem.get("view-settings")!).state.tuningPreview).toBe("jump");
+    // A reload: another fresh copy rehydrates from the same storage.
+    vi.resetModules();
+    const reloaded = await import("./ViewSettingsStore");
+    await reloaded.useViewSettingsStore.persist.rehydrate();
+    expect(reloaded.useViewSettingsStore.getState().tuningPreview).toBe("jump");
+    vi.unstubAllGlobals();
   });
 });

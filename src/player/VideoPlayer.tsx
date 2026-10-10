@@ -22,11 +22,12 @@
 // worse disruption — being yanked out of a magnified view mid-explanation — and scene
 // detection is a heuristic that fires on build animations and camera moves too.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Box, Text, Group, UnstyledButton, Slider, Popover, Menu } from "@mantine/core";
+import { Box, Text, Group, UnstyledButton, Popover, Menu } from "@mantine/core";
 import {
   useElementSize,
   useDisclosure,
   useHotkeys,
+  type HotkeyItem,
   useMergedRef,
   useMouse,
   useTimeout,
@@ -64,6 +65,7 @@ import { isAnalyzed } from "../analyzer/ranges";
 import type { Activity, AnalysisMeta, Range, Scene } from "../analyzer/types";
 import { toPlayerActivity } from "./types";
 import { computeLetterbox } from "./geometry";
+import { placeSample, type Rect } from "./sample";
 import { timelineMarkers, stepMoment, seekTargetFor } from "./moments";
 import { momentDescription, momentPlace } from "./describe";
 import { cropRect } from "../analyzer/snippets";
@@ -73,6 +75,8 @@ import HighlightIndicator from "./HighlightIndicator";
 import MagnificationOverlay from "./MagnificationOverlay";
 import SVGFilters from "./SVGFilters";
 import { stopPlayerHotkeys } from "./hotkeys";
+import PlayerTip from "./PlayerTip";
+import { PlayerTipRoot } from "./tipRoot";
 import { useMagnificationSettingsStore } from "../stores/MagnificationSettingsStore";
 import {
   useViewSettingsStore, setPlaybackRate,
@@ -96,8 +100,27 @@ type Props = {
   // (coverage, moments found) the player can already derive from ranges/activities.
   xRealtime?: number;
   selectOpts: SelectOpts;
-  onSeeked?: (t: number) => void;
+  // `byViewer` is false for the seeks the player makes on its own (the Appearance preview jump
+  // and the step back from it). Those are not the viewer choosing a place, so App must not
+  // treat them as an answer to the resume offer (D33).
+  onSeeked?: (t: number, byViewer: boolean) => void;
+  // For the resume bookmark (player/bookmark.ts), reported when each happens rather than when
+  // the seek lands: a seek the VIEWER asked for, and the Appearance preview parking the
+  // playhead on a moment and later stepping back to `back`.
+  onViewerSeek?: (t: number) => void;
+  onPreviewStart?: () => void;
+  onPreviewEnd?: (back: number) => void;
+  // The viewer started playback from where the preview had parked the playhead: that place is
+  // now theirs. No seek is involved, so nothing is "pending" — the bookmark just takes it.
+  onPreviewTaken?: (t: number) => void;
   onTimeChange?: (t: number) => void;
+  // Play/pause as the element reports it. App needs both edges for the resume position: play
+  // is the viewer answering the resume offer by doing something else, and pause is a moment
+  // worth saving where they are.
+  onPlayingChange?: (playing: boolean) => void;
+  // "Resume at 12:34?" (D33). App owns the saved position and decides when to offer it; the
+  // player only draws it, on the video, so offering it moves nothing on the page.
+  resumeOffer?: { at: number; onResume: () => void; onRestart: () => void } | null;
   // Fires only when the highlighted moment CHANGES — not per frame. The moments sidebar
   // needs to know which card is current, and only the player derives that (it runs
   // selectActivity on the rVFC loop; App sees time at a 0.2s throttle). Re-deriving it in
@@ -118,24 +141,52 @@ const FLASH_SPEED = 250;
 const SCENE_NOTICE_MS = 2500;
 
 // The keys that must NOT summon the control bar, because the control they operate is not in it:
-// zoom is drawn on the video with its own indicator, and [ / ] are navigation. Kept as one set
-// so the hotkey table and the container's onKeyDown cannot drift apart and disagree. Both `z`
-// and `Z` — the container sees the raw event.key, so Shift and CapsLock both reach it.
-const NO_REVEAL_KEYS = new Set(["z", "Z", "p", "P", "ArrowUp", "ArrowDown", "[", "]"]);
+// zoom is drawn on the video with its own indicator, [ / ] are navigation, and C / S move and
+// resize the pinned snapshot, whose buttons live on the panel itself. Kept as one set so the
+// hotkey table and the container's onKeyDown cannot drift apart and disagree. Both `z` and `Z`
+// — the container sees the raw event.key, so Shift and CapsLock both reach it.
+const NO_REVEAL_KEYS = new Set([
+  "z", "Z", "p", "P", "c", "C", "s", "S", "ArrowUp", "ArrowDown", "[", "]",
+]);
 
 // Seconds of analysis before playback unlocks. Lives here because the pre-playback gate
 // PROMISES this number on screen ("the first 10 seconds"), and App gates `canPlay` on it —
 // two copies would be two chances for the promise and the behaviour to drift apart.
 export const PLAYBACK_LEAD = 10;
 
+// Whether this browser draws a range input vertically under `writing-mode: vertical-lr`.
+// Chromium only does from 124 (2024), Safari and Firefox from about the same time; an older
+// one keeps drawing it horizontally, squeezed into the volume popover's 24px-wide box, while
+// aria-orientation still claims vertical. A CSS-only test cannot tell (writing-mode itself is
+// supported everywhere), so measure an unstyled one: a vertical range is taller than wide.
+// Once per page; the answer cannot change under us.
+let verticalRangeSupport: boolean | null = null;
+function supportsVerticalRange(): boolean {
+  if (verticalRangeSupport !== null) return verticalRangeSupport;
+  const probe = document.createElement("input");
+  probe.type = "range";
+  probe.style.cssText = "writing-mode: vertical-lr; position: absolute; visibility: hidden";
+  document.body.appendChild(probe);
+  const r = probe.getBoundingClientRect();
+  probe.remove();
+  verticalRangeSupport = r.height > r.width;
+  return verticalRangeSupport;
+}
+
 const VideoPlayer = (props: Props) => {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   // Fullscreen is requested on the container; the overlay geometry measures the <video>
-  // element. They are the same rectangle today (the video is the container's only in-flow
-  // child), but only by accident — anything else placed in that flow would break the
-  // container measurement while the video measurement stays correct.
+  // element. They are NOT the same rectangle: windowed, the control bar sits in flow below the
+  // video, inside the container. That is safe because nothing measures the container — the
+  // highlight math reads the <video> box, and every layer drawn over the picture lives in
+  // .video-stage, which is exactly the video's box.
   const containerRef = useRef<HTMLDivElement>(null);
+  // The same element again, as STATE, for the tooltips to portal into (tipRoot.ts). A ref
+  // would not do: the tips render before the container has mounted, and only a re-render
+  // hands them the element once it exists.
+  const [tipRoot, setTipRoot] = useState<HTMLDivElement | null>(null);
+  const containerMergedRef = useMergedRef(containerRef, setTipRoot);
   const {
     ref: videoSizeRef,
     width: boxWidth,
@@ -143,7 +194,7 @@ const VideoPlayer = (props: Props) => {
   } = useElementSize<HTMLVideoElement>();
   const videoMergedRef = useMergedRef(videoRef, videoSizeRef);
   // The moments overlay anchors just above the control bar, whose height depends on
-  // collapsed state and which rows (lane, now-line) are present — so it is measured.
+  // collapsed state and the window's width (the controls wrap) — so it is measured.
   const { ref: barSizeRef, height: barHeight } = useElementSize<HTMLDivElement>();
 
   // State
@@ -159,6 +210,10 @@ const VideoPlayer = (props: Props) => {
   const [isZoomIn, handleIsZoomIn] = useDisclosure(false);
   const [isFullscreen, handleIsFullscreen] = useDisclosure(false);
   const [hideControls, handleHideControls] = useDisclosure(false);
+  // Fullscreen only (D32). Windowed, the bar is in flow under the picture, so collapsing it
+  // changed the bar's height — and the player's width cap subtracts that height, so the whole
+  // player resized under the viewer's pointer. Windowed is always expanded; this state is only
+  // ever true while fullscreen, and is never persisted.
   const [collapsed, handleCollapsed] = useDisclosure(false);
   // Fullscreen-only: the moments list summoned as an overlay inside the player.
   const [momentsOpen, handleMomentsOpen] = useDisclosure(false);
@@ -168,6 +223,27 @@ const VideoPlayer = (props: Props) => {
   const lastReportedActivityRef = useRef<number | null>(null);
   const chromeTimeRef = useRef(-1);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  // Whether the video has a first frame to show. Until it has, the picture and everything drawn
+  // on it are transparent and the container holds the loading placeholder's dark: loading a
+  // lecture used to blink through ~100ms of hard black (an empty <video> over the container's
+  // black) between the placeholder and the slide. Now the picture fades in over 200ms from that
+  // same dark instead (player.css). A fade is not
+  // vestibular motion, so there is no reduced-motion gate — the same call as the magnifier's
+  // crossfade. Opacity changes nothing about layout, so every measurement of the video box is
+  // the same before and after.
+  const [framed, setFramed] = useState(false);
+  useEffect(() => {
+    setFramed(false);
+    // Never stay hidden: if no frame arrives (a codec the element cannot play while the
+    // analyzer still can), the "Finding the moments…" gate and the rest must still show.
+    const t = window.setTimeout(() => setFramed(true), 1500);
+    return () => window.clearTimeout(t);
+  }, [props.src]);
+  // Where the sample highlight sits (stage px), or null when it is not shown.
+  const [sampleRect, setSampleRect] = useState<Rect | null>(null);
+  // Tracked only so the resume card knows to wait while it is open (see .resume-slot).
+  const [speedOpen, setSpeedOpen] = useState(false);
   const [previewJumped, setPreviewJumped] = useState(false);
   // For the "Magnifier on · 1.7×" chip; same 1 + strength display the Appearance sheet uses.
   const zoomStrength = useMagnificationSettingsStore((s) => s.zoom_strength);
@@ -178,6 +254,10 @@ const VideoPlayer = (props: Props) => {
   const sceneNotice = useViewSettingsStore((s) => s.sceneNotice);
   const pinSize = useViewSettingsStore((s) => s.pinSize);
   const pinCorner = useViewSettingsStore((s) => s.pinCorner);
+  // WCAG 2.1.4: every single-character shortcut can be switched off (the sidebar's footer).
+  // A speech-input user saying an ordinary word otherwise fires a dozen player actions.
+  const letterShortcuts = useViewSettingsStore((s) => s.letterShortcuts);
+  const tuningPreview = useViewSettingsStore((s) => s.tuningPreview);
   const insideMomentRef = useRef<Activity | null>(null); // raw in-moment tracking (no lead/linger)
   // Pinned snapshot: a full-res crop of a moment's final ink, captured from the live video
   // element the instant playback crosses the moment's end (the end frame is what's on screen
@@ -189,15 +269,29 @@ const VideoPlayer = (props: Props) => {
   pinnedRef.current = pinned;
   // Where the viewer was before we jumped them to a moment to preview against.
   const preAppearanceTimeRef = useRef<number | null>(null);
+  // The target of a seek the player made itself, so its `seeked` can be told apart from one
+  // the viewer made. Matched by time rather than a boolean: a viewer seek that lands while
+  // ours is still in flight must still count as theirs.
+  const ownSeekRef = useRef<number | null>(null);
 
+  // The bar only ever hides in fullscreen. Windowed, it sits BELOW the video, in flow, and covers
+  // nothing — it used to overlay the bottom of the picture, which on a lecture is exactly where
+  // the instructor writes last, and viewers reported it masking the writing. Fullscreen has no
+  // room below the picture, so there it overlays, and it hides even while paused: a paused
+  // frame is a frame someone is READING, and the bar over its bottom strip is the same mask.
+  // Any pointer movement, key or focus brings it back (see the container's handlers). D32.
+  const barHidden = hideControls && isFullscreen;
   const videoContainerClasses = classNames("video-container", {
-    // The bar only ever hides while playing. Paused, it stays — you paused BECAUSE you want
-    // to do something, and hunting for the controls you just summoned is not that something.
-    clear: hideControls && isPlaying,
-    paused: !isPlaying,
-    collapsed,
+    // Until the first frame has decoded (see `framed`).
+    unframed: !framed,
+    clear: barHidden,
+    collapsed: collapsed && isFullscreen,
     fullscreen: isFullscreen,
   });
+  // How much of the picture's bottom edge the bar covers. Windowed it covers none of it, so
+  // the things docked at the bottom of the picture (the pinned snapshot, the preview notice)
+  // sit at the same small inset as their top-docked counterparts instead of a bar's height up.
+  const barOverlap = isFullscreen ? barHeight : 0;
 
   // Hooks and interactivity
   const { ref: timelineContainerRef, x: timelineX } = useMouse<HTMLDivElement>();
@@ -216,9 +310,23 @@ const VideoPlayer = (props: Props) => {
     // is USING the bar even though no events are firing. Just skip — re-arming from inside
     // the callback is a no-op (Mantine's useTimeout still holds its ref while the callback
     // runs); the container's onBlurCapture restarts the timer when focus leaves.
+    //
+    // Nor out from under a resting pointer. A pointer parked on a bar button, or on the tip it
+    // opened, is someone reading the tip — and the tip goes with the bar, which made it fail
+    // WCAG 1.4.13's "persistent" (it vanished after 1.6s with the pointer still on it). Moving
+    // off the bar onto the picture is a mousemove, which restarts this timer as usual.
+    //
+    // KEYBOARD focus, that is: `:focus-visible`. A mouse click on a bar button leaves focus on
+    // it too, and counting that as "using the bar" meant entering fullscreen by clicking the
+    // button parked focus on "Exit fullscreen" and the bar never hid again. And never while
+    // one of the bar's own dropdowns (the Appearance sheet, the speed menu) is open: they live
+    // inside the bar, so hiding it would take the sheet away from someone reading it.
     useTimeout(() => {
       const bar = barSizeRef.current;
-      if (bar && bar.contains(document.activeElement)) return;
+      const active = document.activeElement;
+      if (bar && active && bar.contains(active) && active.matches(":focus-visible")) return;
+      if (bar?.querySelector(".ap-pop, .bar-pop")) return;
+      if (bar?.matches(":hover") || containerRef.current?.querySelector(".player-tip:hover")) return;
       handleHideControls.open();
     }, 2000);
   const { start: startSceneNoticeTimeout, clear: clearSceneNoticeTimeout } = useTimeout(
@@ -243,26 +351,49 @@ const VideoPlayer = (props: Props) => {
     showControls();
     fn();
   };
+  // Two tables, because WCAG 2.1.4 draws the line between them (D31). Space and the arrows are not
+  // character keys — a spoken word never produces them — and they are how the player is driven
+  // at all without a pointer, so they are always on. Every printable-character key is in the
+  // second table, which the viewer can switch off.
   useHotkeys([
     ["Space", reveal(() => handlePlayPause())],
-    ["F", reveal(() => handleFullscreen())],
-    ["M", reveal(() => handleMute())],
     ["ArrowLeft", reveal(() => handleTimeShift(-5))],
     ["ArrowRight", reveal(() => handleTimeShift(5))],
     // No reveal — the magnifier is drawn on the video and has its own indicator; the bar has
-    // no zoom control to show you. Kept in step with NO_REVEAL_KEYS below.
-    ["Z", () => handleZoom()],
-    ["P", () => handlePin()],
+    // no zoom control to show you. Kept in step with NO_REVEAL_KEYS above.
     ["ArrowUp", () => handleZoomShift(0.1)],
     ["ArrowDown", () => handleZoomShift(-0.1)],
-    // Mantine matches on event.key, which for these is literally "[" and "]" — not the
-    // KeyboardEvent.code names ("BracketLeft"/"BracketRight"), which never match.
-    ["[", () => handleStepMoment(-1)],
-    ["]", () => handleStepMoment(1)],
-    // Shift+comma/period arrive as "<"/">" in event.key — but the Shift modifier must ALSO
-    // be declared, or Mantine rejects the match for having an undeclared modifier down.
-    ["shift+<", reveal(() => handleRateStep(-1))],
-    ["shift+>", reveal(() => handleRateStep(1))],
+    ...(letterShortcuts
+      ? ([
+          ["F", reveal(() => handleFullscreen())],
+          ["M", reveal(() => handleMute())],
+          ["Z", () => handleZoom()],
+          ["P", () => handlePin()],
+          // Appearance and the moments list both open from the bar, so both reveal it: a
+          // hidden bar is opacity 0 and pointer-events none, and the sheet is anchored inside it.
+          ["A", reveal(() => handleAppearanceOpen(!appearanceOpen))],
+          ["L", () => handleMomentsKey()],
+          // The snapshot's own buttons, as keys. Only while something is pinned — with no panel
+          // there is nothing to move, and silently rewriting a stored preference the viewer
+          // cannot see change would be worse than doing nothing. No reveal: the panel is not in
+          // the bar, and it shows its own change. Read from the store, not the render closure,
+          // so key-repeat cycles rather than recomputing one step from a stale value.
+          ["C", () => {
+            if (pinnedRef.current) setPinCorner(nextPinCorner(useViewSettingsStore.getState().pinCorner));
+          }],
+          ["S", () => {
+            if (pinnedRef.current) setPinSize(nextPinSize(useViewSettingsStore.getState().pinSize));
+          }],
+          // Mantine matches on event.key, which for these is literally "[" and "]" — not the
+          // KeyboardEvent.code names ("BracketLeft"/"BracketRight"), which never match.
+          ["[", () => handleStepMoment(-1)],
+          ["]", () => handleStepMoment(1)],
+          // Shift+comma/period arrive as "<"/">" in event.key — but the Shift modifier must ALSO
+          // be declared, or Mantine rejects the match for having an undeclared modifier down.
+          ["shift+<", reveal(() => handleRateStep(-1))],
+          ["shift+>", reveal(() => handleRateStep(1))],
+        ] as HotkeyItem[])
+      : []),
   ]);
 
   // The rates every mainstream player offers, plus a study-slow 0.5. Stepping clamps at the
@@ -297,10 +428,54 @@ const VideoPlayer = (props: Props) => {
   // Which moment is current, taken from the player's own selection rather than re-derived —
   // otherwise the lit-up mark and the highlight on the video disagree by `lead` seconds.
   const currIndex = currActivity ? props.activities.indexOf(currActivity) : -1;
-  const upcoming = stepMoment(props.activities, currTime, props.selectOpts.lead, 1);
-  // "Next at ..." is a lie while the video after the playhead is still unanalyzed: the next
-  // moment by time may simply not exist yet. Say nothing rather than point at the wrong one.
-  const nextIsKnown = props.done || isAnalyzed(props.ranges, upcoming?.start ?? currTime);
+
+  // The status region's moment sentence (see it in the bar below). Set when a moment starts and
+  // left alone when it ends, so each moment is one announcement. "Next at" is the moment after
+  // THIS one — from the list, not from the playhead, which sits `lead` seconds before the start
+  // when the moment is selected and would name the current moment as the next.
+  //
+  // Keyed on ENTERING a moment — the activity object becoming current — not on its index. An
+  // index shifts when a backfill finds an earlier moment while the viewer sits in this one, and
+  // that is not news; going back into the same moment after a gap IS, even though the sentence
+  // is the same — so each entry bumps `momentEntry`, which remounts the text node and makes it
+  // a fresh addition to the live region rather than a no-op rewrite of identical text.
+  const [momentSpoken, setMomentSpoken] = useState("");
+  const [momentEntry, setMomentEntry] = useState(0);
+  useEffect(() => {
+    if (!currActivity || currIndex < 0) return;
+    const a = currActivity;
+    const next = props.activities[currIndex + 1];
+    // "Next at ..." is a lie while the video after this moment is still unanalyzed: the next
+    // moment by time may simply not exist yet. Say nothing rather than point at the wrong one.
+    const known = next && (props.done || isAnalyzed(props.ranges, next.start));
+    setMomentSpoken(
+      `Moment ${currIndex + 1}${props.done ? ` of ${props.activities.length}` : ""}, ` +
+        `${momentPlace(a, props.meta.analysisWidth, props.meta.analysisHeight)}, ` +
+        `${convertSecondsToTimecode(a.start)}, ${(a.end - a.start).toFixed(1)} seconds.` +
+        (known ? ` Next at ${convertSecondsToTimecode(next.start)}.` : "")
+    );
+    setMomentEntry((n) => n + 1);
+    // Only on entering a moment: re-announcing because the analysis found another moment, or
+    // the playhead moved, is exactly the churn this exists to stop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currActivity]);
+
+  // The magnifier's own announcement, in its own live region (below). A role=status region is
+  // atomic, so sharing one with the moment sentence re-read the whole sentence on every Z, and
+  // switching it off just removed the words — silence where "off" should be. Empty until the
+  // first change, so loading a video announces nothing about a magnifier nobody touched.
+  // A strength change counts only while magnifying (↑/↓, or the sheet's slider with the
+  // magnifier on); with it off, moving the slider is not the magnifier changing.
+  const [zoomSpoken, setZoomSpoken] = useState("");
+  const prevZoomRef = useRef(isZoomIn);
+  useEffect(() => {
+    const toggled = prevZoomRef.current !== isZoomIn;
+    prevZoomRef.current = isZoomIn;
+    if (!toggled && !isZoomIn) return;
+    if (!toggled && zoomSpoken === "") return; // first run: nothing has changed yet
+    setZoomSpoken(isZoomIn ? `Magnifier on, ${(1 + zoomStrength).toFixed(1)} times.` : "Magnifier off.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isZoomIn, zoomStrength]);
 
   // Helper functions
   const showControls = () => {
@@ -328,9 +503,9 @@ const VideoPlayer = (props: Props) => {
     // asked for. The Prev/Next BUTTONS reveal it themselves (below) — they live in the bar, so
     // it must not vanish out from under the cursor that is clicking them.
     const seekTo = seekTargetFor(target, props.selectOpts.lead);
-    video.currentTime = seekTo;
+    viewerSeek(video, seekTo);
     // Keep the chrome in step immediately rather than waiting for the next presented frame,
-    // so the now-line and the lit mark move with the key rather than a beat behind it.
+    // so the status and the lit mark move with the key rather than a beat behind it.
     chromeTimeRef.current = seekTo;
     setCurrTime(seekTo);
   };
@@ -391,7 +566,7 @@ const VideoPlayer = (props: Props) => {
   // Core per-time update: selection, stable activity, scene tracking. Kept in a ref
   // so the rVFC loop always calls the freshest closure.
   const updateAtTime = (t: number) => {
-    // The chrome (scrubber, timecode, now-line, current mark) updates at ~10Hz, not at the
+    // The chrome (scrubber, timecode, status, current mark) updates at ~10Hz, not at the
     // display's frame rate. Only the highlight and the magnifier need frame accuracy — a
     // highlight 100ms behind the pen is the bug the rVFC loop exists to fix; a mark lighting
     // up 100ms late is invisible. This caps React's work on a main thread already shared
@@ -461,6 +636,15 @@ const VideoPlayer = (props: Props) => {
   const updateAtTimeRef = useRef(updateAtTime);
   updateAtTimeRef.current = updateAtTime;
 
+  // Selection only re-runs when the time moves (rVFC, timeupdate). A moment the analysis finds
+  // UNDER a paused playhead — the viewer seeked ahead and waited — was therefore never selected:
+  // no highlight, nothing announced, until they nudged the time. Re-run it when the list grows
+  // while paused. (Playing, the frame loop picks it up within a frame anyway.)
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v && v.paused) updateAtTimeRef.current(v.currentTime);
+  }, [props.activities]);
+
   // The persisted rate survives reloads and new videos; the element resets to 1 whenever
   // src changes, so re-apply on both.
   useEffect(() => {
@@ -507,29 +691,118 @@ const VideoPlayer = (props: Props) => {
   // showing, jump to the nearest one, and step back to where the viewer was when they close.
   // Never move the playhead while the video is playing: that would be the app yanking them
   // out of the lecture.
+  // Every seek the VIEWER makes goes through here. If the Appearance preview has parked the
+  // playhead on a moment, the viewer moving it is them choosing a place, so the preview lets go
+  // first — synchronously, before the seek. It used to let go on `seeked`, which is too late: a
+  // click on the scrubber is also an outside-click that closes the sheet, the close restored
+  // the pre-preview time before `seeked` arrived, and the viewer's seek was undone (and the
+  // bookmark kept the old place). Same race for ] followed quickly by Escape.
+  const cancelPreview = () => {
+    if (preAppearanceTimeRef.current === null) return;
+    preAppearanceTimeRef.current = null;
+    setPreviewJumped(false);
+  };
+  const viewerSeek = (video: HTMLVideoElement, t: number) => {
+    cancelPreview();
+    props.onViewerSeek?.(t);
+    // And forget a preview jump still in flight: ownership is matched by landing time, so a
+    // viewer seek landing within 0.05s of that target before its `seeked` would otherwise be
+    // taken for the player's own and leave the resume offer and the bookmark untouched.
+    ownSeekRef.current = null;
+    video.currentTime = t;
+  };
+
+  // When a bar popover closes, put focus back on its trigger — but only if focus was LOST: it sat
+  // in the popover, which is gone, so it is now on <body>. Closing it dropped a keyboard user on
+  // nothing (opened with A from the resume card, then Escape: the next Space played from 0:00
+  // and threw the offer away). Mantine's returnFocus did it unconditionally, which was the
+  // opposite failure: a click on a sidebar row that also dismissed the sheet had its focus
+  // dragged back to the Appearance button, and Space then reopened the sheet. Checked a frame
+  // later, after the click that closed it has moved focus wherever it was going. If the trigger
+  // is not on screen (the collapsed fullscreen bar drops some buttons), the first visible bar
+  // control takes it instead.
+  const refocusIfLost = (selector: string, dropdown: string) => {
+    requestAnimationFrame(() => {
+      const a = document.activeElement;
+      // Lost = on <body>, detached, or still inside THIS popover's dropdown — Mantine keeps a
+      // closing dropdown mounted for its exit transition, so a frame later focus can still be
+      // in it, about to vanish with it. Only this one: focus in ANOTHER open popover (speed
+      // menu open, then A opens the Appearance sheet, which closes the menu) is where the
+      // viewer is working, and pulling it back to the speed button threw them out of the sheet.
+      const lost = !a || a === document.body || !a.isConnected || !!a.closest(dropdown);
+      if (!lost) return;
+      const bar = barSizeRef.current;
+      const trigger = containerRef.current?.querySelector<HTMLElement>(selector);
+      const target =
+        trigger && trigger.getClientRects().length > 0
+          ? trigger
+          : [...(bar?.querySelectorAll<HTMLElement>(".controls > button") ?? [])].find(
+              (b) => b.getClientRects().length > 0
+            );
+      target?.focus();
+    });
+  };
+
+  // The "nearest moment" preview (Appearance → Preview on): park the playhead on a moment so
+  // the settings have something to show on, and step back to where the viewer was. Both are
+  // the player's own moves — never the viewer's intent, so the bookmark ignores them.
+  // Only while paused with no moment on screen: never yank someone out of the lecture.
+  const startPreviewJump = (video: HTMLVideoElement) => {
+    if (preAppearanceTimeRef.current !== null || isPlaying || currActivity) return;
+    if (props.activities.length === 0) return;
+    const target =
+      stepMoment(props.activities, video.currentTime, props.selectOpts.lead, 1) ??
+      stepMoment(props.activities, video.currentTime, props.selectOpts.lead, -1);
+    if (!target) return;
+    preAppearanceTimeRef.current = video.currentTime;
+    // Clamped inside the moment and the video: a moment in the last fraction of a second
+    // would put the target past the end, the browser would clamp the seek, and the landing
+    // time would no longer match ownSeekRef — the player's own preview jump would then count
+    // as the viewer's, dismissing the resume offer.
+    const end = Math.min(target.end, (video.duration || totalTime) - 0.05);
+    const t = Math.max(
+      target.start,
+      Math.min(end, seekTargetFor(target, props.selectOpts.lead) + props.selectOpts.lead + 0.2)
+    );
+    ownSeekRef.current = t;
+    video.currentTime = t;
+    setPreviewJumped(true);
+    props.onPreviewStart?.();
+  };
+  const endPreviewJump = (video: HTMLVideoElement) => {
+    if (preAppearanceTimeRef.current === null) return;
+    const back = preAppearanceTimeRef.current;
+    ownSeekRef.current = back;
+    video.currentTime = back;
+    preAppearanceTimeRef.current = null;
+    setPreviewJumped(false);
+    props.onPreviewEnd?.(back);
+  };
+
   const handleAppearanceOpen = (open: boolean) => {
     const video = videoRef.current;
     setAppearanceOpen(open);
+    if (!open) refocusIfLost('button[aria-label^="Appearance"]', ".ap-pop");
     if (!video) return;
-
-    if (open) {
-      if (!isPlaying && !currActivity && props.activities.length > 0) {
-        const target =
-          stepMoment(props.activities, video.currentTime, props.selectOpts.lead, 1) ??
-          stepMoment(props.activities, video.currentTime, props.selectOpts.lead, -1);
-        if (target) {
-          preAppearanceTimeRef.current = video.currentTime;
-          const t = seekTargetFor(target, props.selectOpts.lead) + props.selectOpts.lead + 0.2;
-          video.currentTime = t;
-          setPreviewJumped(true);
-        }
-      }
-    } else if (preAppearanceTimeRef.current !== null) {
-      video.currentTime = preAppearanceTimeRef.current;
-      preAppearanceTimeRef.current = null;
-      setPreviewJumped(false);
-    }
+    // In "sample" mode (the default) nothing moves: the sample highlight shows the changes.
+    if (open && useViewSettingsStore.getState().tuningPreview === "jump") startPreviewJump(video);
+    else if (!open) endPreviewJump(video);
   };
+
+  // Switching "Preview on" while the sheet is open applies at once: to "The nearest moment",
+  // the jump happens now (same conditions as on opening); to "A sample highlight", a jump
+  // already made steps back now and the sample takes over. Preview moves both ways, so the
+  // bookmark is untouched however often it is flipped.
+  const prevTuningRef = useRef(tuningPreview);
+  useEffect(() => {
+    if (prevTuningRef.current === tuningPreview) return;
+    prevTuningRef.current = tuningPreview;
+    const video = videoRef.current;
+    if (!video || !appearanceOpen) return;
+    if (tuningPreview === "jump") startPreviewJump(video);
+    else endPreviewJump(video);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tuningPreview]);
 
   const handleFullscreen = () => {
     if (isFullscreen) {
@@ -541,10 +814,137 @@ const VideoPlayer = (props: Props) => {
     }
   };
 
+  // The moments list, one toggle for the button and the L key. Opening it collapses the bar, so
+  // the list gets the height the expanded bar would have taken.
+  const toggleMomentsOverlay = () => {
+    if (!momentsOpen) handleCollapsed.open();
+    handleMomentsOpen.toggle();
+  };
+
+  // L means "take me to the moments", which is a different thing in the two layouts. In
+  // fullscreen the list is an overlay the key opens and closes, exactly like its button (and
+  // the bar is revealed, since that button lives in it). Windowed, the list is already on the
+  // page, so there is nothing to open: the key moves focus to it — to the row playing now, so
+  // the reader starts where the lecture is, else to the first row that can take focus.
+  const handleMomentsKey = () => {
+    const container = containerRef.current;
+    if (isFullscreen) {
+      showControls();
+      // Closing from inside the list would drop focus on <body> as the overlay unmounts —
+      // hand it back to the toggle, as Escape does.
+      const inside = !!container?.querySelector(".moments-side.overlay")?.contains(document.activeElement);
+      toggleMomentsOverlay();
+      if (momentsOpen && inside) {
+        container?.querySelector<HTMLButtonElement>('button[aria-label="Moments list"]')?.focus();
+      }
+      return;
+    }
+    const side = document.querySelector<HTMLElement>(".moments-side:not(.overlay)");
+    if (!side) return;
+    // "Can take focus" means enabled AND rendered: a row inside a folded scene is in the DOM
+    // but has no box, and focus() on it silently does nothing. A folded scene's own summary
+    // is the fallback, since that is where its rows are.
+    const rows = [
+      side.querySelector<HTMLElement>('.side-row[aria-current="true"]'),
+      ...side.querySelectorAll<HTMLElement>(".side-row:not(:disabled)"),
+      side.querySelector<HTMLElement>(".side-scene summary"),
+    ];
+    rows.find((r) => r && r.getClientRects().length > 0)?.focus();
+  };
+
+  // Place the sample highlight while the Appearance sheet is open in "sample" mode: a square a
+  // fifth of the picture's height, where the sheet (and, in fullscreen, the bar over the picture)
+  // covers it least. Re-placed whenever any of those move or resize — the window, fullscreen,
+  // the sheet switching tabs (each tab is a different height).
+  useEffect(() => {
+    if (!appearanceOpen || tuningPreview !== "sample") {
+      setSampleRect(null);
+      return;
+    }
+    const container = containerRef.current;
+    const video = videoRef.current;
+    if (!container || !video) return;
+    const place = () => {
+      const vr = video.getBoundingClientRect();
+      const picture: Rect = {
+        x: leftShift,
+        y: topShift,
+        w: vr.width - 2 * leftShift,
+        h: vr.height - 2 * topShift,
+      };
+      if (picture.w <= 0 || picture.h <= 0) return;
+      const rel = (el: Element | null): Rect[] => {
+        if (!el) return [];
+        const r = el.getBoundingClientRect();
+        return [{ x: r.left - vr.left, y: r.top - vr.top, w: r.width, h: r.height }];
+      };
+      const obstacles = [
+        ...rel(container.querySelector(".ap-pop")),
+        ...(isFullscreen ? rel(barSizeRef.current) : []),
+      ];
+      setSampleRect(placeSample(picture, obstacles, Math.round(picture.h * 0.2)));
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(video);
+    // The dropdown mounts with its open transition, a frame or two after the state flips.
+    let raf = 0;
+    const watchSheet = () => {
+      const pop = container.querySelector(".ap-pop");
+      if (pop) {
+        ro.observe(pop);
+        place();
+      } else raf = requestAnimationFrame(watchSheet);
+    };
+    watchSheet();
+    window.addEventListener("resize", place);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("resize", place);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appearanceOpen, tuningPreview, leftShift, topShift, isFullscreen, barHeight]);
+
+  // The one-row bar's height, for the page's width cap (--video-cap, index.css). Published only
+  // while the controls ARE one row: that height depends on the font size (the timecode's line
+  // box) but not on the player's width, so feeding it back cannot loop — a wrapped bar is the
+  // one measurement that depends on the width, and it is never published. The cap used a fixed
+  // 89px before, true at a 16px root and 7px short at 20px, which scrolled the page.
+  useEffect(() => {
+    const bar = barSizeRef.current;
+    // The DOM's word, not the state's: `barHeight` (ResizeObserver) and `isFullscreen` (the
+    // fullscreenchange event) settle at different moments, and on leaving fullscreen with the
+    // bar expanded there, the state still held the FULLSCREEN bar's height for a frame — it got
+    // published, the windowed player narrowed by 1.8px, and on a player within that much of the
+    // wrap threshold the row wrapped and the guard below never published the right value again.
+    // So: skip while anything is fullscreen, and measure the bar here, at the moment of the
+    // one-row check, so the two describe the same layout.
+    if (!bar || isFullscreen || document.fullscreenElement) return;
+    const tops = [...bar.querySelectorAll<HTMLElement>(".controls > button")]
+      .filter((b) => b.getClientRects().length > 0)
+      .map((b) => Math.round(b.getBoundingClientRect().top));
+    if (new Set(tops).size !== 1) return;
+    const h = bar.getBoundingClientRect().height;
+    if (h <= 0) return;
+    document.documentElement.style.setProperty("--bar-one-row", `${Math.ceil(h)}px`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barHeight, isFullscreen]);
+  useEffect(() => () => {
+    document.documentElement.style.removeProperty("--bar-one-row");
+  }, []);
+
+  // Fullscreen starts collapsed: the bar overlays the picture there, and the one-line bar covers
+  // the least of it. Leaving always returns to the expanded bar, the only windowed one (D32).
   useEffect(() => {
     const sync = () => {
-      if (document.fullscreenElement) handleIsFullscreen.open();
-      else handleIsFullscreen.close();
+      if (document.fullscreenElement) {
+        handleCollapsed.open();
+        handleIsFullscreen.open();
+      } else {
+        handleCollapsed.close();
+        handleIsFullscreen.close();
+      }
     };
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
@@ -552,8 +952,10 @@ const VideoPlayer = (props: Props) => {
   }, []);
 
   const handleZoomShift = (shift: number) => {
+    // ↑ with the magnifier off turns it on — "more zoom" from none. ↓ with it off does nothing:
+    // it used to turn it ON too, so "zoom out" zoomed in.
     if (!isZoomIn) {
-      handleZoom();
+      if (shift > 0) handleZoom();
       return;
     }
     useMagnificationSettingsStore.setState((state) => ({
@@ -565,9 +967,13 @@ const VideoPlayer = (props: Props) => {
   const handleTimeShift = (shift: number) => {
     const video = videoRef.current;
     if (!video || !props.canPlay) return;
+    // From the ELEMENT, like handleStepMoment and for the same reason: `currTime` is throttled
+    // state that only catches up when a frame is presented, so while paused, or on quick
+    // repeated presses, it is stale — three presses of ← became one, and a press right after
+    // a seek jumped from wherever the state last was (measured: 30s → 0s).
     const oldValue = video.currentTime;
-    const newValue = Math.max(0, Math.min(totalTime, currTime + shift));
-    video.currentTime = newValue;
+    const newValue = Math.max(0, Math.min(totalTime, oldValue + shift));
+    viewerSeek(video, newValue);
 
     if (oldValue < newValue) {
       clearForwardShiftTimeout();
@@ -587,8 +993,12 @@ const VideoPlayer = (props: Props) => {
     const video = videoRef.current;
     const timeline = timelineContainerRef.current;
     if (!video || !timeline || !props.canPlay) return;
-    const timelineWidth = timeline.clientWidth || 1;
-    video.currentTime = (timelineX / timelineWidth) * video.duration;
+    // From the event, not from useMouse's `timelineX`: that is state, updated on mousemove and
+    // read here from the last render, so a quick move-and-click (or a click with no move over
+    // the strip at all) seeked to wherever the pointer USED to be — 0:00, measured.
+    const rect = timeline.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (event.clientX - rect.left) / (rect.width || 1)));
+    viewerSeek(video, frac * video.duration);
   };
 
   const handleZoom = () => {
@@ -625,7 +1035,7 @@ const VideoPlayer = (props: Props) => {
       props.seekFnRef.current = (t: number, play?: boolean) => {
         const v = videoRef.current;
         if (!v) return;
-        v.currentTime = t;
+        viewerSeek(v, t);
         if (play && props.canPlay) void v.play();
       };
     }
@@ -636,7 +1046,21 @@ const VideoPlayer = (props: Props) => {
     ? (timelineX / (timelineContainerRef.current.clientWidth || 1)) * totalTime
     : 0;
 
-  const playerActivity = currActivity ? toPlayerActivity(currActivity, props.meta) : null;
+  const realActivity = currActivity ? toPlayerActivity(currActivity, props.meta) : null;
+  // The sample highlight (player/sample.ts), in video px for HighlightIndicator: drawn through
+  // the REAL indicator, so every setting shows exactly as it will on a moment. Only while the
+  // sheet is open in "sample" mode and no moment is current — a real moment always wins.
+  const sampleActivity =
+    sampleRect && !realActivity && scaleRatio > 0
+      ? {
+          id: -1,
+          start: 0,
+          end: 0,
+          pos: { x: (sampleRect.x - leftShift) / scaleRatio, y: (sampleRect.y - topShift) / scaleRatio },
+          dim: { width: sampleRect.w / scaleRatio, height: sampleRect.h / scaleRatio },
+        }
+      : null;
+  const playerActivity = realActivity ?? sampleActivity;
   const zoomActivity = currActivity ?? stableActivity;
 
   // The gate's bar fills toward the UNLOCK (the first PLAYBACK_LEAD seconds), not toward the
@@ -648,14 +1072,14 @@ const VideoPlayer = (props: Props) => {
   const gatePct = (analyzedSec / PLAYBACK_LEAD) * 100;
 
   return (
+    <PlayerTipRoot.Provider value={tipRoot}>
     <Box
       className={videoContainerClasses}
-      ref={containerRef}
+      ref={containerMergedRef}
       onMouseMove={showControls}
-      // The reveal triggers that make auto-hide safe. Pointer movement alone would delete the
-      // moments and the controls for a keyboard or screen-reader user; focus and keypress
-      // bring them back for everyone. (Pause is handled by the `clear` class, which is gated
-      // on isPlaying.)
+      // The reveal triggers that make auto-hide safe (auto-hide is fullscreen-only). Pointer
+      // movement alone would delete the moments and the controls for a keyboard or
+      // screen-reader user; focus and keypress bring them back for everyone.
       //
       // Except the keys whose control is not IN the bar (zoom, moment-stepping) — see
       // NO_REVEAL_KEYS and the hotkey table. Every other key still reveals it, so the bar is
@@ -669,20 +1093,80 @@ const VideoPlayer = (props: Props) => {
       // so this restart is what lets the bar hide again afterwards.
       onBlurCapture={showControls}
     >
+      {/* The resume offer, ON the video. It was a strip above the player, which pushed the whole
+          player down the moment it appeared — the page moving under the viewer, the very thing
+          this round removed everywhere else (Yotam). Centred: clear of the top-centre notices
+          and of every corner the pinned snapshot can take, and over the picture the viewer has
+          not started yet.
+          Still a question the viewer may ignore, not a dialog: nothing takes focus, play or a
+          seek answers it as surely as either button, and both buttons are in the tab order
+          (after the bar's controls, Resume first). The live region stays mounted and the card
+          appears INSIDE it, because a region inserted together with its content is not
+          announced. Space and Enter press its buttons, never the player; and its clicks stop
+          here, so pressing it cannot reach the click-to-pause surface underneath.
+          FIRST in the player's DOM, so first in its tab order, while drawn over the picture:
+          after the bar it sat behind every moment mark in the lane (each a tab stop — 36 on a
+          36-moment lecture) before a keyboard user could reach Resume. Positioned over the
+          picture's box: the whole container less the bar where the bar sits below it
+          (windowed); in fullscreen, where the bar overlays, the picture above the bar. */}
+      <Box
+        className={classNames("resume-slot", {
+          // While the fullscreen moments list or any of the bar's popovers is open, the offer
+          // waits: hidden, but still mounted (the live region stays), and back when they close
+          // if it is still unanswered. Those all open over the picture, where the card is; with
+          // both up, one would cover the other and its focusable controls.
+          waiting: (isFullscreen && momentsOpen) || appearanceOpen || volumeOpen || speedOpen,
+        })}
+        role="status"
+        // The card's area is the picture LESS the bar, always — never under it, never over it, by
+        // layout rather than by stacking (the pinned snapshot's rule). Windowed the bar is below
+        // the picture; in fullscreen it overlays the picture's bottom, so the area stops a gap
+        // above it, and the card compacts to fit (player.css). An earlier version lifted the card
+        // ABOVE the bar instead, and every layer that opens over the picture — the bar's popovers,
+        // the fullscreen list, a focused bar control — then had to be argued with one by one.
+        style={{ bottom: isFullscreen ? barHeight + 8 : barHeight }}
+      >
+        {props.resumeOffer && (
+          <div
+            className="resume-card"
+            role="group"
+            aria-label="Resume where you left off"
+            onKeyDown={stopPlayerHotkeys}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            <p className="resume-q">
+              Resume at <b>{convertSecondsToTimecode(props.resumeOffer.at)}</b>?
+            </p>
+            <div className="resume-actions">
+              <button type="button" className="resume-yes" onClick={props.resumeOffer.onResume}>
+                Resume
+              </button>
+              <button type="button" className="resume-no" onClick={props.resumeOffer.onRestart}>
+                Start from the beginning
+              </button>
+            </div>
+          </div>
+        )}
+      </Box>
       {/* No py prop: it lands as an inline style and silently overrides the stylesheet's
           padding, so the bar's vertical rhythm ends up owned by two places. CSS owns it. */}
-      {/* Keys pressed while focus is on a control in the bar belong to THAT control — the
-          same rule the moments sidebar already applies. Without this, Space on the focused
-          Mute button toggles playback instead of mute, and ArrowLeft on the volume slider
-          nudges the volume AND seeks −5s (the document-level hotkeys see every bubbled
-          keydown). The reveal is re-applied here because the stop also hides the event from
-          the container's own reveal handler. */}
+      {/* The keys a focused bar control USES belong to that control — the same rule the
+          moments sidebar applies. Without this, Space on the focused Mute button toggles
+          playback instead of mute, and ArrowLeft on the volume slider nudges the volume AND
+          seeks −5s (the document-level hotkeys see every bubbled keydown). The reveal is
+          re-applied here because the stop also hides those keys from the container's own
+          reveal handler.
+          Scoped to those keys (stopPlayerHotkeys), not every key. This was a blanket
+          stopPropagation, which made every letter shortcut dead while focus sat on ANY bar
+          control — including right after clicking one with the mouse, so F, P, A and L
+          silently did nothing until you clicked the video. Found testing D31's keys. */}
       <Box
         className="video-controls-container"
         ref={barSizeRef}
         onKeyDown={(e) => {
           showControls();
-          e.stopPropagation();
+          stopPlayerHotkeys(e);
         }}
       >
         {/* The scrubber is a slider to the keyboard and AT, not just a mouse strip: it was
@@ -711,10 +1195,10 @@ const VideoPlayer = (props: Props) => {
               handleTimeShift(e.key === "ArrowLeft" ? -5 : 5);
             } else if (e.key === "Home") {
               e.preventDefault();
-              video.currentTime = 0;
+              viewerSeek(video, 0);
             } else if (e.key === "End") {
               e.preventDefault();
-              video.currentTime = totalTime;
+              viewerSeek(video, totalTime);
             }
           }}
         >
@@ -754,8 +1238,16 @@ const VideoPlayer = (props: Props) => {
             can click and Tab to, and scrubbing never competes with jumping. Drawing the marks
             INSIDE the track (YouTube-chapter style) is cheaper in space but a mark under the
             playhead becomes invisible and there is nothing separate to focus. */}
-        {markers.length > 0 && (
-          <Box className="moment-lane" role="group" aria-label="Moments in this lecture">
+        {/* Rendered from the first frame, empty until the first moment arrives. It used to mount
+            when the analysis found something, which grew the bar mid-analysis and, windowed,
+            resized the player under the viewer (D32). An empty lane is hidden from AT: a group
+            of nothing is noise. */}
+        <Box
+          className="moment-lane"
+          role={markers.length > 0 ? "group" : undefined}
+          aria-label={markers.length > 0 ? "Moments in this lecture" : undefined}
+          aria-hidden={markers.length > 0 ? undefined : true}
+        >
             {markers.map((m) => {
               const isNow = currIndex >= 0 && m.activities.some((a) => a === currActivity);
               const label =
@@ -777,70 +1269,42 @@ const VideoPlayer = (props: Props) => {
                   onClick={() => {
                     const v = videoRef.current;
                     if (!v || !props.canPlay) return;
-                    v.currentTime = seekTargetFor(m.activities[0], props.selectOpts.lead);
+                    viewerSeek(v, seekTargetFor(m.activities[0], props.selectOpts.lead));
                     void v.play(); // a jump is "go watch this" — landing paused costs a second click
                   }}
                 />
               );
             })}
-          </Box>
-        )}
+        </Box>
 
-        {/* The label is TEXT, in a live region — not a hover tooltip. The lane is a map; a row
-            of identical rectangles tells a viewer nothing, and hover is invisible to a keyboard
-            user, a screen reader, and anyone driving a magnifier. */}
-        {props.activities.length > 0 && (
-          <Box className="now-line" role="status">
-            <span className={classNames("now-dot", { on: currIndex >= 0 })} />
-            <Text>
-              {currIndex >= 0 ? (
-                <>
-                  Moment <b>{currIndex + 1}</b>
-                  {props.done ? <> of <b>{props.activities.length}</b></> : null}
-                  {" · "}
-                  {/* The worded geometry (describe.ts): tells you WHERE, not just when —
-                      the same words the screen reader gets. */}
-                  {momentPlace(props.activities[currIndex], props.meta.analysisWidth, props.meta.analysisHeight)}
-                  {" · "}
-                  <b>{convertSecondsToTimecode(props.activities[currIndex].start)}</b>,{" "}
-                  {(props.activities[currIndex].end - props.activities[currIndex].start).toFixed(1)}s
-                </>
-              ) : props.done ? (
-                <>
-                  <b>{props.activities.length}</b> moments in this lecture
-                </>
-              ) : (
-                <>
-                  <b>{props.activities.length}</b> moments so far — still looking…
-                </>
-              )}
-            </Text>
-            {/* Mode state as persistent TEXT, not just the transient on-video icon: a
-                low-vision user cannot be asked to notice a subtle glyph to know what mode
-                their player is in. Lives in the status line they already anchor on. */}
-            {isZoomIn && (
-              <Text className="now-zoom">
-                Magnifier on · {(1 + zoomStrength).toFixed(1)}×
-              </Text>
-            )}
-            {upcoming && nextIsKnown && (
-              <Text className="now-next">
-                Next at <b>{convertSecondsToTimecode(upcoming.start)}</b>
-              </Text>
-            )}
-          </Box>
-        )}
+        {/* What is happening, for a screen reader: a visually hidden live region, mounted from
+            the first frame (a region inserted together with its text is not announced). It
+            speaks when a moment STARTS — once, with where the next one is — and when the
+            magnifier changes, in its own text node so only that part is read. It says nothing
+            when a moment ends: it used to switch to "36 moments in this lecture. Next at …"
+            there, so every moment was two announcements, and at speed the end of one and the
+            start of the next landed 100ms apart and clipped each other.
+            It used to be a visible status line here too, "Moment 3 of 36 · top right · 01:23,
+            2.6s … Next at 01:40". Yotam removed it (D32): it cost the bar a row and the picture
+            the height of that row, it made the bar's height depend on how its sentence wrapped
+            (which took reserved-height sizers to keep the player still), and what it said is
+            already on screen — the lit mark in the lane, the current row in the moments list,
+            the timecode, and the magnifier button's amber pressed state. "No moments found"
+            has its visible home in the moments list. */}
+        <Box className="now-status" role="status">
+          <span key={momentEntry}>
+            {props.activities.length === 0
+              ? props.done
+                ? "No moments found."
+                : "Looking for moments…"
+              : momentSpoken}
+          </span>
+        </Box>
+        <Box className="now-status" role="status">
+          {zoomSpoken}
+        </Box>
 
-        {props.done && props.activities.length === 0 && (
-          <Box className="now-line empty" role="status">
-            <Text>
-              No annotation moments found in this video — the highlight and magnifier have
-              nothing to follow.
-            </Text>
-          </Box>
-        )}
-
-        <Group className="controls" gap={3} align="center" mt={4}>
+        <Group className="controls" gap={4} align="center" mt={4}>
           {/* aria-disabled, not disabled: the click is already a guarded no-op while gated,
               and a hard disabled would throw keyboard focus somewhere else the moment the
               gate lifts. This way AT hears "dimmed" instead of a button that eats presses
@@ -853,61 +1317,97 @@ const VideoPlayer = (props: Props) => {
           >
             {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
           </UnstyledButton>
-          {props.activities.length > 0 && (
-            <>
-              <UnstyledButton
-                className="collapse-hide"
-                onClick={() => { showControls(); handleStepMoment(-1); }}
-                onKeyDown={stopPlayerHotkeys}
-                disabled={!props.canPlay}
-                aria-label="Previous moment"
-                title="Previous moment ( [ )"
-              >
-                <IconPlayerTrackPrevFilled />
-              </UnstyledButton>
-              <UnstyledButton
-                className="collapse-hide"
-                onClick={() => { showControls(); handleStepMoment(1); }}
-                onKeyDown={stopPlayerHotkeys}
-                disabled={!props.canPlay}
-                aria-label="Next moment"
-                title="Next moment ( ] )"
-              >
-                <IconPlayerTrackNextFilled />
-              </UnstyledButton>
-            </>
-          )}
-          <Box className="volume-container">
-            {/* Label + pressed state both flip: an icon swap alone is invisible to AT, and
-                "Mute" on a muted player reads as the current state instead of the action. */}
-            <UnstyledButton
-              onClick={handleMute}
-              aria-label={isMuted ? "Unmute" : "Mute"}
-              aria-pressed={isMuted}
+          {/* Always rendered, dimmed until there is a moment to step to: two buttons
+              appearing mid-analysis could push the row to wrap on a narrow window, which is the
+              same resize the lane above no longer causes. */}
+          <UnstyledButton
+            className="collapse-hide"
+            onClick={() => { showControls(); handleStepMoment(-1); }}
+            onKeyDown={stopPlayerHotkeys}
+            disabled={!props.canPlay || props.activities.length === 0}
+            aria-label="Previous moment"
+            title="Previous moment ( [ )"
+          >
+            <IconPlayerTrackPrevFilled />
+          </UnstyledButton>
+          <UnstyledButton
+            className="collapse-hide"
+            onClick={() => { showControls(); handleStepMoment(1); }}
+            onKeyDown={stopPlayerHotkeys}
+            disabled={!props.canPlay || props.activities.length === 0}
+            aria-label="Next moment"
+            title="Next moment ( ] )"
+          >
+            <IconPlayerTrackNextFilled />
+          </UnstyledButton>
+          {/* Volume: a button that opens a vertical slider, not a slider always in the row. The
+              always-visible horizontal slider cost the row 92px (Yotam asked for it out, D32).
+              It once expanded on HOVER, which hid it from keyboard, screen-reader and touch
+              users — so this opens on click, Enter or Space and on nothing else. Focus lands on
+              the slider; Escape closes and returns focus to the button. withinPortal={false}
+              for the same reason as the speed menu and Appearance: portalled to body it would
+              be invisible in fullscreen. The icon keeps showing muted / low / high, and M still
+              mutes without opening anything. */}
+          <Popover
+              position="top"
+              withinPortal={false}
+              classNames={{ dropdown: supportsVerticalRange() ? "bar-pop vol-pop" : "bar-pop vol-pop flat" }}
+              opened={volumeOpen}
+              onChange={(o) => {
+                setVolumeOpen(o);
+                if (!o) refocusIfLost('button[aria-label^="Volume"]', ".vol-pop");
+              }}
+              trapFocus
             >
-              {isMuted ? (
-                <IconVolumeMute />
-              ) : volume > 0.5 ? (
-                <IconVolumeHigh />
-              ) : (
-                <IconVolumeLow />
-              )}
-            </UnstyledButton>
-            {/* 0-100 domain, not the video element's 0-1: the thumb's aria-valuenow is
-                announced raw, and "35" with a "Volume" name is comprehensible where "0.35"
-                is not. thumbLabel is Mantine's prop for naming the thumb — a plain
-                aria-label prop lands on the root element, which AT never reads. */}
-            <Slider
-              className="volume-slider"
-              value={isMuted ? 0 : Math.round(volume * 100)}
-              onChange={(v) => handleVolumeChange(v / 100)}
-              min={0}
-              max={100}
-              step={1}
-              label={(v) => `${v}%`}
-              thumbLabel="Volume"
-            />
-          </Box>
+              {/* The tip wraps the Target, inside the Popover — never the Popover itself, which
+                  is not an element: wrapped from outside, the tip had no box to anchor to and
+                  drew itself at the player's top-left corner (see PlayerTip on the order). */}
+              <PlayerTip label="Volume" hotkey="M" disabled={volumeOpen || barHidden}>
+                <Popover.Target>
+                  <UnstyledButton
+                    className="collapse-hide"
+                    onClick={() => setVolumeOpen((o) => !o)}
+                    onKeyDown={stopPlayerHotkeys}
+                    aria-label={`Volume: ${isMuted ? "muted" : `${Math.round(volume * 100)}%`}`}
+                    aria-keyshortcuts={letterShortcuts ? "M" : undefined}
+                    aria-expanded={volumeOpen}
+                  >
+                    {isMuted ? (
+                      <IconVolumeMute />
+                    ) : volume > 0.5 ? (
+                      <IconVolumeHigh />
+                    ) : (
+                      <IconVolumeLow />
+                    )}
+                  </UnstyledButton>
+                </Popover.Target>
+              </PlayerTip>
+              <Popover.Dropdown onKeyDown={stopPlayerHotkeys}>
+                {/* A native range, vertical by writing-mode: Mantine's Slider has no vertical
+                    mode, and the native control brings the arrow keys (up = louder), Home/End
+                    and the slider role for free. 0-100, not the element's 0-1: "35 percent"
+                    is comprehensible where "0.35" is not. data-autofocus is where Mantine's
+                    focus trap puts focus on open. */}
+                <input
+                  type="range"
+                  className="vol-range"
+                  data-autofocus
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={isMuted ? 0 : Math.round(volume * 100)}
+                  onChange={(e) => handleVolumeChange(Number(e.currentTarget.value) / 100)}
+                  aria-label="Volume"
+                  aria-valuetext={`${isMuted ? 0 : Math.round(volume * 100)}%`}
+                  aria-orientation={supportsVerticalRange() ? "vertical" : "horizontal"}
+                />
+                {/* Label + pressed state both flip: an icon swap alone is invisible to AT, and
+                    "Mute" on a muted player reads as the current state instead of the action. */}
+                <UnstyledButton className="vol-mute" onClick={handleMute} aria-pressed={isMuted}>
+                  {isMuted ? "Unmute" : "Mute"}
+                </UnstyledButton>
+              </Popover.Dropdown>
+          </Popover>
           <Group className="duration-container" gap="xs">
             <Text>{convertSecondsToTimecode(currTime)}</Text>
             <Text>/</Text>
@@ -922,11 +1422,22 @@ const VideoPlayer = (props: Props) => {
               current rate instead.
               withinPortal={false} is not a style choice: portalled to body, this dropdown is
               invisible in fullscreen — the same reason the Appearance popover sets it.
-              The rate shows next to the icon whenever it is NOT 1×. Icon-only at every rate
-              would hide a non-default state on the one control that silently changes how the
-              whole lecture behaves — the exact bug the visible-magnifier work already fixed
-              once. Idle, it costs nothing; off-default, it says so. */}
-          <Menu position="top" withinPortal={false} classNames={{ dropdown: "bar-pop" }}>
+              The rate shows next to the icon, always. Icon-only at every rate would hide a
+              non-default state on the one control that silently changes how the whole lecture
+              behaves — the exact bug the visible-magnifier work already fixed once; off-default
+              it also turns amber. It used to show only off 1×, to keep the bar narrow, but the
+              button now holds a fixed width for the widest rate (a width that changed with the
+              rate could wrap the row — player.css), so at 1× that room would sit empty. */}
+          <Menu
+            position="top"
+            withinPortal={false}
+            classNames={{ dropdown: "bar-pop" }}
+            onOpen={() => setSpeedOpen(true)}
+            onClose={() => {
+              setSpeedOpen(false);
+              refocusIfLost(".bar-speed", ".bar-pop:not(.vol-pop)");
+            }}
+          >
             <Menu.Target>
               <UnstyledButton
                 className={classNames("collapse-end", "bar-speed", { on: playbackRate !== 1 })}
@@ -935,7 +1446,7 @@ const VideoPlayer = (props: Props) => {
                 title={`Playback speed: ${playbackRate}×`}
               >
                 <IconGauge />
-                {playbackRate !== 1 && <span className="bar-speed-v">{playbackRate}×</span>}
+                <span className="bar-speed-v">{playbackRate}×</span>
               </UnstyledButton>
             </Menu.Target>
             <Menu.Dropdown onKeyDown={stopPlayerHotkeys}>
@@ -988,17 +1499,22 @@ const VideoPlayer = (props: Props) => {
             onChange={handleAppearanceOpen}
             trapFocus
           >
-            <Popover.Target>
-              <UnstyledButton
-                className="collapse-end"
-                onClick={() => handleAppearanceOpen(!appearanceOpen)}
-                onKeyDown={stopPlayerHotkeys}
-                aria-label="Appearance"
-                aria-expanded={appearanceOpen}
-              >
-                <IconSparkles />
-              </UnstyledButton>
-            </Popover.Target>
+            {/* The name says what is IN the sheet. "Appearance" alone read as the app's theme,
+                and the sparkles glyph says nothing at all. */}
+            <PlayerTip label="Appearance: highlight and magnifier" hotkey="A" disabled={appearanceOpen || barHidden}>
+              <Popover.Target>
+                <UnstyledButton
+                  className="collapse-end"
+                  onClick={() => handleAppearanceOpen(!appearanceOpen)}
+                  onKeyDown={stopPlayerHotkeys}
+                  aria-label="Appearance: highlight and magnifier"
+                  aria-keyshortcuts={letterShortcuts ? "A" : undefined}
+                  aria-expanded={appearanceOpen}
+                >
+                  <IconSparkles />
+                </UnstyledButton>
+              </Popover.Target>
+            </PlayerTip>
             {/* One guard for the whole sheet: every control inside it is a <button> or a
                 range, and Space/arrows on those would otherwise bubble to the player hotkeys
                 and toggle play or seek while you are adjusting a slider. */}
@@ -1011,18 +1527,19 @@ const VideoPlayer = (props: Props) => {
               because opening the overlay collapses the bar — hiding the button that closes
               it inside the very collapse it causes would strand the viewer. */}
           {isFullscreen && (
-            <UnstyledButton
-              className="collapse-end"
-              onClick={() => {
-                if (!momentsOpen) handleCollapsed.open();
-                handleMomentsOpen.toggle();
-              }}
-              onKeyDown={stopPlayerHotkeys}
-              aria-label="Moments list"
-              aria-expanded={momentsOpen}
-            >
-              <IconListDetails />
-            </UnstyledButton>
+            <PlayerTip label="Moments list" hotkey="L" disabled={momentsOpen || barHidden}>
+              <UnstyledButton
+                className="collapse-end"
+                onClick={toggleMomentsOverlay}
+                onKeyDown={stopPlayerHotkeys}
+                // Exactly this string: onEscape finds the button by it to hand focus back.
+                aria-label="Moments list"
+                aria-keyshortcuts={letterShortcuts ? "L" : undefined}
+                aria-expanded={momentsOpen}
+              >
+                <IconListDetails />
+              </UnstyledButton>
+            </PlayerTip>
           )}
           {/* collapse-end: the controls that stay to the RIGHT of the scrubber when the bar
               collapses to a single line. See the Collapsed block in player.css. */}
@@ -1033,17 +1550,27 @@ const VideoPlayer = (props: Props) => {
           >
             {isFullscreen ? <IconMaximizeOff /> : <IconMaximize />}
           </UnstyledButton>
-          <UnstyledButton
-            className="collapse-end"
-            onClick={() => handleCollapsed.toggle()}
-            onKeyDown={stopPlayerHotkeys}
-            aria-label={collapsed ? "Expand controls" : "Collapse controls"}
-            aria-expanded={!collapsed}
-          >
-            {collapsed ? <IconChevronUp /> : <IconChevronDown />}
-          </UnstyledButton>
+          {/* Fullscreen only, like collapsing itself (D32): windowed, a shorter bar meant a
+              resized player. */}
+          {isFullscreen && (
+            <UnstyledButton
+              className="collapse-end"
+              onClick={() => handleCollapsed.toggle()}
+              onKeyDown={stopPlayerHotkeys}
+              aria-label={collapsed ? "Expand controls" : "Collapse controls"}
+              aria-expanded={!collapsed}
+            >
+              {collapsed ? <IconChevronUp /> : <IconChevronDown />}
+            </UnstyledButton>
+          )}
         </Group>
       </Box>
+      {/* The picture and everything drawn ON it. Its box is the video's box, so the layers
+          inside size to the video rather than to the container, which also holds the bar.
+          (It was 100% of the container while the bar overlaid the video; with the bar in flow
+          below, that would have stretched every layer over the bar too.) The bar stays first
+          in the DOM, so it keeps its place in the tab order; CSS orders it below. D32. */}
+      <Box className="video-stage">
       <video
         ref={videoMergedRef}
         src={props.src}
@@ -1052,10 +1579,36 @@ const VideoPlayer = (props: Props) => {
           const v = videoRef.current;
           if (v) updateAtTimeRef.current(v.currentTime);
         }}
-        onSeeked={() => props.onSeeked?.(videoRef.current?.currentTime ?? 0)}
-        onPlay={handleIsPlaying.open}
-        onPause={handleIsPlaying.close}
+        onSeeked={() => {
+          const t = videoRef.current?.currentTime ?? 0;
+          const own = ownSeekRef.current !== null && Math.abs(t - ownSeekRef.current) < 0.05;
+          if (own) ownSeekRef.current = null;
+          // The viewer navigating while the Appearance preview is parked on a moment (] from a
+          // preset button, a click on the lane) has chosen a place: the preview must not drag
+          // them back to where they were when they opened the sheet, and a save must record
+          // where they went, not that old place.
+          // (A backstop only: every viewer seek path already let go of the preview, synchronously,
+          // in viewerSeek. This catches a seek from somewhere that does not — the browser's own
+          // media keys, say.)
+          if (!own) cancelPreview();
+          props.onSeeked?.(t, !own);
+        }}
+        onPlay={() => {
+          handleIsPlaying.open();
+          // Playing while the Appearance preview has the playhead parked (Space in the sheet, a
+          // media key) is the viewer choosing to watch from HERE: the preview lets go, so
+          // closing the sheet no longer drags them back, and the bookmark takes this place.
+          const v = videoRef.current;
+          if (v && preAppearanceTimeRef.current !== null) {
+            cancelPreview();
+            props.onPreviewTaken?.(v.currentTime);
+          }
+          props.onPlayingChange?.(true);
+        }}
+        onPause={() => { handleIsPlaying.close(); props.onPlayingChange?.(false); }}
         onEnded={handleVideoEnded}
+        onLoadedData={() => setFramed(true)}
+        onError={() => setFramed(true)}
         muted={isMuted}
       ></video>
       <Box className="video-highlights">
@@ -1072,7 +1625,11 @@ const VideoPlayer = (props: Props) => {
           videoRef={videoRef}
           scaleRatio={scaleRatio}
           activity={zoomActivity ? toPlayerActivity(zoomActivity, props.meta) : null}
-          zoomIn={isZoomIn}
+          // Paused while the sample highlight shows: the magnifier fills the frame with the last
+          // moment's region, so the sample — the thing being tuned — was not visible at all. It
+          // stays switched on (the button keeps its pressed state) and comes back the moment the
+          // sample goes. Not aimed AT the sample: a magnified stand-in previews nothing real.
+          zoomIn={isZoomIn && !sampleActivity}
         />
       </Box>
       <Box
@@ -1090,15 +1647,22 @@ const VideoPlayer = (props: Props) => {
         <Box className="time-shift forward-shift" opacity={forwardShiftRequest ? 1 : 0}>
           <IconArrowBigRightLineFilled />
         </Box>
-        <Box className="overlay-item zoom-indicator" opacity={isZoomIn ? 1 : 0}>
+        {/* Follows the magnifier's EFFECTIVE state: paused while the sample highlight shows. */}
+        <Box className="overlay-item zoom-indicator" opacity={isZoomIn && !sampleActivity ? 1 : 0}>
           <IconZoom />
         </Box>
         <Box className="overlay-end" hidden={!isEnded}></Box>
         {/* The only moment the app makes anyone wait. So it says what it is doing, shows it
             moving, and says when it ends — a bare "Analyzing…" gives a viewer no way to tell
             a slow machine from a hung one. */}
-        {!props.canPlay && (
-          <Box className="overlay-gate" role="status">
+        {/* Mounted throughout and LIFTED (faded out) when playback unlocks, rather than
+            unmounted: it used to vanish in one frame, a hard cut from the dark panel to the
+            slide. Hidden from AT once lifted, so its last numbers are not left lying around. */}
+        <Box
+          className={classNames("overlay-gate", { lifted: props.canPlay })}
+          role={props.canPlay ? undefined : "status"}
+          aria-hidden={props.canPlay || undefined}
+        >
             <div className="gate-h">Finding the moments…</div>
             <div className="gate-sub">
               Playback starts as soon as the first {PLAYBACK_LEAD} seconds are ready.
@@ -1110,8 +1674,7 @@ const VideoPlayer = (props: Props) => {
               {props.xRealtime ? <>running at <b>{props.xRealtime.toFixed(1)}× realtime</b> · </> : null}
               <b>{props.activities.length}</b> moment{props.activities.length === 1 ? "" : "s"} found so far
             </div>
-          </Box>
-        )}
+        </Box>
         {/* The three transient notices stay MOUNTED and toggle their content instead of
             mounting populated: a live region inserted together with its text is not a
             change, and most screen reader/browser pairs never announce it. The :empty
@@ -1121,13 +1684,14 @@ const VideoPlayer = (props: Props) => {
           {props.canPlay && atUnanalyzed ? "Analyzing this part…" : null}
         </Box>
         {/* Moving someone's playhead without saying so feels like a glitch. Say so.
-            Anchored above the MEASURED bar height: the pill only ever shows while the
-            Appearance sheet is open, which is exactly when the bar is up — a fixed bottom
-            offset put it behind the bar, illegible at every zoom. */}
+            In fullscreen, anchored above the MEASURED bar height: the pill only ever shows
+            while the Appearance sheet is open, which is exactly when the bar is up — a fixed
+            bottom offset put it behind the bar, illegible at every zoom. Windowed, the bar is
+            below the picture and the pill sits at the ordinary inset. */}
         <Box
           className="overlay-preview-jump"
           role="status"
-          style={{ bottom: barHeight + 12 }}
+          style={{ bottom: barOverlap + 12 }}
         >
           {previewJumped ? "Jumped to a moment so you can see your changes · returns when you close" : null}
         </Box>
@@ -1147,17 +1711,18 @@ const VideoPlayer = (props: Props) => {
           lecture's pace again. Corner and size are the reader's to choose and persist: one default
           cannot be right for both a reader who wants it out of the live action and one who
           needs it big enough to read. The top-center stays reserved either way — the
-          catching-up and scene notices own it — and a bottom-docked panel clears the
-          measured bar, so no choice can bury the controls or the notices. */}
+          catching-up and scene notices own it — and in fullscreen a bottom-docked panel clears
+          the measured bar, so no choice can bury the controls or the notices. */}
       {pinned && (
         <Box
           className={classNames("pin-panel", `size-${pinSize}`, `at-${pinCorner}`)}
-          // The bar is measured, and it sits ABOVE this panel: anything the panel grows
-          // into, the bar covers. Capping the height at the space the bar leaves is what
-          // keeps the panel's own caption controls clickable at every size.
+          // In fullscreen the bar is measured, and it sits ABOVE this panel: anything the panel
+          // grows into, the bar covers. Capping the height at the space the bar leaves is what
+          // keeps the panel's own caption controls clickable at every size. Windowed, the bar
+          // is below the picture and the panel has the whole of it, less the insets.
           style={{
-            maxHeight: `calc(100% - ${barHeight + 24}px)`,
-            ...(pinCorner === "bl" || pinCorner === "br" ? { bottom: barHeight + 12 } : {}),
+            maxHeight: `calc(100% - ${barOverlap + 24}px)`,
+            ...(pinCorner === "bl" || pinCorner === "br" ? { bottom: barOverlap + 12 } : {}),
           }}
           role="group"
           aria-label={`Pinned snapshot: ${momentDescription(pinned.activity, props.meta.analysisWidth, props.meta.analysisHeight)}, ${convertSecondsToTimecode(pinned.activity.start)}`}
@@ -1174,23 +1739,29 @@ const VideoPlayer = (props: Props) => {
             </Text>
             {/* Cycles, not menus: a picker would open over the very video the panel is
                 already covering. Each label names where the next press lands, so the
-                choice is knowable without sight and without trying it. */}
-            <UnstyledButton
-              aria-label={`Snapshot size: ${PIN_SIZE_NAMES[pinSize]}. Change to ${PIN_SIZE_NAMES[nextPinSize(pinSize)]}.`}
-              title={`Snapshot size: ${PIN_SIZE_NAMES[pinSize]}`}
-              onClick={() => setPinSize(nextPinSize(pinSize))}
-              onKeyDown={stopPlayerHotkeys}
-            >
-              {pinSize === "l" ? <IconArrowsDiagonalMinimize2 size={20} /> : <IconArrowsDiagonal size={20} />}
-            </UnstyledButton>
-            <UnstyledButton
-              aria-label={`Snapshot corner: ${PIN_CORNER_NAMES[pinCorner]}. Move to ${PIN_CORNER_NAMES[nextPinCorner(pinCorner)]}.`}
-              title={`Snapshot corner: ${PIN_CORNER_NAMES[pinCorner]}`}
-              onClick={() => setPinCorner(nextPinCorner(pinCorner))}
-              onKeyDown={stopPlayerHotkeys}
-            >
-              <IconLayoutDistributeHorizontal size={20} />
-            </UnstyledButton>
+                choice is knowable without sight and without trying it. The accessible
+                names START with the words the tip shows (WCAG 2.5.3), so a speech-input
+                user can say what they see. */}
+            <PlayerTip label="Snapshot size" hotkey="S">
+              <UnstyledButton
+                aria-label={`Snapshot size: ${PIN_SIZE_NAMES[pinSize]}. Change to ${PIN_SIZE_NAMES[nextPinSize(pinSize)]}.`}
+                aria-keyshortcuts={letterShortcuts ? "S" : undefined}
+                onClick={() => setPinSize(nextPinSize(pinSize))}
+                onKeyDown={stopPlayerHotkeys}
+              >
+                {pinSize === "l" ? <IconArrowsDiagonalMinimize2 size={20} /> : <IconArrowsDiagonal size={20} />}
+              </UnstyledButton>
+            </PlayerTip>
+            <PlayerTip label="Move snapshot" hotkey="C">
+              <UnstyledButton
+                aria-label={`Move snapshot: now ${PIN_CORNER_NAMES[pinCorner]}. Move to ${PIN_CORNER_NAMES[nextPinCorner(pinCorner)]}.`}
+                aria-keyshortcuts={letterShortcuts ? "C" : undefined}
+                onClick={() => setPinCorner(nextPinCorner(pinCorner))}
+                onKeyDown={stopPlayerHotkeys}
+              >
+                <IconLayoutDistributeHorizontal size={20} />
+              </UnstyledButton>
+            </PlayerTip>
             <UnstyledButton aria-label="Dismiss pinned snapshot" onClick={handleUnpin} onKeyDown={stopPlayerHotkeys}>
               <IconX size={20} />
             </UnstyledButton>
@@ -1223,14 +1794,16 @@ const VideoPlayer = (props: Props) => {
           onJump={(t) => {
             const v = videoRef.current;
             if (!v || !props.canPlay) return;
-            v.currentTime = t;
+            viewerSeek(v, t);
             void v.play();
           }}
           style={{ bottom: barHeight + 24, maxHeight: `calc(100% - ${barHeight + 48}px)` }}
         />
       )}
+      </Box>
       <SVGFilters />
     </Box>
+    </PlayerTipRoot.Provider>
   );
 };
 

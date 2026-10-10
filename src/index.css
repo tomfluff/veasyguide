@@ -2,6 +2,21 @@
    SPDX-License-Identifier: AGPL-3.0-or-later */
 
 :root {
+  /* The widest the windowed video may be: as wide as fits the window's height once the page's
+     own chrome is taken — the measured top bar and footer (Shell.tsx sets --chrome-top and
+     --chrome-foot), the page's 16px + 24px padding, and the one-row control bar under the
+     video (--bar-one-row, published by the player only while its controls are on one row, so
+     it never depends on the player's width — the measured height of a WRAPPED bar does, and
+     feeding that back was a feedback loop, see player.css; 89px at a 16px root until then). The player caps itself at this, and the page caps itself at this plus the
+     sidebar, so the two read as one block and neither leaves the window's height unused.
+     The fallbacks are today's measured values, for the first frame. */
+  --video-cap: max(
+    20rem,
+    calc(
+      (100vh - var(--chrome-top, 49px) - var(--chrome-foot, 37px) - 40px - var(--bar-one-row, 89px))
+        * 16 / 9
+    )
+  );
   color-scheme: light;
   /* Atkinson Hyperlegible — a functional legibility choice for low-vision readers, not a style
      one (DESIGN.md). Faces are self-hosted via @fontsource (imported in main.tsx); no CDN. */

@@ -41,7 +41,7 @@
 }
 /* No background plate: the mark is a finished tile with its own colours and corners. */
 .top .mark { width: 28px; height: 28px; flex: none; display: block; }
-.ttl { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.ttl { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; margin: 0; white-space: nowrap; }
 .ttl em { font-style: italic; font-weight: 400; color: var(--muted); font-size: 0.9375rem; margin-left: 6px; }
 .filechip {
   font-size: 0.9375rem; color: var(--muted);
@@ -86,6 +86,59 @@
 .nav a.acc { color: var(--accent); }
 .nav a:focus-visible,
 .nav button:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+
+/* --- Narrow top bar --------------------------------------------------------
+   The full row needs ~1120px with a lecture open (a long filename at its 240px cap and the
+   "Finding moments… 87%" chip) and ~480px on the landing screen. Below that it used to
+   overflow and drag the whole page sideways. The filename gives way first: it hugs its
+   text as it always has (max 240px), and only shrinks, with an ellipsis, when the row is short
+   of room — a fixed-basis version of this rule made it a 240px pill even for "short.mp4"; below
+   the breakpoint the row folds into the mark, the
+   status chip as a bare number, and one Menu holding everything else.
+   Breakpoints in em, so they move with the reader's default font size, not only with zoom:
+   62.5em = 1000px with a lecture open and 42em = 672px on the landing screen — each measured
+   as where that full row stops fitting (988px with the filename at its 6rem floor; 638px,
+   which the fallback font overshoots by ~30px for the moment before the web font loads).
+   Below 32em the tagline and the filename chip go as well. */
+.top .narrow-only { display: none; }
+.chip .chip-short { display: none; }
+.filechip-change { white-space: nowrap; }
+.top-menu-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; flex: none;
+  background: none; border: none; cursor: pointer;
+  color: var(--ink); border-radius: var(--r-sm);
+}
+.top-menu-btn:hover { background: var(--hover); }
+.top-menu-btn:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.top-menu .mantine-Menu-item { min-height: 44px; font-size: 0.9375rem; }
+.top-menu-file { overflow-wrap: anywhere; font-size: 0.875rem; }
+
+@media (max-width: 62.5em) {
+  .top.with-file .wide-only { display: none; }
+  .top.with-file .narrow-only { display: flex; }
+  .top.with-file .chip-long {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+  .top.with-file .chip-short { display: inline; font-variant-numeric: tabular-nums; }
+  .top.with-file .chip { margin-right: 0; }
+}
+@media (max-width: 42em) {
+  .top .wide-only { display: none; }
+  .top .narrow-only { display: flex; }
+}
+@media (max-width: 32em) {
+  .top { gap: 8px; padding: 0 12px; }
+  /* The tagline, and with a lecture open the filename, go: the menu's first line names the
+     file, and the mark plus the h1 (kept for headings navigation) name the app. */
+  .ttl em { display: none; }
+  .top.with-file .filechip { display: none; }
+  .top.with-file .ttl {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+}
 
 /* --- About ---------------------------------------------------------------- */
 .about {
@@ -276,9 +329,13 @@
   flex-direction: column;
   justify-content: center;
 }
-/* Wide, so the lecture can use the window. The player's own height bound (player.css) stops it
-   from growing taller than the viewport on the way. */
-.app.with-side { max-width: 1560px; }
+/* As wide as the video can be (--video-cap, index.css) plus the sidebar and the page padding —
+   no wider. It was a fixed 1560px, which was wrong both ways: on a tall window it held the video
+   narrower than the height allowed (1222px at 1920x1080, with a band of empty window under it),
+   and on a short one the page outgrew the height-bound video and stranded the sidebar at the far
+   edge with a gap beside the picture. Now the video and the list are one block, centred. The
+   282px is the sidebar's 268 + its 14px gap; 56px is this padding. */
+.app.with-side { max-width: calc(var(--video-cap) + 282px + 56px); }
 
 /* --- Moments sidebar ------------------------------------------------------
    Light, like the page it lives on. (It was dark, to match the player's control bar — but on a
@@ -439,6 +496,9 @@
    bottom and the rows scroll behind it instead of pushing it off. */
 .moments-side .side-foot {
   flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--line);
 }
@@ -471,6 +531,13 @@
 .side-view button.on { background: var(--plum); color: #fff; }
 .side-view button:focus-visible { outline: 3px solid var(--ring); outline-offset: -3px; }
 
+.moments-side .side-empty {
+  margin: 1rem 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.moments-side.overlay .side-empty { color: var(--d-muted); }
 .moments-side .side-list {
   flex: 1;
   min-height: 0; /* lets the list shrink to the aside's pinned height instead of its content */
@@ -731,6 +798,8 @@
 }
 .strip button:hover { background: rgba(0, 0, 0, 0.08); }
 
+
+
 .error {
   margin: 16px 0;
   padding: 12px 16px;
@@ -748,7 +817,8 @@
   justify-content: center;
   gap: 12px;
   width: 100%;
-  max-width: calc((100vh - 160px) * 16 / 9);
+  /* The video's own cap (index.css), so the placeholder is as wide as the video will be. */
+  max-width: var(--video-cap);
   aspect-ratio: 16 / 9;
   margin-inline: auto;
   padding: 24px;
