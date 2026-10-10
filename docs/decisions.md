@@ -1326,7 +1326,13 @@ third.
   never loses it.
 - Dismissible: Escape closes it, through Mantine's `useDismiss`.
 
-These fix measurements are code-lead's; verify-lead's independent re-measure is pending.
+Re-measured independently. On the 6px walk from the Appearance button onto its tip, the tip is
+present at all 8 steps and still there 400ms after landing on it. In fullscreen, with the
+pointer resting on the button, the bar's opacity is 1 and the tip is shown at every 500ms sample
+from 0 to 4.0s; once the pointer moves onto the picture, both hide. Escape dismisses a hovered
+tip, windowed and in fullscreen (fullscreen is kept), and a keyboard-focused tip. The tip lingers
+400ms after the pointer leaves the button, the 300ms close delay plus the transition. Tab still
+shows it, and a click followed by leaving still shows none.
 
 The close delay changes the timing reported above, which was "immediate close". The open delay
 is unchanged.
@@ -1338,6 +1344,11 @@ played or paused the video instead of pressing the button. Space on D33's Resume
 which is why nobody had noticed. Now guarded: the resume strip, the strips' ✕ buttons, the
 header's Change and Moments file buttons, and all three modal dialogs (both confirms and About).
 The dialogs stop every key, because the player is inert behind a modal anyway (dda1bdb).
+Re-measured independently: Space on Resume lands at 124.00s from a stored 124, playing; Space on
+"Start from the beginning" stays at 0, paused, and removes the strip. Space on "Switch video"
+switches, Space on "Keep watching" closes the dialog and keeps the current video, and Escape and
+Enter still work. About blocks F, M, Z, A, L, ], Space and →. Space on the header's Change and
+Moments file buttons opens the picker and leaves the video paused.
 
 **And two tests that could not fail.** The "on by default" tests for `letterShortcuts` and D28's
 `sceneNotice` asserted the value their own `beforeEach` had just set. They now read
@@ -1377,7 +1388,9 @@ to about 1067px there. The user chose the bar below the video; this is the price
 choice, recorded here so it is a known trade and not a surprise. As first shipped, collapsing
 the bar got most of the size back; that is no longer offered in the window. Moving the
 now-line into the sidebar was weighed as another way back and rejected (below), so the cost is
-accepted, not pending.
+accepted, not pending. The 832px is exact arithmetic for a 139.8px bar. It has to be re-checked
+once the feedback loop under Still open is fixed, because the loop makes the bar taller than
+that on some windows.
 
 **Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
 bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
@@ -1386,7 +1399,8 @@ starts collapsed (54px measured at 1400x900), and it hides after a short idle ev
 because a paused frame is one someone is reading. The idle delay is still 2000ms, and the bar
 still never hides while keyboard focus is inside it, or, since dda1bdb, while the pointer is
 over the bar or one of its tips (D31). Measured: opacity 0 by 2.6s idle while
-paused, the 2000ms delay plus the fade. Entering fullscreen always collapses the bar. As
+paused, the 2000ms delay plus the fade. **That measurement holds only when fullscreen was
+entered by key, or when something has blurred focus since** (see Still open). Entering fullscreen always collapses the bar. As
 first shipped, leaving restored the windowed state both ways, measured expanded to expanded and
 collapsed to collapsed; since c1785ae there is no windowed collapsed state to restore. The `clear` class is now `hideControls && isFullscreen`, where it was `&& isPlaying`,
 and the `.paused` force-visible rule is gone.
@@ -1466,6 +1480,12 @@ nothing scrolls, and the player causes no horizontal overflow. At 320px wide the
 264px and fits. At 320x320 with the bar expanded it runs to 397px, past the window: that is the
 20rem floor, by design.
 
+*Correction, same round:* these "fits the window" checks measured that the player's bottom edge
+was inside the viewport. A video that has shrunk always passes that test, so they could not
+catch the player sizing itself too small, and they did not: the owner found the feedback loop
+under Still open on a desktop window. They prove that nothing overflows, not that the video is
+the right size.
+
 The old `@media (max-width: 520px)` block that already put the bar in flow (the WCAG 1.4.10
 reflow case) is now the default everywhere, and it is gone.
 
@@ -1480,7 +1500,10 @@ state on exit (`collapsedRef`, `windowedCollapsedRef`) are gone, and the `collap
 also gated on `isFullscreen`, so a stray state cannot collapse a windowed bar. The state is
 never persisted. Opening the moments overlay still collapses the bar, which only ever happened
 in fullscreen. Measured at 1400x900: the windowed player is 1062x737 before fullscreen and after
-leaving it, with no collapse control in the window.
+leaving it, with no collapse control in the window. Re-measured independently: no collapse
+control in the window, and the player held at 1062x737.17 through load, the Appearance sheet,
+a pin, the magnifier and a fullscreen round trip. Fullscreen enters collapsed at 54px; Expand
+gives 140.8px and Collapse 54px.
 
 **Fixed in the same round: the bar still resized the player on its own** (d3d2108). Removing
 collapse left two jumps. The moment lane and the now-line mounted only once the analysis had
@@ -1502,6 +1525,19 @@ start, so before the first moment the picture is smaller than it was, and it no 
 and then shrinks. The truncation applies only where wrapping actually changed the height:
 it did at 400px, and wider windows never truncate. Also fixed on the way: "1 moments so far"
 now reads "1 moment".
+
+**Correction: d3d2108 did not hold the player still.** The numbers above are real, but they
+come from one clip at four widths, where the bar did settle at one height. An independent
+re-measure found the player shrinking on other windows, at d3d2108:
+- 800x600: the player went from 744 to 533.7 to 450.1px wide as the analysis started, and the
+  bar from 140 to 186.8px.
+- At 200% zoom (683x384 CSS px at DPR 2): 398 to 320px wide.
+- At 400% zoom (341x192 at DPR 4): the bar went from 233.8 to 280.8px when the magnifier or
+  speed was used mid-playback.
+- Stable, as reported: the clip with moments at 400, 560 and 1400px wide (233.8, 186.8 and
+  139.8px), and the clip with none at 400 and 1400px.
+This is the bug the owner hit, below under Still open. "Constant through a whole session" was
+true only for the cases measured.
 
 **Corrected in the same round: the ellipsis hid text** (cd5a242, replacing d3d2108's
 one-line rule). Truncating the now-line at 400px held the bar still, but it did so by hiding the
@@ -1525,9 +1561,23 @@ the current width from the first frame, with no JavaScript measuring anything.
 Bar height, constant through a whole session with zero clipped samples: 140px at 1400 and 800
 wide, 222px at 560, 312px at 400, 393px at 320. With the ellipsis it was 140, 140, 187 and 234.
 The cost is empty space under a short sentence at narrow widths, and a smaller picture there.
-Nothing is hidden and nothing moves. Whether that cost is acceptable is not decided (Still open).
+Nothing is hidden. "Nothing moves" was claimed for these widths, and it has not been
+re-checked against the feedback loop below, which the sizers are suspected of making worse.
+Whether the reserved space is acceptable is not decided (Still open).
 
 **Still open.**
+- **The windowed video can shrink itself to a fraction of the window.** Introduced in this round,
+  missed by the "fits the window" checks above, and found by the owner on a desktop: the video
+  rendered tiny and the bar wrapped into three rows. The suspected cause is a feedback loop. The
+  player's width cap subtracts the measured bar height (`--bar-h`), a narrower player makes the
+  bar wrap taller, and a taller bar narrows the player again. cd5a242's worst-case sizers are
+  suspected of making it worse, because they wrap earlier. Measured at d3d2108 above. code-lead
+  is fixing it; numbers to follow.
+- **In fullscreen the bar never hides if fullscreen was entered with the mouse.** Clicking the
+  Fullscreen button leaves focus on what is now "Exit fullscreen". It is not `:focus-visible`,
+  but the guard that keeps the bar up while keyboard focus is inside it counts it anyway, so the
+  bar stays at opacity 1 after 3s. Measured at 8883cbd, dda1bdb and c1785ae. Once focus is
+  blurred, it hides at 2s. With code-lead.
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
@@ -1622,6 +1672,11 @@ rests on the tree, not on hearing it.
   (`byViewer = false`), and if the page goes away mid-preview, App saves the position from before
   the preview. Measured: `{t: 21.2}` survives opening and closing Appearance and leaving
   mid-preview, and a viewer at 15s who leaves mid-preview saves 15, not the preview's 25.8.
+Re-measured independently with `{t: 20}` stored and the video reopened at 0:00: Appearance's
+preview jumps to 25.77s with the strip still shown, closing it returns to 0 with the strip still
+there, and the stored entry stays `{t: 20}`. Leaving mid-preview without touching anything keeps
+`{t: 20}`. A viewer at 15s who leaves mid-preview saves 15; at 4s the entry is cleared, which is
+the 10s start edge working as designed.
 
 **Still open.**
 - At 320x320 the strip wraps to 154px and stacks its buttons, which pushes the video's top to
