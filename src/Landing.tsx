@@ -97,8 +97,7 @@ export default function Landing({ onFiles, error }: { onFiles: (fs: File[]) => v
       <div className="privacy">
         <IconLock size={20} />
         <p>
-          <b>Your video never leaves this device.</b> Every frame is analyzed in your browser.
-          No upload, no account, no server.
+          <b>Your video never leaves this device.</b> Videos are fully analyzed on-device.
         </p>
       </div>
     </div>
