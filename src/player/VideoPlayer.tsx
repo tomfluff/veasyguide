@@ -224,6 +224,21 @@ const VideoPlayer = (props: Props) => {
   const chromeTimeRef = useRef(-1);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
+  // Whether the video has a first frame to show. Until it has, the picture and everything drawn
+  // on it are transparent and the container shows no black: loading a lecture blinked the page
+  // white -> black (an empty <video> over the container's black, ~100ms) -> the white slide.
+  // Now the picture fades in over 200ms from the page instead (player.css). A fade is not
+  // vestibular motion, so there is no reduced-motion gate — the same call as the magnifier's
+  // crossfade. Opacity changes nothing about layout, so every measurement of the video box is
+  // the same before and after.
+  const [framed, setFramed] = useState(false);
+  useEffect(() => {
+    setFramed(false);
+    // Never stay hidden: if no frame arrives (a codec the element cannot play while the
+    // analyzer still can), the "Finding the moments…" gate and the rest must still show.
+    const t = window.setTimeout(() => setFramed(true), 1500);
+    return () => window.clearTimeout(t);
+  }, [props.src]);
   // Where the sample highlight sits (stage px), or null when it is not shown.
   const [sampleRect, setSampleRect] = useState<Rect | null>(null);
   // Tracked only so the resume card knows to wait while it is open (see .resume-slot).
@@ -266,6 +281,8 @@ const VideoPlayer = (props: Props) => {
   // Any pointer movement, key or focus brings it back (see the container's handlers). D32.
   const barHidden = hideControls && isFullscreen;
   const videoContainerClasses = classNames("video-container", {
+    // Until the first frame has decoded (see `framed`).
+    unframed: !framed,
     clear: barHidden,
     collapsed: collapsed && isFullscreen,
     fullscreen: isFullscreen,
@@ -1589,6 +1606,8 @@ const VideoPlayer = (props: Props) => {
         }}
         onPause={() => { handleIsPlaying.close(); props.onPlayingChange?.(false); }}
         onEnded={handleVideoEnded}
+        onLoadedData={() => setFramed(true)}
+        onError={() => setFramed(true)}
         muted={isMuted}
       ></video>
       <Box className="video-highlights">

@@ -54,7 +54,17 @@
 .video-stage {
   position: relative;
   width: 100%;
+  transition: opacity 200ms ease-out;
 }
+
+/* Before the first frame (VideoPlayer's `framed`): the picture and its overlays are transparent
+   and the container shows the page, not black, so the lecture fades in from the page rather
+   than blinking white -> black -> white. The resume card fades with the picture it sits on. */
+.video-container { transition: background-color 200ms ease-out; }
+.video-container.unframed { background-color: transparent; }
+.video-container.unframed .video-stage,
+.video-container.unframed .resume-slot { opacity: 0; }
+.resume-slot { transition: opacity 200ms ease-out; }
 
 /* display:block — an inline <video> sits on a text baseline, leaving a few pixels of gap under
    it that the stage would then include and the overlays would misalign by. */
