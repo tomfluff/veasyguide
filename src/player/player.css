@@ -14,8 +14,8 @@
      bar under it, is exactly as tall as the space left once the two page bars and the page
      padding are taken.
 
-     The bar's share is a CONSTANT — the one-row expanded bar, 103px (scrubber, moment lane,
-     controls; all fixed-px chrome) — never the bar's measured height. It was the measured height once, and that is a feedback
+     The bar's share is a CONSTANT — the one-row expanded bar, 89px (scrubber, moment lane,
+     28px controls; all fixed-px chrome) — never the bar's measured height. It was the measured height once, and that is a feedback
      loop: the bar's height depends on the player's width (a narrower bar wraps its controls and
      the status line onto more rows), so a tall bar made the player narrower, which made the bar
      taller, which made the player narrower still. On a 1366x768 laptop it settled at a 477px
@@ -27,7 +27,7 @@
      The 20rem floor is for short windows. Subtracting the bar there could shrink the video to
      a sliver (at 320x320 the formula alone gives a picture under 20px wide); below the floor
      the page scrolls instead, which is what a page is for. */
-  max-width: max(20rem, calc((100vh - 160px - 103px) * 16 / 9));
+  max-width: max(20rem, calc((100vh - 160px - 89px) * 16 / 9));
   display: flex;
   flex-direction: column;
   margin-inline: auto;
@@ -89,7 +89,9 @@
                          picture's bottom edge, and must win there over the click-to-play layer */
   order: 2;
   z-index: 50;
-  padding: 4px 12px;
+  /* 6px below: a focused button's ring reaches 5px past it, and in fullscreen the bar's bottom
+     edge is the screen's. */
+  padding: 4px 10px 6px;
   background-color: rgba(18, 22, 29, 0.85);
   border-top: 1px solid var(--d-line);
   color: var(--d-text);
@@ -104,14 +106,14 @@
    mid-pixel. The bar is its own composited layer (it animates opacity), so it and the
    video underneath round that .469 independently; when they disagree, one device pixel of
    video shows below the bar. Overshooting by a whole CSS pixel means the bar's background
-   always wins the rounding, and `padding-bottom: 5px` (4 + the 1 borrowed) keeps the
+   always wins the rounding, and `padding-bottom: 7px` (6 + the 1 borrowed) keeps the
    controls exactly where they were — this changes what is PAINTED, never the layout. */
 .video-container.fullscreen .video-controls-container {
   position: absolute;
   bottom: -1px;
   left: 0;
   right: 0;
-  padding-bottom: 5px;
+  padding-bottom: 7px;
 }
 
 .video-container.clear .video-controls-container {
@@ -123,29 +125,30 @@
   pointer-events: none;
 }
 
-/* The mute button is the one bar control that is NOT a direct child of .controls — it is
-   nested in .volume-container next to the slider — so it needs naming here explicitly, or it
-   misses the 44px box and centres nowhere near its siblings. A descendant selector would be
-   shorter but the Appearance popover also lives inside .controls, and its buttons must not
-   become 44px squares. */
-.video-controls-container .controls > button,
-.video-controls-container .controls > .volume-container > button {
+/* Direct children only: the Appearance sheet, the speed menu and the volume popover also
+   live inside .controls, and their buttons must not become bar-sized squares.
+
+   28px by the owner's call (D32): the bar gives the picture back the height. WCAG 2.5.8 (AA,
+   24px minimum) is met, and no two targets overlap — the row's 4px gap separates them. That
+   gap is also what keeps a focus ring (3px outline at 2px offset, so 5px out) off the
+   neighbouring icon, which sits 4px inside its own 28px box. (These were 44px, the 2.5.5 AAA
+   size, until this round.) The scrubber's pointer zone and the moment marks' 24px hit areas
+   are unchanged. */
+.video-controls-container .controls > button {
   color: var(--d-text);
-  height: 44px;   /* WCAG 2.5.5 target size. Was 2rem/32px. */
-  width: 44px;
+  height: 28px;
+  width: 28px;
   border-radius: var(--r-md);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.video-controls-container .controls > button:hover,
-.video-controls-container .controls > .volume-container > button:hover {
+.video-controls-container .controls > button:hover {
   background-color: #21262f;
 }
 
-.video-controls-container .controls > button:focus-visible,
-.video-controls-container .controls > .volume-container > button:focus-visible {
+.video-controls-container .controls > button:focus-visible {
   outline: 3px solid var(--brand-300);
   outline-offset: 2px;
 }
@@ -164,15 +167,18 @@
 /* Speed / Pace: native selects dressed for the always-dark bar. color-scheme: dark keeps
    the UA-rendered popup list from flashing white over the player. */
 /* Speed: an icon in the bar, its values in a menu. Everything about how a bar button looks
-   already lives in the `.controls > button` rules above — colour, 44px target, radius,
-   hover, focus ring — so this only says where it differs: it may grow past 44px wide when
-   it carries the rate. Scoped to match those rules' specificity, which is not decoration:
-   `.controls > button` sets a fixed `width: 44px` and wins over a bare `.bar-speed`.
-   The rate rides alongside the icon only when it is NOT 1x, so the bar stays narrow in the
-   common case and never hides a setting that quietly changes how the whole lecture plays. */
+   already lives in the `.controls > button` rules above — colour, 28px target, radius,
+   hover, focus ring — so this only says where it differs: it is wider than 28px, because
+   it carries the rate beside the icon. Scoped to match those rules' specificity, which is not
+   decoration: `.controls > button` sets a fixed `width: 28px` and wins over a bare
+   `.bar-speed`. */
 .video-controls-container .controls > button.bar-speed {
-  width: auto;
-  min-width: 44px;
+  /* A FIXED width, wide enough for the widest rate ("1.25×", "0.75×"), whatever the rate.
+     Auto-width meant changing speed changed the row's width, and on a player just wide enough
+     for one row that wrapped the controls onto a second: the bar, and so the windowed player,
+     resized because someone pressed ">". 36px of chrome (padding, gap, icon) plus the label's
+     rem-sized text. */
+  width: calc(36px + 2.75rem);
   gap: 4px;
   padding: 0 8px;
 }
@@ -270,8 +276,10 @@
 .pin-cap {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 4px 2px 10px;
+  gap: 4px;
+  /* 6px around the buttons, not 2: the panel is overflow:hidden, and a focus ring reaches 5px
+     outside its button — at 2px the panel's own edge cut the bottom of every ring off. */
+  padding: 6px 6px 6px 10px;
   color: var(--d-text);
   font-size: 0.9375rem;
 }
@@ -287,22 +295,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The same 28px as the bar's buttons (see there): one control size across the player. */
 .pin-cap button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 28px;
+  height: 28px;
   color: var(--d-text);
   border-radius: var(--r-md);
 }
 .pin-cap button:hover { background: #21262f; }
 .pin-cap button:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 
-.video-controls-container .controls > button svg,
-.video-controls-container .controls > .volume-container > button svg {
-  width: 22px;
-  height: 22px;
+.video-controls-container .controls > button svg {
+  width: 20px;
+  height: 20px;
 }
 
 
@@ -311,17 +319,38 @@
   cursor: not-allowed;
 }
 
-.volume-container {
+/* The volume popover: a vertical native range over a Mute toggle, dark like the bar's other
+   dropdowns (.bar-pop). writing-mode makes the range vertical; direction: rtl puts its max at
+   the TOP, so the thumb goes up as the sound does (the arrow keys already agree: up = louder). */
+.vol-pop {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 8px;
+  padding: 12px 8px 8px;
 }
-
-/* Always visible. It used to expand from 0px on hover — invisible to a keyboard or
-   screen-reader user, and undiscoverable on a touch screen. */
-.volume-container .volume-slider {
-  width: 84px;
+.vol-range {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 24px;
+  height: 120px;
+  margin: 0;
+  accent-color: var(--brand-300);
+  cursor: pointer;
 }
+.vol-range:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 4px; }
+.vol-mute {
+  min-height: 28px;
+  min-width: 72px;
+  padding: 0 10px;
+  border-radius: var(--r-md);
+  color: var(--d-text);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+.vol-mute:hover { background: #21262f; }
+.vol-mute[aria-pressed="true"] { color: #ffc233; }
+.vol-mute:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 2px; }
 
 .timeline-container {
   height: 16px;
@@ -839,9 +868,8 @@
    The biggest picture, without losing the ability to stop what you are hearing. One line:
    play/pause, timecode, scrubber, then speed, zoom, pin, Appearance, fullscreen, expand.
    The moment marks, volume and the moment steppers belong to the expanded bar. The [ / ]
-   keys still work while collapsed. */
+   and M keys still work while collapsed. */
 .video-container.collapsed .moment-lane,
-.video-container.collapsed .volume-container,
 .video-container.collapsed .collapse-hide {
   display: none;
 }
@@ -879,12 +907,6 @@
   flex-grow: 0; /* expanded, it is the spacer that pushes the right-hand icons out; here the
                    scrubber does that job */
   padding-left: 4px;
-}
-
-/* Only the track needs overriding — the bar and thumb come from the theme's brand colour.
-   The track sits on the dark bar, so it cannot use Mantine's light-surface default. */
-.volume-slider .mantine-Slider-track::before {
-  background-color: #39414d;
 }
 
 .duration-container {

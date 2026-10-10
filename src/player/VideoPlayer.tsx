@@ -22,7 +22,7 @@
 // worse disruption — being yanked out of a magnified view mid-explanation — and scene
 // detection is a heuristic that fires on build animations and camera moves too.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Box, Text, Group, UnstyledButton, Slider, Popover, Menu } from "@mantine/core";
+import { Box, Text, Group, UnstyledButton, Popover, Menu } from "@mantine/core";
 import {
   useElementSize,
   useDisclosure,
@@ -195,6 +195,7 @@ const VideoPlayer = (props: Props) => {
   const lastReportedActivityRef = useRef<number | null>(null);
   const chromeTimeRef = useRef(-1);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [volumeOpen, setVolumeOpen] = useState(false);
   const [previewJumped, setPreviewJumped] = useState(false);
   // For the "Magnifier on · 1.7×" chip; same 1 + strength display the Appearance sheet uses.
   const zoomStrength = useMagnificationSettingsStore((s) => s.zoom_strength);
@@ -959,7 +960,7 @@ const VideoPlayer = (props: Props) => {
           {upcoming && nextIsKnown ? ` Next at ${convertSecondsToTimecode(upcoming.start)}.` : ""}
         </Box>
 
-        <Group className="controls" gap={3} align="center" mt={4}>
+        <Group className="controls" gap={4} align="center" mt={4}>
           {/* aria-disabled, not disabled: the click is already a guarded no-op while gated,
               and a hard disabled would throw keyboard focus somewhere else the moment the
               gate lifts. This way AT hears "dimmed" instead of a button that eats presses
@@ -972,7 +973,7 @@ const VideoPlayer = (props: Props) => {
           >
             {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
           </UnstyledButton>
-          {/* Always rendered, dimmed until there is a moment to step to: two 44px buttons
+          {/* Always rendered, dimmed until there is a moment to step to: two buttons
               appearing mid-analysis could push the row to wrap on a narrow window, which is the
               same resize the lane above no longer causes. */}
           <UnstyledButton
@@ -995,37 +996,69 @@ const VideoPlayer = (props: Props) => {
           >
             <IconPlayerTrackNextFilled />
           </UnstyledButton>
-          <Box className="volume-container">
-            {/* Label + pressed state both flip: an icon swap alone is invisible to AT, and
-                "Mute" on a muted player reads as the current state instead of the action. */}
-            <UnstyledButton
-              onClick={handleMute}
-              aria-label={isMuted ? "Unmute" : "Mute"}
-              aria-pressed={isMuted}
+          {/* Volume: a button that opens a vertical slider, not a slider always in the row. The
+              always-visible horizontal slider cost the row 92px (Yotam asked for it out, D32).
+              It once expanded on HOVER, which hid it from keyboard, screen-reader and touch
+              users — so this opens on click, Enter or Space and on nothing else. Focus lands on
+              the slider; Escape closes and returns focus to the button. withinPortal={false}
+              for the same reason as the speed menu and Appearance: portalled to body it would
+              be invisible in fullscreen. The icon keeps showing muted / low / high, and M still
+              mutes without opening anything. */}
+          <PlayerTip label="Volume" hotkey="M" disabled={volumeOpen || barHidden}>
+            <Popover
+              position="top"
+              withinPortal={false}
+              classNames={{ dropdown: "bar-pop vol-pop" }}
+              opened={volumeOpen}
+              onChange={setVolumeOpen}
+              trapFocus
+              returnFocus
             >
-              {isMuted ? (
-                <IconVolumeMute />
-              ) : volume > 0.5 ? (
-                <IconVolumeHigh />
-              ) : (
-                <IconVolumeLow />
-              )}
-            </UnstyledButton>
-            {/* 0-100 domain, not the video element's 0-1: the thumb's aria-valuenow is
-                announced raw, and "35" with a "Volume" name is comprehensible where "0.35"
-                is not. thumbLabel is Mantine's prop for naming the thumb — a plain
-                aria-label prop lands on the root element, which AT never reads. */}
-            <Slider
-              className="volume-slider"
-              value={isMuted ? 0 : Math.round(volume * 100)}
-              onChange={(v) => handleVolumeChange(v / 100)}
-              min={0}
-              max={100}
-              step={1}
-              label={(v) => `${v}%`}
-              thumbLabel="Volume"
-            />
-          </Box>
+              <Popover.Target>
+                <UnstyledButton
+                  className="collapse-hide"
+                  onClick={() => setVolumeOpen((o) => !o)}
+                  onKeyDown={stopPlayerHotkeys}
+                  aria-label={`Volume: ${isMuted ? "muted" : `${Math.round(volume * 100)}%`}`}
+                  aria-keyshortcuts={letterShortcuts ? "M" : undefined}
+                  aria-expanded={volumeOpen}
+                >
+                  {isMuted ? (
+                    <IconVolumeMute />
+                  ) : volume > 0.5 ? (
+                    <IconVolumeHigh />
+                  ) : (
+                    <IconVolumeLow />
+                  )}
+                </UnstyledButton>
+              </Popover.Target>
+              <Popover.Dropdown onKeyDown={stopPlayerHotkeys}>
+                {/* A native range, vertical by writing-mode: Mantine's Slider has no vertical
+                    mode, and the native control brings the arrow keys (up = louder), Home/End
+                    and the slider role for free. 0-100, not the element's 0-1: "35 percent"
+                    is comprehensible where "0.35" is not. data-autofocus is where Mantine's
+                    focus trap puts focus on open. */}
+                <input
+                  type="range"
+                  className="vol-range"
+                  data-autofocus
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={isMuted ? 0 : Math.round(volume * 100)}
+                  onChange={(e) => handleVolumeChange(Number(e.currentTarget.value) / 100)}
+                  aria-label="Volume"
+                  aria-valuetext={`${isMuted ? 0 : Math.round(volume * 100)}%`}
+                  aria-orientation="vertical"
+                />
+                {/* Label + pressed state both flip: an icon swap alone is invisible to AT, and
+                    "Mute" on a muted player reads as the current state instead of the action. */}
+                <UnstyledButton className="vol-mute" onClick={handleMute} aria-pressed={isMuted}>
+                  {isMuted ? "Unmute" : "Mute"}
+                </UnstyledButton>
+              </Popover.Dropdown>
+            </Popover>
+          </PlayerTip>
           <Group className="duration-container" gap="xs">
             <Text>{convertSecondsToTimecode(currTime)}</Text>
             <Text>/</Text>
@@ -1040,10 +1073,12 @@ const VideoPlayer = (props: Props) => {
               current rate instead.
               withinPortal={false} is not a style choice: portalled to body, this dropdown is
               invisible in fullscreen — the same reason the Appearance popover sets it.
-              The rate shows next to the icon whenever it is NOT 1×. Icon-only at every rate
-              would hide a non-default state on the one control that silently changes how the
-              whole lecture behaves — the exact bug the visible-magnifier work already fixed
-              once. Idle, it costs nothing; off-default, it says so. */}
+              The rate shows next to the icon, always. Icon-only at every rate would hide a
+              non-default state on the one control that silently changes how the whole lecture
+              behaves — the exact bug the visible-magnifier work already fixed once; off-default
+              it also turns amber. It used to show only off 1×, to keep the bar narrow, but the
+              button now holds a fixed width for the widest rate (a width that changed with the
+              rate could wrap the row — player.css), so at 1× that room would sit empty. */}
           <Menu position="top" withinPortal={false} classNames={{ dropdown: "bar-pop" }}>
             <Menu.Target>
               <UnstyledButton
@@ -1053,7 +1088,7 @@ const VideoPlayer = (props: Props) => {
                 title={`Playback speed: ${playbackRate}×`}
               >
                 <IconGauge />
-                {playbackRate !== 1 && <span className="bar-speed-v">{playbackRate}×</span>}
+                <span className="bar-speed-v">{playbackRate}×</span>
               </UnstyledButton>
             </Menu.Target>
             <Menu.Dropdown onKeyDown={stopPlayerHotkeys}>
