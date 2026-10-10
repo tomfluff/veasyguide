@@ -2034,7 +2034,8 @@ magnifier's region is a second `role="status"`: Z gave "Magnifier on, 1.5 times.
 region throughout. Re-entry while playing, measured later: playing from 83s, "Moment 8" at
 84.7s; ← to 83.5s gives
 "Moment 7"; playing on re-enters 8 and announces it again. A backfill renumbering staying quiet
-could not be exercised as intended (Still open has why). Strength changes while the magnifier is off did not exist as a path: ↑ and ↓ both turned the
+could not be exercised as intended (see the older bugs below). Strength changes while the
+magnifier is off did not exist as a path: ↑ and ↓ both turned the
 magnifier on, as on main. That turned out to be a bug, fixed below (5c4bffd).
 
 **Two older bugs, found by these checks** (5c4bffd). Both are on main too.
