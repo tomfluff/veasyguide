@@ -2347,7 +2347,8 @@ entering or leaving fullscreen, and when the sheet's height changes between tabs
 carried an `aria-hidden` "Sample" tag, so a sighted viewer would not take it for a found moment;
 the owner had it removed (172fae3): "not needed, it's kind of obvious". A real moment on screen
 takes precedence, and the sample goes when the sheet closes. The magnifier does not target the
-sample; that was the simpler of the correct options.
+sample; that was the simpler of the correct options. It pauses while the sample shows (5e3938d,
+below).
 
 **The setting.** `tuningPreview` in `ViewSettingsStore`, persisted, and kept out of the preset
 stores for the same reason as D28: a preset must not switch it back. The control replaces the
@@ -2390,11 +2391,17 @@ placement tests.
   returns to 2s, nearest goes to 25.77s again, and closing returns to 2s.
 - Escape in a drill tab closes the sheet, as on d2e19c3.
 
+**Fixed after the eleventh Codex review** (5e3938d).
+- With the speed menu open, A then Tab sent focus out of the Appearance sheet to the speed
+  button: closing speed reclaimed focus even though Appearance had just taken it. Focus return
+  is now per popover, and each close reclaims focus only from its own dropdown.
+- With the magnifier on from an earlier moment, opening Appearance between moments hid the
+  sample entirely under the magnified frame. The magnifier now pauses while the sample shows: it
+  stays on, its button stays pressed, and it resumes when the sample goes. It is still not aimed
+  at the sample.
+
 **Still open.**
-- Speed open, then A, then Tab sends focus out of the Appearance sheet to the speed button.
-  Found by the eleventh Codex review, confirmed; with code-lead.
-- With the magnifier on, opening Appearance at a gap hides the sample entirely under the
-  magnified picture. Found by the eleventh Codex review, confirmed; with code-lead.
+
 - Low: at 375px wide and below, the 398px sheet covers the whole picture, so the sample cannot
   be clear of it. By design.
 - Low: placement uses the moment's square, not the drawn extent, so at Size 200% the sample can
