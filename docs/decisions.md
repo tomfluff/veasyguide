@@ -1503,15 +1503,39 @@ and then shrinks. The truncation applies only where wrapping actually changed th
 it did at 400px, and wider windows never truncate. Also fixed on the way: "1 moments so far"
 now reads "1 moment".
 
+**Corrected in the same round: the ellipsis hid text** (cd5a242, replacing d3d2108's
+one-line rule). Truncating the now-line at 400px held the bar still, but it did so by hiding the
+end of the sentence from exactly the reader who sees the app at that width, someone zoomed in.
+WCAG 1.4.10 (Reflow) does not allow losing content to reflow, and the screen reader getting the
+full text does not cover the sighted reader who doesn't.
+
+The now-line wraps freely again, and its height still does not change. It shares a CSS grid
+cell (`.now-slot`) with sizers that are `visibility: hidden` and `aria-hidden`, holding the
+longest content the line can ever show: a moment sentence with a three-digit moment number,
+"most of the slide" and this video's own duration as the timecode, plus the magnifier chip and
+"Next at". The cell is as tall as the tallest of them, so the row reserves the worst case at
+the current width from the first frame, with no JavaScript measuring anything.
+- Rejected: a fixed two-line height, team-lead's first suggestion. At 320px and 400px the worst
+  case needs about four lines, so two lines would clip it, which is the bug being fixed.
+- The empty-video sentence was shortened from "No annotation moments found in this video — the
+  highlight and magnifier have nothing to follow." (96 characters) to "No moments found — nothing
+  for the highlight to follow." The long one was itself the worst case, and reserved two extra
+  lines on every video for a state most videos never reach.
+
+Bar height, constant through a whole session with zero clipped samples: 140px at 1400 and 800
+wide, 222px at 560, 312px at 400, 393px at 320. With the ellipsis it was 140, 140, 187 and 234.
+The cost is empty space under a short sentence at narrow widths, and a smaller picture there.
+Nothing is hidden and nothing moves.
+
 **Still open.**
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
 - Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
   nav, not the player, and is in TODOS.md.
-- At narrow windows the now-line's sentence is cut off with an ellipsis (measured at 400px; it
-  never truncates on wider windows). A screen reader still gets the whole sentence, but a sighted
-  viewer at that width, often someone zoomed in, does not.
+- At narrow widths the bar reserves the now-line's worst case, so under a short sentence there
+  is empty space: the bar is 393px tall at 320px wide. That is the accepted price of the
+  reservation below, recorded so a later reader does not "fix" it by clipping again.
 
 ---
 
