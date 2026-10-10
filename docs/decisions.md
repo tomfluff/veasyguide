@@ -1390,7 +1390,8 @@ the bar got most of the size back; that is no longer offered in the window. Movi
 now-line into the sidebar was weighed as another way back and rejected (below), so the cost is
 accepted, not pending. The 832px is exact arithmetic for a 139.8px bar. It has to be re-checked
 once the feedback loop under Still open is fixed, because the loop makes the bar taller than
-that on some windows.
+that on some windows. After the fix (eaceeb5, below) the cap subtracts a constant 140px, which
+gives the same 832px by arithmetic; not yet re-measured.
 
 **Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
 bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
@@ -1472,7 +1473,8 @@ panel grew UNDER the bar" now describes fullscreen only.
 **Player sizing.** The width cap was `calc((100vh - 160px) * 16/9)`, which assumed the bar sat on
 the video. It is now `max(20rem, calc((100vh - 160px - var(--bar-h, 0px)) * 16/9))`, where
 `--bar-h` is the measured bar height set inline (0 in fullscreen), so the video and the bar
-together fit the window. The 20rem floor exists because at 320x320 the formula alone gives a
+together fit the window. That measured height turned out to be a feedback loop, and was replaced
+by a constant within the round (eaceeb5, "Fixed: the width cap fed on itself" below). The 20rem floor exists because at 320x320 the formula alone gives a
 video under 20px wide. Below the floor the page scrolls, which is what a page is for.
 Measured at 1400x900: the player's bottom edge is at 802px, inside the 900px window, and the
 sidebar spans the player's full 737.2px height. At 1366x768, 1920x1080 and 1536x864 at DPR 1.25
@@ -1556,7 +1558,9 @@ the current width from the first frame, with no JavaScript measuring anything.
 - The empty-video sentence was shortened from "No annotation moments found in this video — the
   highlight and magnifier have nothing to follow." (96 characters) to "No moments found — nothing
   for the highlight to follow." The long one was itself the worst case, and reserved two extra
-  lines on every video for a state most videos never reach.
+  lines on every video for a state most videos never reach. It was later cut to just "No
+  moments found", at the owner's wording, and its sizer removed (9830653). The moment sentence
+  with both chips is now the only worst case. Heights are unchanged.
 
 Bar height, constant through a whole session with zero clipped samples: 140px at 1400 and 800
 wide, 222px at 560, 312px at 400, 393px at 320. With the ellipsis it was 140, 140, 187 and 234.
@@ -1565,19 +1569,33 @@ Nothing is hidden. "Nothing moves" was claimed for these widths, and it has not 
 re-checked against the feedback loop below, which the sizers are suspected of making worse.
 Whether the reserved space is acceptable is not decided (Still open).
 
+**Fixed: the width cap fed on itself** (eaceeb5). Introduced in this round, by 9e5fdbf's sizing
+formula, and found by the owner on his desktop: a video a quarter of the window wide, under a
+bar wrapped into three rows. The cap subtracted the bar's **measured** height, `--bar-h`. But the
+bar's height depends on the player's width, since a narrower bar wraps into more rows. So a tall
+bar made a narrower player, which made a taller bar, and the loop converged small. cd5a242's
+worst-case sizers made it worse, because they wrap sooner. The "fits the window" checks could not
+see it (see the correction under Player sizing), and d3d2108's "constant" numbers happened to
+come from windows where the loop settled at once.
+
+The cap now subtracts a constant: one row of bar, `108px + 2rem`, which is 140px at a 16px root
+font size. `--bar-h` is gone. The lesson worth keeping: **a size must not depend on something it
+causes.** Measured video width, before and after: 1366x650, 477 to 622px; 1280x600 at DPR 1.5,
+320 to 533px (it had hit the 20rem floor); 1920x960, 2048x1030, 1707x840 and 1600x700
+unchanged.
+
+**Fixed: the fullscreen bar never hid after a mouse click** (eaceeb5). Any focus inside the bar
+blocked the idle hide, so clicking the Fullscreen button parked focus on "Exit fullscreen" and
+the bar stayed up for good. Now only `:focus-visible` focus blocks it, plus an open Appearance
+sheet or speed menu, which live inside the bar. Not yet re-measured independently.
+
 **Still open.**
-- **The windowed video can shrink itself to a fraction of the window.** Introduced in this round,
-  missed by the "fits the window" checks above, and found by the owner on a desktop: the video
-  rendered tiny and the bar wrapped into three rows. The suspected cause is a feedback loop. The
-  player's width cap subtracts the measured bar height (`--bar-h`), a narrower player makes the
-  bar wrap taller, and a taller bar narrows the player again. cd5a242's worst-case sizers are
-  suspected of making it worse, because they wrap earlier. Measured at d3d2108 above. code-lead
-  is fixing it; numbers to follow.
-- **In fullscreen the bar never hides if fullscreen was entered with the mouse.** Clicking the
-  Fullscreen button leaves focus on what is now "Exit fullscreen". It is not `:focus-visible`,
-  but the guard that keeps the bar up while keyboard focus is inside it counts it anyway, so the
-  bar stays at opacity 1 after 3s. Measured at 8883cbd, dda1bdb and c1785ae. Once focus is
-  blurred, it hides at 2s. With code-lead.
+- **On short windows the controls wrap to two rows.** There the video is 533-622px wide, narrower
+  than the one-row control set (about 672px). Pending the owner's decision between a full-column
+  bar with the video pillarboxed, and accepting two rows.
+- The cap now assumes a one-row, 140px bar. Where the bar is taller (222-393px at 560px wide and
+  below), the video and bar together are taller than the cap allows for. Whether that makes the
+  page scroll at those sizes has not been measured.
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
