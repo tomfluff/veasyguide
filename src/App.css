@@ -276,9 +276,13 @@
   flex-direction: column;
   justify-content: center;
 }
-/* Wide, so the lecture can use the window. The player's own height bound (player.css) stops it
-   from growing taller than the viewport on the way. */
-.app.with-side { max-width: 1560px; }
+/* As wide as the video can be (--video-cap, index.css) plus the sidebar and the page padding —
+   no wider. It was a fixed 1560px, which was wrong both ways: on a tall window it held the video
+   narrower than the height allowed (1222px at 1920x1080, with a band of empty window under it),
+   and on a short one the page outgrew the height-bound video and stranded the sidebar at the far
+   edge with a gap beside the picture. Now the video and the list are one block, centred. The
+   282px is the sidebar's 268 + its 14px gap; 56px is this padding. */
+.app.with-side { max-width: calc(var(--video-cap) + 282px + 56px); }
 
 /* --- Moments sidebar ------------------------------------------------------
    Light, like the page it lives on. (It was dark, to match the player's control bar — but on a
@@ -780,7 +784,8 @@
   justify-content: center;
   gap: 12px;
   width: 100%;
-  max-width: calc((100vh - 160px) * 16 / 9);
+  /* The video's own cap (index.css), so the placeholder is as wide as the video will be. */
+  max-width: var(--video-cap);
   aspect-ratio: 16 / 9;
   margin-inline: auto;
   padding: 24px;

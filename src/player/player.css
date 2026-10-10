@@ -11,8 +11,12 @@
      from when the page was one narrow reading column, and beside the sidebar in a wide window
      it just left the lecture small with grey space around it — the opposite of what this app is
      for. The bound is the viewport, not a magic number: a 16:9 video this wide, plus the control
-     bar under it, is exactly as tall as the space left once the two page bars and the page
-     padding are taken.
+     bar under it, is exactly as tall as the space left once the page's own chrome is taken —
+     the top bar (with the hairline above it) and the footer, both MEASURED (Shell.tsx sets
+     --chrome-top and --chrome-foot), and the page's 16px + 24px padding, so the player ends one
+     ordinary gap above the footer. This used to subtract a flat 160px guess, which had drifted
+     to ~100px more than the chrome really took: Yotam had a band of empty window under the
+     player and the sidebar. The fallbacks are today's measured values, for the first frame.
 
      The bar's share is a CONSTANT — the one-row expanded bar, 89px (scrubber, moment lane,
      28px controls; all fixed-px chrome) — never the bar's measured height. It was the measured height once, and that is a feedback
@@ -27,7 +31,7 @@
      The 20rem floor is for short windows. Subtracting the bar there could shrink the video to
      a sliver (at 320x320 the formula alone gives a picture under 20px wide); below the floor
      the page scrolls instead, which is what a page is for. */
-  max-width: max(20rem, calc((100vh - 160px - 89px) * 16 / 9));
+  max-width: var(--video-cap);
   display: flex;
   flex-direction: column;
   margin-inline: auto;

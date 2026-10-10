@@ -4,7 +4,7 @@
 // The app's chrome: title bar and footer. Modelled on the chart-accessibility demo's shell so
 // the two read as one body of work — plum hairline, slim white bar, italic qualifier beside the
 // name, muted nav with one accent link, a human byline at the bottom.
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { useMantineColorScheme, useComputedColorScheme } from "@mantine/core";
 import { IconBrandGithub, IconExternalLink, IconMoon, IconSun } from "@tabler/icons-react";
 // Both bundled, not hotlinked from tomfluff.github.io. The landing screen promises "no upload,
@@ -13,6 +13,33 @@ import { IconBrandGithub, IconExternalLink, IconMoon, IconSun } from "@tabler/ic
 import avatar from "./assets/avatar.webp";
 import icon from "./assets/icon.png";
 import { stopPlayerHotkeys } from "./player/hotkeys";
+
+// Publishes how much of the window this bar takes, as a CSS variable on <html>, for the player's
+// width cap (player.css): the video is sized to fit the window MINUS the real chrome. It used to
+// subtract a 160px guess, which stopped being true as the bars changed and left ~100px of the
+// window empty under the player on Yotam's desktop. Measured, so it follows font size, zoom and
+// any later change to either bar. No feedback loop: neither bar's height depends on the player.
+// `edge` "bottom" measures from the top of the page to the bar's bottom edge (the plum hairline
+// above the top bar included); "height" is just the bar's own height.
+function useChromeVar(ref: RefObject<HTMLElement | null>, name: string, edge: "bottom" | "height") {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const set = () => {
+      const r = el.getBoundingClientRect();
+      const px = edge === "bottom" ? r.bottom + window.scrollY : r.height;
+      root.style.setProperty(name, `${Math.ceil(px)}px`);
+    };
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty(name);
+    };
+  }, [ref, name, edge]);
+}
 
 const PROFILE = "https://tomfluff.github.io/";
 const PROJECT = "https://veasyguide.github.io/";
@@ -39,8 +66,10 @@ export function TopBar({
   // (localStorage) and "auto" tracks the OS until the viewer picks a side.
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme("light");
+  const headerRef = useRef<HTMLElement>(null);
+  useChromeVar(headerRef, "--chrome-top", "bottom");
   return (
-    <header className="top">
+    <header className="top" ref={headerRef}>
       {/* The project mark is a finished tile — it brings its own colours and its own rounded
           corners, so it gets no background plate behind it. */}
       <img className="mark" src={icon} alt="" aria-hidden="true" />
@@ -126,12 +155,14 @@ export function TopBar({
 }
 
 export function Footer({ feedbackHref }: { feedbackHref: string }) {
+  const footRef = useRef<HTMLElement>(null);
+  useChromeVar(footRef, "--chrome-foot", "height");
   return (
     // A flex row, not a line of text with an inline-flex link in it: an inline-flex box takes
     // its baseline from its FIRST item — here the avatar, whose baseline is its bottom edge —
     // so the name inside it sat off the baseline of the words around it. Centring every part
     // against each other sidesteps baselines entirely.
-    <footer className="foot">
+    <footer className="foot" ref={footRef}>
       <span>Created with love and care by</span>
       <a className="foot-link" href={PROFILE} target="_blank" rel="noreferrer">
         <img className="foot-av" src={avatar} alt="" aria-hidden="true" />
