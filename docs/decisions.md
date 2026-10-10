@@ -1808,12 +1808,18 @@ the stored entry is `{t: 52.8}`. Re-measured independently: paused at 30s, the p
 
 Measured (code-lead's): during the preview, a scrubber click at 100s lands at 100.0s and stores
 100.0; ] then Escape lands at 52.8s and stores 52.8; closing the sheet without seeking still
-restores 30.0s.
+restores 30.0s. Re-measured independently, paused at 30s with the preview at 47.8s: a scrubber
+click at the 100s point lands at 99.95s with the sheet closed and stores 99.946; ] then Escape
+stores 52.8; closing the sheet by clicking Appearance again returns to 30.0s and stores 30; a
+sidebar row stores 120.9. ArrowRight inside the sheet does not seek at all, because the sheet's
+key guard takes the arrows; that is intended.
 
 **An older scrubber bug, found on the way.** A click on the scrubber seeked to the pointer's
 position as of the last render (`useMouse`'s state), not the click's own. A click without a
 mouse movement just before it landed wherever the pointer had last been seen: measured, at 0:00.
-It now reads the click's coordinates. This predates the round.
+It now reads the click's coordinates. This predates the round. Re-measured independently, with
+no preview open: a real click at the 200s point lands at 199.89s, and a synthetic press and
+release at the 60s point with no mouse movement first lands at 59.9s.
 
 **Revised: a card on the video** (c8ec242, the owner's decision after watching the demo). The
 strip pushed the whole player down when it appeared, which is the layout jump this round removed
@@ -1839,6 +1845,27 @@ region mounted before the card arrives; Space and Enter press its buttons; play,
 button dismisses it. Clicks on the card stop there, so they cannot toggle playback underneath.
 The buttons are now 36px tall, not 44px, so the card fits a 180px-tall picture at 320px wide.
 That is above 2.5.8's 24px, and below the 44px the strip had.
+
+**Re-measured independently** (stored position 20s).
+- The player's box takes one value per session, sampled every frame from load, card or no
+  card: 782.2x529.0 at 1366x650, 992x647 at 1366x768, 264x301.5 at 320x640.
+- The card sits inside the picture at all three sizes: 339x100 and centred at 1366px wide. At
+  320px it fits within the video's box, and its content scrolls by 11px inside the card; the page
+  itself does not scroll either way.
+- In fullscreen it shows inside the fullscreen element. Its slot is at z 45, between the
+  fullscreen list (40) and the bar (50), and at 1366px the card and the list do not overlap.
+- Contrast, with the computed colours composited over the slide. On white: text 15.25:1, the
+  time 10.41:1, Resume 6.88:1, Start's label 15.25:1. On black: 17.52, 11.96, 6.88 and 17.52:1.
+  Start's 1px border is 2.97:1 against the card on white (3.41:1 on black), just under 1.4.11's
+  3:1. The button is identified by its label, not its border.
+- Space or Enter on Resume both land at 20.5s, playing, with focus on Pause. On Start, both stay
+  at 0, paused, with focus on Play. A click on the card's text leaves the video paused and the
+  card up. Space with focus elsewhere on the page plays from 0 and dismisses; → seeks to 5s and
+  dismisses; a click on the video plays and dismisses.
+- The `role="status"` slot is mounted at about 850ms, and the card is inserted into it about
+  3.3s later (4.15-4.28s).
+- Buttons are 86x36 and 209x36px. Tab order: the header, the scrubber, Play, Volume, Speed,
+  Magnify, Pin, Appearance, Fullscreen, then Resume, then Start.
 
 **Still open.**
 
