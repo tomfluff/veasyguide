@@ -1713,9 +1713,10 @@ the 10s start edge working as designed.
 
 ## D34 — The bar is one slim row: no visible status line, 28px buttons
 
-**Decision** (482f7eb, 1605098; the owner's call on both). The now-line, the sentence under the
-scrubber that said what the current moment is ("Moment 4 of 31 · most of the slide · Next at
-12:40"), is no longer shown. Its announcement stays, as a visually hidden `role="status"`. The
+**Decision** (482f7eb, 1605098; the owner's call on both). The now-line, the status line in the
+bar, is no longer shown. It said which moment is current, where on the slide it is (the worded
+geometry from D19), its timecode and length, then "Magnifier on · 2.0×" when magnifying and
+"Next at" the following moment. Its announcement stays, as a visually hidden `role="status"`. The
 bar's buttons go from 44px to 28px, and volume moves from an always-visible slider into a
 popover. The bar is now one row at every desktop size measured.
 
@@ -1731,20 +1732,27 @@ he had said that low-vision viewers cannot read the line well anyway.
 - It repeated what is already on screen: the lit mark in the moment lane, the current row in the
   moments list, the timecode, and the magnifier button's amber state.
 
+**This reverses a rule, and it should be read as reversed.** The removed code said the
+magnifier's state was shown "as persistent TEXT, not just the transient on-video icon: a
+low-vision user cannot be asked to notice a subtle glyph to know what mode their player is in."
+After this change the visible signal is the amber Magnify button, and the text is spoken but
+not shown. The owner's judgement is that the line was not readable for that same reader, so it
+was not doing the job the rule asked of it.
+
 **What is kept.** The same sentence, the magnifier state and "Next at" go into a visually hidden
 `role="status"`, mounted from the first frame so it is announced (a live region inserted with
 its content is not, D33). It is now announced in fullscreen with the bar collapsed too. Before,
-the collapsed bar hid the line with `display: none`, which also silenced it for screen readers,
-a bug nobody had reported. "No moments found" moves to the moments list's empty state, and the
-position readout stops repeating it.
+the collapsed bar hid the line with `display: none`, which also silenced it for screen readers.
+"No moments found" moves to the moments list's empty state, and the position readout stops
+repeating it.
 
 **Why 28px buttons, and what that gives up.** The owner set the sizes. Buttons go from 44px to
 28px and icons from 22px to 20px. 28px meets WCAG 2.5.8 (Target Size, Minimum, AA, 24px). It
 gives up 2.5.5 (Target Size, Enhanced, AAA, 44px), deliberately. The code comments say "28px by
 the owner's call; 2.5.8 AA met", so a later reader does not mistake it for an oversight. The
-people this hurts most are those with tremor or low motor precision, and those using a
-magnifier at a high zoom, where a small target is also a small thing to find. The trade is
-picture size, which the low-vision reader needs as much.
+people this hurts most are those with tremor or low motor precision, and those using a magnifier
+at a high zoom, where a small target is also a small thing to find. What it buys is the one-row
+bar, and the picture height that comes with it.
 - The row gap goes from 3px to 4px. The focus ring reaches 5px out and the icon sits 4px inside
   its button, so 4px keeps one button's ring off its neighbour's icon.
 - The pin caption and the bar's bottom padding are 6px, so `overflow: hidden` or the screen edge
@@ -1752,10 +1760,9 @@ picture size, which the low-vision reader needs as much.
 - The scrubber's hit zone and the moment marks' hit areas are unchanged.
 
 **Volume becomes a popover.** The 84px slider was always visible, and it was made that way on
-purpose, because the usual hover-to-reveal slider is unreachable by keyboard and vanishes under
-a magnifier user's pointer. The popover opens on click, Enter or Space, never on hover, so that
-reason still holds. It holds a vertical native range and Mute. M still mutes, and the button has
-a "Volume" tip (D31).
+purpose, to avoid the usual hover-to-reveal slider. The popover opens on click, Enter or Space,
+never on hover, so that reason still holds. It holds a vertical native range and Mute. M still
+mutes, and the button has a "Volume" tip (D31).
 
 **Speed is a fixed width and always shows its rate**, "1×" included, where D24 showed the rate
 only when it was off-default.
