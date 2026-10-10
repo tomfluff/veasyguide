@@ -1186,6 +1186,9 @@ The header comment's "a fixed 340x260" is wrong on both axes. The sheet renders 
 (396 plus a 1px border each side) and 351.1px tall on the drill screens. That predates this
 entry and is recorded rather than fixed here.
 
+*Later (D36):* the root screen's hint line became the "Preview on" choice, and the root is now
+327px against the drill screens' 349px, so the fixed band still holds.
+
 Rendered label widths in the 62px column: Border 37, Colour 37, Fill 17, Opacity 44, Shape 36,
 Size 25. All fit on one line. The five tabs end at 293px of a 372px row (79px spare), with no
 horizontal scroll. The Ink screen's "The highlight" / "The magnifier" choice renders both
@@ -1700,10 +1703,13 @@ fits one row down to a 486px player, and every desktop size measured is one row 
 ## D33 — Reopening a video offers to resume; it never resumes on its own
 
 **Decision** (91a9849, revised in c8ec242). When a video opens and a saved position exists for
-it, the player asks "Resume at 12:34?" with two buttons, Resume and Start from the beginning. The
-player never jumps to the saved place without being asked. The question first shipped as a strip
-above the player, and now is a card centred on the video ("Revised: a card on the video",
-below).
+it, the player asks "Resume at 12:34?" with two buttons, Resume and Start from the beginning.
+The player never jumps to the saved place without being asked. The question first shipped as a
+strip above the player, and now is a card centred on the video, laid out under the bar so the
+two never meet (3d8cdd4). The saved place is tracked as the viewer's intent, in one reducer, so
+leaving the page at any instant records the right place (2f9edd8). Most of this entry's later
+fixes concern the Appearance preview's jump, which since D36 runs only when the viewer chooses
+it.
 
 **Why.** D29 made switching videos safe for the analysis, but the place in the lecture was still
 lost: reopening any video started at 0:00, so coming back to a 90-minute lecture meant scrubbing
@@ -2002,18 +2008,25 @@ mid-preview from 15s saves 15, and from 4s saves nothing (the start edge); playi
 52s saves 52.03. Focus returns to the opening button for Appearance (on Escape and an outside
 click), speed (Escape and picking a rate) and volume (Escape).
 
+**Fixed after the tenth Codex review** (2fa3613).
+- Playback started during the Appearance preview, for example by a media key, was not taken
+  as the viewer's: played on to 62.1s, Escape jumped back to 30s and saved 30s (reproduced).
+  Play during the preview now cancels it, and the bookmark takes the place played from.
+- After a seek, the landing re-armed the pending seek instead of clearing it, so a late next
+  time report (at 3x, or in a throttled background tab) could leave the bookmark frozen. Found
+  from the code and not reproduced in a foreground tab, but small, so fixed rather than logged:
+  the landing now clears it (`bookmarkSeeked`), with a test.
+- Focus return was unconditional (Mantine's `returnFocus`). Clicking a sidebar row while
+  Appearance or speed was open dragged focus back to the popover's button, and Space then
+  reopened it (reproduced). Focus now returns only when it was lost, and only to a visible
+  control. That rule also covers a low the same review raised from the code: focus returning
+  to a bar control that collapsing the fullscreen bar had hidden.
+
 **Still open.**
-- Playback started during the Appearance preview, for example by a media key, is not taken as
-  the viewer's. Played on to 62.1s, then Escape jumps back to 30s, and 30s is saved. Found by the
-  tenth Codex review, reproduced; with code-lead.
-- Closing a popover by clicking a sidebar row returns focus to the popover's button rather than
-  the row, so Space then reopens the popover. Found by the tenth Codex review, reproduced; with
-  code-lead.
-- After a seek whose frame reports arrive late, the bookmark could stay frozen, because the
-  reducer ignores time reports until one lands near the pending seek. Found by the tenth Codex
-  review from the code; plausible, did not reproduce in a foreground tab; with code-lead.
-- Low, left by the stop rule: focus returned to a bar control that collapsing the fullscreen
-  bar has hidden. Found by the tenth Codex review; not reproduced.
+
+
+
+
 
 - Low, left by the stop rule: at 320x180 at DPR 4 in fullscreen with the bar expanded, the card is
   42px tall and scrolls 29px inside itself. A keyboard user is fine, since focus scrolls each
@@ -2278,3 +2291,63 @@ independently: opened at exactly 1000px and widened to 1001px, it closes, and fr
   control. The menu returns focus to its trigger, and at that width the trigger is
   `display: none`. The right target is the matching control in the full bar, which needs a
   mapping from menu items to bar controls, so it is not a trivial fix.
+
+---
+
+## D36 — Appearance previews on a sample highlight by default; the jump is an opt-in
+
+**Decision** (7de7c8f; the owner's call). Tuning the highlight in the Appearance sheet no longer
+moves the playhead by default. A new setting on the sheet's root screen, "Preview on", offers
+"A sample highlight" (the default) and "The nearest moment". The sample is a square drawn on the
+video, through the real highlight component, in the part of the picture the sheet covers least,
+whenever no real moment is on screen. "The nearest moment" is the old behaviour: the player
+jumps to a moment so the viewer can see their changes, and returns when the sheet closes.
+
+**The owner's words.** First: "draw a sample highlight that also is not behind or blocked by
+the settings panel which could happen, so some square would be nice." Then, when the first plan
+was to remove the jump: "don't delete the existing functionality but make a new default".
+
+**Why the jump stopped being the default.** The jump predates this round (it arrived with
+cec95b0, 2026-07-13). It was a hidden move of the playhead that the viewer did not ask for, and
+this round added two things that care where the playhead is: the bookmark (D33) and the resume
+card. The collision surfaced in five Codex rounds in a row, the sixth to the tenth: the
+preview's time saved as the bookmark, the viewer's own seek undone when the sheet closed,
+ownership of a seek mistaken by landing time, focus lost when the card hid, and play during the
+preview undone. D33 records each fix. 2f9edd8 rebuilt the bookmark so it could not be fooled by
+timing, but the jump itself remained the thing every one of those bugs needed. With a sample
+square, opening Appearance moves nothing, so none of those interactions can arise in the
+default.
+
+**Rejected.**
+- Keep fixing the jump as the default. Five rounds had shown that each fix exposed the next
+  window; the reducer made the bookmark safe, but the jump still moved the playhead under the
+  resume card and the viewer's focus.
+- Skip the jump only while a resume offer is pending. It narrows the worst case without
+  removing it, and makes the preview behave differently depending on a state the viewer may not
+  have noticed.
+- Delete the jump. The owner wants both: a real moment is the truest preview when there is one
+  nearby.
+- Put the choice in a drill tab. The owner wants it on the root screen, where the viewer is when
+  they start tuning.
+
+**The sample.** A square 1/5 of the picture's height, drawn by `HighlightIndicator`, so border,
+fill, opacity, shape and filters all show as they will on a real moment. `player/sample.ts`
+places it where the sheet, and in fullscreen the bar, cover it least: inside the picture, clear
+of the notices at the top centre, preferring the upper left. It is re-placed on resize, on
+entering or leaving fullscreen, and when the sheet's height changes between tabs. It carries an
+`aria-hidden` "Sample" tag so a sighted viewer does not take it for a found moment. A real moment
+on screen takes precedence, and the sample goes when the sheet closes. The magnifier does not
+target the sample; that was the simpler of the correct options.
+
+**The setting.** `tuningPreview` in `ViewSettingsStore`, persisted, and kept out of the preset
+stores for the same reason as D28: a preset must not switch it back. The control replaces the
+hint line on the sheet's root, which is now 327px tall against the drill screens' 349px (it was
+320.8px), so D30's fixed band still holds.
+
+**Tests.** 141 in total, including the setting's default, a persistence round trip, and 7
+placement tests. These numbers are code-lead's; an independent re-measure is pending.
+
+**Still open.**
+- At 320px wide the 398px sheet covers the whole picture, so the sample cannot be clear of it.
+- With "The nearest moment" chosen, every preview interaction in D33 is back in play. They are
+  fixed as recorded there, but that mode is where any remaining bug of that class would live.
