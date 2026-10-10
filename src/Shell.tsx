@@ -4,7 +4,7 @@
 // The app's chrome: title bar and footer. Modelled on the chart-accessibility demo's shell so
 // the two read as one body of work — plum hairline, slim white bar, italic qualifier beside the
 // name, muted nav with one accent link, a human byline at the bottom.
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Menu, useMantineColorScheme, useComputedColorScheme } from "@mantine/core";
 import {
   IconBrandGithub,
@@ -78,6 +78,17 @@ export function TopBar({
   const headerRef = useRef<HTMLElement>(null);
   useChromeVar(headerRef, "--chrome-top", "bottom");
   const toggleScheme = () => setColorScheme(scheme === "dark" ? "light" : "dark");
+  // The compact menu, controlled so it can be closed from outside. The player's F key still
+  // works with the menu open (it is a document-level shortcut, and the menu's items are
+  // buttons, not text fields), and fullscreen shows only the player — so a menu left open
+  // there is open, invisible, and holding focus nobody can see.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const close = () => setMenuOpen(false);
+    document.addEventListener("fullscreenchange", close);
+    return () => document.removeEventListener("fullscreenchange", close);
+  }, []);
   return (
     // Two layouts in one bar, switched by CSS (App.css, "Narrow top bar"): the full row, and a
     // compact one — mark, status, one Menu — for windows the full row does not fit. The row
@@ -171,10 +182,18 @@ export function TopBar({
           hotkeys, as on every other button in this bar. */}
       {/* returnFocus: choosing an item, or Escape, hands focus back to this button rather than
           dropping it on <body> — a keyboard user stays where they were. */}
-      <Menu position="bottom-end" width={260} classNames={{ dropdown: "top-menu" }} returnFocus>
+      <Menu
+        position="bottom-end"
+        width={260}
+        classNames={{ dropdown: "top-menu" }}
+        returnFocus
+        opened={menuOpen}
+        onChange={setMenuOpen}
+      >
         <Menu.Target>
           <button
             type="button"
+            ref={menuBtnRef}
             className="top-menu-btn narrow-only"
             aria-label="Menu"
             onKeyDown={stopPlayerHotkeys}
@@ -203,7 +222,16 @@ export function TopBar({
           >
             {scheme === "dark" ? "Light theme" : "Dark theme"}
           </Menu.Item>
-          <Menu.Item leftSection={<IconInfoCircle size={18} />} onClick={onAbout}>
+          {/* Focus the Menu button BEFORE the dialog opens. A modal <dialog> returns focus on
+              close to whatever had it when showModal() ran — here the menu item, which is gone
+              by then, so focus fell to <body> and one Tab landed in the player. */}
+          <Menu.Item
+            leftSection={<IconInfoCircle size={18} />}
+            onClick={() => {
+              menuBtnRef.current?.focus();
+              onAbout();
+            }}
+          >
             About
           </Menu.Item>
           <Menu.Item

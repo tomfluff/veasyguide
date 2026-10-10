@@ -18,15 +18,14 @@
      to ~100px more than the chrome really took: Yotam had a band of empty window under the
      player and the sidebar. The fallbacks are today's measured values, for the first frame.
 
-     The bar's share is a CONSTANT — the one-row expanded bar, 89px (scrubber, moment lane,
-     28px controls; all fixed-px chrome) — never the bar's measured height. It was the measured height once, and that is a feedback
-     loop: the bar's height depends on the player's width (a narrower bar wraps its controls and
-     the status line onto more rows), so a tall bar made the player narrower, which made the bar
-     taller, which made the player narrower still. On a 1366x768 laptop it settled at a 477px
-     video in a 1028px column; on a short window at 150% scaling, at the 20rem floor. A width
-     that depends on nothing it causes cannot do that. Where the bar does wrap (narrow windows,
-     high zoom) the page simply grows a little taller and scrolls. (It was 108px + 2rem while the
-     bar carried a visible status line, whose text scaled with the font size; that line is gone.)
+     The bar's share is the ONE-ROW bar's height (--bar-one-row: 89px at a 16px root; the player
+     publishes the real value, but only while its controls are on one row) — never the bar's
+     height as it stands. That was the rule once, and it is a feedback loop: a wrapped bar's
+     height depends on the player's width, so a tall bar made the player narrower, which made the
+     bar taller, which made the player narrower still. On a 1366x768 laptop it settled at a 477px
+     video in a 1028px column; on a short window at 150% scaling, at the 20rem floor. The one-row
+     height depends on the font size, not on the width, so it cannot loop. Where the bar does
+     wrap (narrow windows, high zoom) the page simply grows a little taller and scrolls.
 
      The 20rem floor is for short windows. Subtracting the bar there could shrink the video to
      a sliver (at 320x320 the formula alone gives a picture under 20px wide); below the floor
@@ -341,6 +340,15 @@
   margin: 0;
   accent-color: var(--brand-300);
   cursor: pointer;
+}
+/* Where the browser cannot draw a vertical range (see supportsVerticalRange), the popover lays
+   the same control out flat rather than squeezing a horizontal slider into a 24px column. */
+.vol-pop.flat { flex-direction: row; padding: 8px 10px; }
+.vol-pop.flat .vol-range {
+  writing-mode: horizontal-tb;
+  direction: ltr;
+  width: 120px;
+  height: 24px;
 }
 .vol-range:focus-visible { outline: 3px solid var(--brand-300); outline-offset: 4px; }
 .vol-mute {

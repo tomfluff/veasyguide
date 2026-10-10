@@ -90,8 +90,10 @@
 /* --- Narrow top bar --------------------------------------------------------
    The full row needs ~1120px with a lecture open (a long filename at its 240px cap and the
    "Finding moments… 87%" chip) and ~480px on the landing screen. Below that it used to
-   overflow and drag the whole page sideways. The filename gives way first (it shrinks to
-   6rem before anything else moves); below the breakpoint the row folds into the mark, the
+   overflow and drag the whole page sideways. The filename gives way first: it hugs its
+   text as it always has (max 240px), and only shrinks, with an ellipsis, when the row is short
+   of room — a fixed-basis version of this rule made it a 240px pill even for "short.mp4"; below
+   the breakpoint the row folds into the mark, the
    status chip as a bare number, and one Menu holding everything else.
    Breakpoints in em, so they move with the reader's default font size, not only with zoom:
    62.5em = 1000px with a lecture open and 42em = 672px on the landing screen — each measured
@@ -100,7 +102,6 @@
    Below 32em the tagline and the filename chip go as well. */
 .top .narrow-only { display: none; }
 .chip .chip-short { display: none; }
-.filechip { flex: 0 1 240px; min-width: 6rem; }
 .filechip-change { white-space: nowrap; }
 .top-menu-btn {
   display: flex; align-items: center; justify-content: center;

@@ -145,6 +145,25 @@ const NO_REVEAL_KEYS = new Set([
 // two copies would be two chances for the promise and the behaviour to drift apart.
 export const PLAYBACK_LEAD = 10;
 
+// Whether this browser draws a range input vertically under `writing-mode: vertical-lr`.
+// Chromium only does from 124 (2024), Safari and Firefox from about the same time; an older
+// one keeps drawing it horizontally, squeezed into the volume popover's 24px-wide box, while
+// aria-orientation still claims vertical. A CSS-only test cannot tell (writing-mode itself is
+// supported everywhere), so measure an unstyled one: a vertical range is taller than wide.
+// Once per page; the answer cannot change under us.
+let verticalRangeSupport: boolean | null = null;
+function supportsVerticalRange(): boolean {
+  if (verticalRangeSupport !== null) return verticalRangeSupport;
+  const probe = document.createElement("input");
+  probe.type = "range";
+  probe.style.cssText = "writing-mode: vertical-lr; position: absolute; visibility: hidden";
+  document.body.appendChild(probe);
+  const r = probe.getBoundingClientRect();
+  probe.remove();
+  verticalRangeSupport = r.height > r.width;
+  return verticalRangeSupport;
+}
+
 const VideoPlayer = (props: Props) => {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -377,10 +396,29 @@ const VideoPlayer = (props: Props) => {
   // Which moment is current, taken from the player's own selection rather than re-derived —
   // otherwise the lit-up mark and the highlight on the video disagree by `lead` seconds.
   const currIndex = currActivity ? props.activities.indexOf(currActivity) : -1;
-  const upcoming = stepMoment(props.activities, currTime, props.selectOpts.lead, 1);
-  // "Next at ..." is a lie while the video after the playhead is still unanalyzed: the next
-  // moment by time may simply not exist yet. Say nothing rather than point at the wrong one.
-  const nextIsKnown = props.done || isAnalyzed(props.ranges, upcoming?.start ?? currTime);
+
+  // The status region's moment sentence (see it in the bar below). Set when a moment starts and
+  // left alone when it ends, so each moment is one announcement. "Next at" is the moment after
+  // THIS one — from the list, not from the playhead, which sits `lead` seconds before the start
+  // when the moment is selected and would name the current moment as the next.
+  const [momentSpoken, setMomentSpoken] = useState("");
+  useEffect(() => {
+    if (currIndex < 0) return;
+    const a = props.activities[currIndex];
+    const next = props.activities[currIndex + 1];
+    // "Next at ..." is a lie while the video after this moment is still unanalyzed: the next
+    // moment by time may simply not exist yet. Say nothing rather than point at the wrong one.
+    const known = next && (props.done || isAnalyzed(props.ranges, next.start));
+    setMomentSpoken(
+      `Moment ${currIndex + 1}${props.done ? ` of ${props.activities.length}` : ""}, ` +
+        `${momentPlace(a, props.meta.analysisWidth, props.meta.analysisHeight)}, ` +
+        `${convertSecondsToTimecode(a.start)}, ${(a.end - a.start).toFixed(1)} seconds.` +
+        (known ? ` Next at ${convertSecondsToTimecode(next.start)}.` : "")
+    );
+    // Only on a change of moment: re-announcing because the analysis found another moment,
+    // or the playhead moved, is exactly the churn this exists to stop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currIndex]);
 
   // Helper functions
   const showControls = () => {
@@ -663,6 +701,25 @@ const VideoPlayer = (props: Props) => {
     rows.find((r) => r && r.getClientRects().length > 0)?.focus();
   };
 
+  // The one-row bar's height, for the page's width cap (--video-cap, index.css). Published only
+  // while the controls ARE one row: that height depends on the font size (the timecode's line
+  // box) but not on the player's width, so feeding it back cannot loop — a wrapped bar is the
+  // one measurement that depends on the width, and it is never published. The cap used a fixed
+  // 89px before, true at a 16px root and 7px short at 20px, which scrolled the page.
+  useEffect(() => {
+    const bar = barSizeRef.current;
+    if (!bar || isFullscreen || barHeight <= 0) return;
+    const tops = [...bar.querySelectorAll<HTMLElement>(".controls > button")]
+      .filter((b) => b.getClientRects().length > 0)
+      .map((b) => Math.round(b.getBoundingClientRect().top));
+    if (new Set(tops).size !== 1) return;
+    document.documentElement.style.setProperty("--bar-one-row", `${Math.ceil(barHeight)}px`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barHeight, isFullscreen]);
+  useEffect(() => () => {
+    document.documentElement.style.removeProperty("--bar-one-row");
+  }, []);
+
   // Fullscreen starts collapsed: the bar overlays the picture there, and the one-line bar covers
   // the least of it. Leaving always returns to the expanded bar, the only windowed one (D32).
   useEffect(() => {
@@ -931,8 +988,12 @@ const VideoPlayer = (props: Props) => {
         </Box>
 
         {/* What is happening, for a screen reader: a visually hidden live region, mounted from
-            the first frame (a region inserted together with its text is not announced) and
-            updated in place as the moment, the magnifier or the analysis changes.
+            the first frame (a region inserted together with its text is not announced). It
+            speaks when a moment STARTS — once, with where the next one is — and when the
+            magnifier changes, in its own text node so only that part is read. It says nothing
+            when a moment ends: it used to switch to "36 moments in this lecture. Next at …"
+            there, so every moment was two announcements, and at speed the end of one and the
+            start of the next landed 100ms apart and clipped each other.
             It used to be a visible status line here too, "Moment 3 of 36 · top right · 01:23,
             2.6s … Next at 01:40". Yotam removed it (D32): it cost the bar a row and the picture
             the height of that row, it made the bar's height depend on how its sentence wrapped
@@ -941,23 +1002,14 @@ const VideoPlayer = (props: Props) => {
             the timecode, and the magnifier button's amber pressed state. "No moments found"
             has its visible home in the moments list. */}
         <Box className="now-status" role="status">
-          {props.activities.length === 0
-            ? props.done
-              ? "No moments found."
-              : "Looking for moments…"
-            : currIndex >= 0
-              ? `Moment ${currIndex + 1}${props.done ? ` of ${props.activities.length}` : ""}, ${momentPlace(
-                  props.activities[currIndex],
-                  props.meta.analysisWidth,
-                  props.meta.analysisHeight
-                )}, ${convertSecondsToTimecode(props.activities[currIndex].start)}, ${(
-                  props.activities[currIndex].end - props.activities[currIndex].start
-                ).toFixed(1)} seconds.`
-              : props.done
-                ? `${props.activities.length} moment${props.activities.length === 1 ? "" : "s"} in this lecture.`
-                : `${props.activities.length} moment${props.activities.length === 1 ? "" : "s"} so far, still looking.`}
-          {isZoomIn ? ` Magnifier on, ${(1 + zoomStrength).toFixed(1)} times.` : ""}
-          {upcoming && nextIsKnown ? ` Next at ${convertSecondsToTimecode(upcoming.start)}.` : ""}
+          <span>
+            {props.activities.length === 0
+              ? props.done
+                ? "No moments found."
+                : "Looking for moments…"
+              : momentSpoken}
+          </span>
+          <span>{isZoomIn ? ` Magnifier on, ${(1 + zoomStrength).toFixed(1)} times.` : ""}</span>
         </Box>
 
         <Group className="controls" gap={4} align="center" mt={4}>
@@ -1004,34 +1056,38 @@ const VideoPlayer = (props: Props) => {
               for the same reason as the speed menu and Appearance: portalled to body it would
               be invisible in fullscreen. The icon keeps showing muted / low / high, and M still
               mutes without opening anything. */}
-          <PlayerTip label="Volume" hotkey="M" disabled={volumeOpen || barHidden}>
-            <Popover
+          <Popover
               position="top"
               withinPortal={false}
-              classNames={{ dropdown: "bar-pop vol-pop" }}
+              classNames={{ dropdown: supportsVerticalRange() ? "bar-pop vol-pop" : "bar-pop vol-pop flat" }}
               opened={volumeOpen}
               onChange={setVolumeOpen}
               trapFocus
               returnFocus
             >
-              <Popover.Target>
-                <UnstyledButton
-                  className="collapse-hide"
-                  onClick={() => setVolumeOpen((o) => !o)}
-                  onKeyDown={stopPlayerHotkeys}
-                  aria-label={`Volume: ${isMuted ? "muted" : `${Math.round(volume * 100)}%`}`}
-                  aria-keyshortcuts={letterShortcuts ? "M" : undefined}
-                  aria-expanded={volumeOpen}
-                >
-                  {isMuted ? (
-                    <IconVolumeMute />
-                  ) : volume > 0.5 ? (
-                    <IconVolumeHigh />
-                  ) : (
-                    <IconVolumeLow />
-                  )}
-                </UnstyledButton>
-              </Popover.Target>
+              {/* The tip wraps the Target, inside the Popover — never the Popover itself, which
+                  is not an element: wrapped from outside, the tip had no box to anchor to and
+                  drew itself at the player's top-left corner (see PlayerTip on the order). */}
+              <PlayerTip label="Volume" hotkey="M" disabled={volumeOpen || barHidden}>
+                <Popover.Target>
+                  <UnstyledButton
+                    className="collapse-hide"
+                    onClick={() => setVolumeOpen((o) => !o)}
+                    onKeyDown={stopPlayerHotkeys}
+                    aria-label={`Volume: ${isMuted ? "muted" : `${Math.round(volume * 100)}%`}`}
+                    aria-keyshortcuts={letterShortcuts ? "M" : undefined}
+                    aria-expanded={volumeOpen}
+                  >
+                    {isMuted ? (
+                      <IconVolumeMute />
+                    ) : volume > 0.5 ? (
+                      <IconVolumeHigh />
+                    ) : (
+                      <IconVolumeLow />
+                    )}
+                  </UnstyledButton>
+                </Popover.Target>
+              </PlayerTip>
               <Popover.Dropdown onKeyDown={stopPlayerHotkeys}>
                 {/* A native range, vertical by writing-mode: Mantine's Slider has no vertical
                     mode, and the native control brings the arrow keys (up = louder), Home/End
@@ -1049,7 +1105,7 @@ const VideoPlayer = (props: Props) => {
                   onChange={(e) => handleVolumeChange(Number(e.currentTarget.value) / 100)}
                   aria-label="Volume"
                   aria-valuetext={`${isMuted ? 0 : Math.round(volume * 100)}%`}
-                  aria-orientation="vertical"
+                  aria-orientation={supportsVerticalRange() ? "vertical" : "horizontal"}
                 />
                 {/* Label + pressed state both flip: an icon swap alone is invisible to AT, and
                     "Mute" on a muted player reads as the current state instead of the action. */}
@@ -1057,8 +1113,7 @@ const VideoPlayer = (props: Props) => {
                   {isMuted ? "Unmute" : "Mute"}
                 </UnstyledButton>
               </Popover.Dropdown>
-            </Popover>
-          </PlayerTip>
+          </Popover>
           <Group className="duration-container" gap="xs">
             <Text>{convertSecondsToTimecode(currTime)}</Text>
             <Text>/</Text>
