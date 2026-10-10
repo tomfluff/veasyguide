@@ -15,6 +15,7 @@ import {
   bookmarkPlay,
   bookmarkPreviewStart,
   bookmarkPreviewEnd,
+  bookmarkSeeked,
   bookmarkToSave,
 } from "./player/bookmark";
 import { stopPlayerHotkeys } from "./player/hotkeys";
@@ -639,12 +640,10 @@ export default function App() {
     // A seek of the viewer's own answers the resume offer too, and is somewhere worth saving.
     // The player's own preview jump is neither: it used to dismiss the offer, mark the video
     // touched and then save 0:00 on the way out — erasing the bookmark it never showed them.
-    if (byViewer) {
-      // Usually already recorded when the seek was REQUESTED (onViewerSeek); this catches seeks
-      // the player did not start itself — the browser's own media keys, say.
-      bookmarkRef.current = bookmarkViewerSeek(bookmarkRef.current, t);
-      setResumeAt(null);
-    }
+    // The landing: clears any pending seek (and, for a seek the player did not start itself —
+    // the browser's own media keys — records it as the viewer's).
+    bookmarkRef.current = bookmarkSeeked(bookmarkRef.current, t, byViewer);
+    if (byViewer) setResumeAt(null);
     if (done || !workerRef.current) return;
     if (!isAnalyzed(ranges, t)) {
       workerRef.current.postMessage({ type: "seek", t });
@@ -1007,6 +1006,7 @@ export default function App() {
               onViewerSeek={(t) => { bookmarkRef.current = bookmarkViewerSeek(bookmarkRef.current, t); }}
               onPreviewStart={() => { bookmarkRef.current = bookmarkPreviewStart(bookmarkRef.current); }}
               onPreviewEnd={(back) => { bookmarkRef.current = bookmarkPreviewEnd(bookmarkRef.current, back); }}
+              onPreviewTaken={(t) => { bookmarkRef.current = bookmarkSeeked(bookmarkRef.current, t, true); }}
               onActivityChange={setCurrMoment}
               thumbs={thumbs}
               seekFnRef={seekFnRef}

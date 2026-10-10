@@ -56,6 +56,18 @@ export function bookmarkViewerSeek(_b: Bookmark, t: number): Bookmark {
   return { place: t, touched: true, pending: t, previewing: false };
 }
 
+// A seek has LANDED (`seeked`), at `t`. The landing is the arrival a pending seek was waiting
+// for, so it clears — it must not re-arm: if the next time report then came more than LANDED
+// later (high speed, a backgrounded tab throttling frame callbacks), every report after it
+// would be rejected and the bookmark would freeze. A landing of the viewer's own counts as
+// their intent; the player's own landing (the preview's park) is ignored while previewing, and
+// its step-back's landing is just the arrival.
+export function bookmarkSeeked(b: Bookmark, t: number, byViewer: boolean): Bookmark {
+  if (byViewer) return { place: t, touched: true, pending: null, previewing: false };
+  if (b.previewing) return b;
+  return { ...b, pending: null, place: t };
+}
+
 // The viewer pressed play: they are watching now, so this video counts as touched.
 export function bookmarkPlay(b: Bookmark): Bookmark {
   return b.touched ? b : { ...b, touched: true };

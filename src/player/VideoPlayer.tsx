@@ -109,6 +109,9 @@ type Props = {
   onViewerSeek?: (t: number) => void;
   onPreviewStart?: () => void;
   onPreviewEnd?: (back: number) => void;
+  // The viewer started playback from where the preview had parked the playhead: that place is
+  // now theirs. No seek is involved, so nothing is "pending" — the bookmark just takes it.
+  onPreviewTaken?: (t: number) => void;
   onTimeChange?: (t: number) => void;
   // Play/pause as the element reports it. App needs both edges for the resume position: play
   // is the viewer answering the resume offer by doing something else, and pause is a moment
@@ -687,9 +690,40 @@ const VideoPlayer = (props: Props) => {
     video.currentTime = t;
   };
 
+  // When a bar popover closes, put focus back on its trigger — but only if focus was LOST: it sat
+  // in the popover, which is gone, so it is now on <body>. Closing it dropped a keyboard user on
+  // nothing (opened with A from the resume card, then Escape: the next Space played from 0:00
+  // and threw the offer away). Mantine's returnFocus did it unconditionally, which was the
+  // opposite failure: a click on a sidebar row that also dismissed the sheet had its focus
+  // dragged back to the Appearance button, and Space then reopened the sheet. Checked a frame
+  // later, after the click that closed it has moved focus wherever it was going. If the trigger
+  // is not on screen (the collapsed fullscreen bar drops some buttons), the first visible bar
+  // control takes it instead.
+  const refocusIfLost = (selector: string) => {
+    requestAnimationFrame(() => {
+      const a = document.activeElement;
+      // Lost = on <body>, detached, or still inside a bar dropdown — Mantine keeps a closing
+      // dropdown mounted for its exit transition, so a frame later focus can still be in it,
+      // about to vanish with it.
+      const lost =
+        !a || a === document.body || !a.isConnected || !!a.closest(".ap-pop, .bar-pop, .vol-pop");
+      if (!lost) return;
+      const bar = barSizeRef.current;
+      const trigger = containerRef.current?.querySelector<HTMLElement>(selector);
+      const target =
+        trigger && trigger.getClientRects().length > 0
+          ? trigger
+          : [...(bar?.querySelectorAll<HTMLElement>(".controls > button") ?? [])].find(
+              (b) => b.getClientRects().length > 0
+            );
+      target?.focus();
+    });
+  };
+
   const handleAppearanceOpen = (open: boolean) => {
     const video = videoRef.current;
     setAppearanceOpen(open);
+    if (!open) refocusIfLost('button[aria-label^="Appearance"]');
     if (!video) return;
 
     if (open) {
@@ -1205,9 +1239,11 @@ const VideoPlayer = (props: Props) => {
               withinPortal={false}
               classNames={{ dropdown: supportsVerticalRange() ? "bar-pop vol-pop" : "bar-pop vol-pop flat" }}
               opened={volumeOpen}
-              onChange={setVolumeOpen}
+              onChange={(o) => {
+                setVolumeOpen(o);
+                if (!o) refocusIfLost('button[aria-label^="Volume"]');
+              }}
               trapFocus
-              returnFocus
             >
               {/* The tip wraps the Target, inside the Popover — never the Popover itself, which
                   is not an element: wrapped from outside, the tip had no box to anchor to and
@@ -1283,8 +1319,10 @@ const VideoPlayer = (props: Props) => {
             withinPortal={false}
             classNames={{ dropdown: "bar-pop" }}
             onOpen={() => setSpeedOpen(true)}
-            onClose={() => setSpeedOpen(false)}
-            returnFocus
+            onClose={() => {
+              setSpeedOpen(false);
+              refocusIfLost(".bar-speed");
+            }}
           >
             <Menu.Target>
               <UnstyledButton
@@ -1346,11 +1384,6 @@ const VideoPlayer = (props: Props) => {
             opened={appearanceOpen}
             onChange={handleAppearanceOpen}
             trapFocus
-            // Every popover in the bar hands focus back on close (the volume one and the speed
-            // menu too). Without it, closing dropped focus on <body>: a keyboard user who
-            // opened the sheet with A from the resume card came back to nothing, and the next
-            // Space played from 0:00 and threw the offer away.
-            returnFocus
           >
             {/* The name says what is IN the sheet. "Appearance" alone read as the app's theme,
                 and the sparkles glyph says nothing at all. */}
@@ -1446,7 +1479,18 @@ const VideoPlayer = (props: Props) => {
           if (!own) cancelPreview();
           props.onSeeked?.(t, !own);
         }}
-        onPlay={() => { handleIsPlaying.open(); props.onPlayingChange?.(true); }}
+        onPlay={() => {
+          handleIsPlaying.open();
+          // Playing while the Appearance preview has the playhead parked (Space in the sheet, a
+          // media key) is the viewer choosing to watch from HERE: the preview lets go, so
+          // closing the sheet no longer drags them back, and the bookmark takes this place.
+          const v = videoRef.current;
+          if (v && preAppearanceTimeRef.current !== null) {
+            cancelPreview();
+            props.onPreviewTaken?.(v.currentTime);
+          }
+          props.onPlayingChange?.(true);
+        }}
         onPause={() => { handleIsPlaying.close(); props.onPlayingChange?.(false); }}
         onEnded={handleVideoEnded}
         muted={isMuted}

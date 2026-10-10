@@ -9,6 +9,7 @@ import {
   bookmarkPlay,
   bookmarkPreviewStart,
   bookmarkPreviewEnd,
+  bookmarkSeeked,
   bookmarkToSave,
   type Bookmark,
 } from "./bookmark";
@@ -81,5 +82,32 @@ describe("the resume bookmark", () => {
   it("does not count the preview as the viewer touching the video", () => {
     // Opening Appearance on a video they have not played is not a place to come back to.
     expect(bookmarkToSave(run([["time", 0], ["previewStart"], ["time", 47.8], ["previewEnd", 0]]))).toBeNull();
+  });
+});
+
+describe("the resume bookmark across a seek's landing", () => {
+  it("does not freeze when the next report comes long after the landing", () => {
+    // timeupdate -> seeked -> a frame report delayed past the landing tolerance (3x speed, or a
+    // backgrounded tab throttling frame callbacks). The landing clears the pending seek, so the
+    // late report still moves the bookmark.
+    let b = run([["play"], ["time", 10], ["seek", 100]]);
+    b = bookmarkSeeked(b, 100, true);
+    b = bookmarkTime(b, 103.2);
+    expect(bookmarkToSave(b)).toBe(103.2);
+    expect(bookmarkToSave(bookmarkTime(b, 110))).toBe(110);
+  });
+
+  it("records a seek it never saw requested (media keys) when it lands", () => {
+    const b = bookmarkSeeked(run([["time", 0]]), 75, true);
+    expect(bookmarkToSave(b)).toBe(75);
+  });
+
+  it("ignores the preview's own landing, and takes the step-back's landing as arrival", () => {
+    let b = run([["seek", 30], ["time", 30], ["previewStart"]]);
+    b = bookmarkSeeked(b, 47.8, false);
+    expect(bookmarkToSave(b)).toBe(30);
+    b = bookmarkPreviewEnd(b, 30);
+    b = bookmarkSeeked(b, 30, false);
+    expect(bookmarkToSave(bookmarkTime(b, 31.5))).toBe(31.5);
   });
 });
