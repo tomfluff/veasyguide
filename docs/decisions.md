@@ -1482,15 +1482,36 @@ never persisted. Opening the moments overlay still collapses the bar, which only
 in fullscreen. Measured at 1400x900: the windowed player is 1062x737 before fullscreen and after
 leaving it, with no collapse control in the window.
 
+**Fixed in the same round: the bar still resized the player on its own** (d3d2108). Removing
+collapse left two jumps. The moment lane and the now-line mounted only once the analysis had
+found a moment, and the now-line wrapped onto more lines as its text grew. The windowed bar is
+in flow and the width cap subtracts `--bar-h`, so each of these resized the player while the
+viewer was watching. Now the lane and a single now-line render from the first frame. The
+now-line reads "Looking for moments…" before any moment, and "No annotation moments found…"
+once an analysis finishes empty; the separate empty-state line is merged into it. The now-line
+is held to one line (`nowrap` and an ellipsis on the sentence, in CSS only, so its
+`role="status"` still announces the full text). The empty lane is `aria-hidden`. Previous and
+Next are always rendered, disabled until there is a moment, so their arrival cannot wrap the
+controls row.
+
+Bar height over a whole session (analysis, playback, magnifier, speed), before and after, on a
+clip with moments: 1400px wide, 81 then 140px became a constant 140px; 800px, 81 then 140 became
+140; 560px, 128 then 187 became 187; 400px, 128 then 259 then 234 became 234. A clip with no
+moments holds 140px and 234px. The price is that the player is sized for the full bar from the
+start, so before the first moment the picture is smaller than it was, and it no longer grows
+and then shrinks. The truncation applies only where wrapping actually changed the height:
+it did at 400px, and wider windows never truncate. Also fixed on the way: "1 moments so far"
+now reads "1 moment".
+
 **Still open.**
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
 - Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
   nav, not the player, and is in TODOS.md.
-- The windowed bar's height can still change once by itself: when the moment lane and now-line
-  first appear during analysis, and possibly when the now-line text wraps differently at narrow
-  widths. Each change resizes the player through `--bar-h`. To be measured.
+- At narrow windows the now-line's sentence is cut off with an ellipsis (measured at 400px; it
+  never truncates on wider windows). A screen reader still gets the whole sentence, but a sighted
+  viewer at that width, often someone zoomed in, does not.
 
 ---
 
