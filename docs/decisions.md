@@ -752,6 +752,9 @@ already fixed once ("keyboard-only, state invisible"). At 1× it is a bare icon;
 it goes amber with the rate, the same state language as the magnifier toggle and the NOW
 mark.
 
+*Later (D34):* the rate is now always shown, "1×" included, in a fixed-width button, so a rate
+change cannot wrap the bar. Off-default still goes amber.
+
 ---
 
 ## D25 — The typecheck was checking nothing, and it was hiding a dead feature
@@ -1369,7 +1372,8 @@ Moments file buttons opens the picker and leaves the video paused.
 never hides. In fullscreen it overlays the picture as before, but it now auto-hides even while
 paused, and it starts collapsed. Collapse exists only in fullscreen: the windowed bar is always
 expanded, and leaving fullscreen returns it to expanded. That last part was revised within the
-round (c1785ae); see "Revised: no collapse in the window" below.
+round (c1785ae); see "Revised: no collapse in the window" below. The bar's contents were then
+cut to one slim row (D34), which is what finally made its height stop depending on its width.
 
 **What was wrong.** A user reported that the bar covered the bottom of the video. On a lecture,
 that is where the instructor writes last, at the foot of the slide, so the bar masked the
@@ -1391,7 +1395,8 @@ now-line into the sidebar was weighed as another way back and rejected (below), 
 accepted, not pending. The 832px is exact arithmetic for a 139.8px bar. It has to be re-checked
 once the feedback loop under Still open is fixed, because the loop makes the bar taller than
 that on some windows. After the fix (eaceeb5, below) the cap subtracts a constant 140px, which
-gives the same 832px by arithmetic; not yet re-measured.
+gives the same 832px by arithmetic. D34 then cut the constant to an 89px bar, which by arithmetic
+gives about 923px at 1366x768; not yet measured.
 
 **Why fullscreen still overlays.** In fullscreen the video fills the screen. Making room for the
 bar means shrinking the video, and doing that only while the bar shows re-lays out the picture
@@ -1589,22 +1594,21 @@ blocked the idle hide, so clicking the Fullscreen button parked focus on "Exit f
 the bar stayed up for good. Now only `:focus-visible` focus blocks it, plus an open Appearance
 sheet or speed menu, which live inside the bar. Not yet re-measured independently.
 
+**Closed by D34.** Two items that were open here were settled by the owner after trying cd5a242.
+The empty space reserved under the now-line at narrow widths (393px of bar at 320px wide) is gone
+with the now-line itself (482f7eb). The two-row controls on short windows, where the owner was
+to choose between a pillarboxed video and accepting two rows, no longer happen: the slimmer bar
+fits one row down to a 486px player, and every desktop size measured is one row (1605098).
+
 **Still open.**
-- **On short windows the controls wrap to two rows.** There the video is 533-622px wide, narrower
-  than the one-row control set (about 672px). Pending the owner's decision between a full-column
-  bar with the video pillarboxed, and accepting two rows.
-- The cap now assumes a one-row, 140px bar. Where the bar is taller (222-393px at 560px wide and
-  below), the video and bar together are taller than the cap allows for. Whether that makes the
-  page scroll at those sizes has not been measured.
+- The cap assumes a one-row bar (89px since D34). Where the bar still wraps (121px at 400px wide,
+  153px at 320px), the video and bar together are taller than the cap allows for. Whether that
+  makes the page scroll at those sizes has not been measured.
 - `.preparing` in App.css still reserves a 16:9 box with no room for the bar, so the page grows
   by the bar's height when the player replaces it. It grows downward and does not shift what the
   viewer was looking at, but it is a jump.
 - Horizontal page scroll at 320px and 800px wide. It predates this entry; it comes from the top
   nav, not the player, and is in TODOS.md.
-- At narrow widths the bar reserves the now-line's worst case, so under a short sentence there
-  is empty space: the bar is 393px tall at 320px wide. Pending the owner's decision after trying
-  cd5a242. One option on the table is to drop the visible now-line altogether and keep only its
-  screen-reader announcement. Whatever is chosen, clipping the text again is ruled out (above).
 
 ---
 
@@ -1704,3 +1708,70 @@ the 10s start edge working as designed.
   cleared site data starts at 0:00, with no offer.
 - The key is `videoKey` (size, duration, frame size), the same as the cache. Two different files
   that match on all of these would share a position. The cache already accepts that collision.
+
+---
+
+## D34 — The bar is one slim row: no visible status line, 28px buttons
+
+**Decision** (482f7eb, 1605098; the owner's call on both). The now-line, the sentence under the
+scrubber that said what the current moment is ("Moment 4 of 31 · most of the slide · Next at
+12:40"), is no longer shown. Its announcement stays, as a visually hidden `role="status"`. The
+bar's buttons go from 44px to 28px, and volume moves from an always-visible slider into a
+popover. The bar is now one row at every desktop size measured.
+
+**The owner's words, after trying cd5a242:** "Remove this, I think it makes things bad." Earlier
+he had said that low-vision viewers cannot read the line well anyway.
+
+**Why the now-line went.**
+- It cost a row. In the windowed player the bar's height comes off the picture (D32), so every
+  row of bar is a strip of lecture the viewer does not get.
+- It made the bar's height depend on how its sentence wrapped. That dependency fed D32's width
+  cap loop, and cd5a242's worst-case sizers existed only to fight it, at the price of empty
+  space on narrow windows.
+- It repeated what is already on screen: the lit mark in the moment lane, the current row in the
+  moments list, the timecode, and the magnifier button's amber state.
+
+**What is kept.** The same sentence, the magnifier state and "Next at" go into a visually hidden
+`role="status"`, mounted from the first frame so it is announced (a live region inserted with
+its content is not, D33). It is now announced in fullscreen with the bar collapsed too. Before,
+the collapsed bar hid the line with `display: none`, which also silenced it for screen readers,
+a bug nobody had reported. "No moments found" moves to the moments list's empty state, and the
+position readout stops repeating it.
+
+**Why 28px buttons, and what that gives up.** The owner set the sizes. Buttons go from 44px to
+28px and icons from 22px to 20px. 28px meets WCAG 2.5.8 (Target Size, Minimum, AA, 24px). It
+gives up 2.5.5 (Target Size, Enhanced, AAA, 44px), deliberately. The code comments say "28px by
+the owner's call; 2.5.8 AA met", so a later reader does not mistake it for an oversight. The
+people this hurts most are those with tremor or low motor precision, and those using a
+magnifier at a high zoom, where a small target is also a small thing to find. The trade is
+picture size, which the low-vision reader needs as much.
+- The row gap goes from 3px to 4px. The focus ring reaches 5px out and the icon sits 4px inside
+  its button, so 4px keeps one button's ring off its neighbour's icon.
+- The pin caption and the bar's bottom padding are 6px, so `overflow: hidden` or the screen edge
+  cannot clip a focus ring.
+- The scrubber's hit zone and the moment marks' hit areas are unchanged.
+
+**Volume becomes a popover.** The 84px slider was always visible, and it was made that way on
+purpose, because the usual hover-to-reveal slider is unreachable by keyboard and vanishes under
+a magnifier user's pointer. The popover opens on click, Enter or Space, never on hover, so that
+reason still holds. It holds a vertical native range and Mute. M still mutes, and the button has
+a "Volume" tip (D31).
+
+**Speed is a fixed width and always shows its rate**, "1×" included, where D24 showed the rate
+only when it was off-default.
+- Rejected: auto width. A rate change would change the button's width, which could wrap the row
+  and resize the player, the jump D32 spent the round removing.
+- Rejected: hiding "1×" in a fixed-width button. The room would be reserved anyway and sit empty.
+
+**Numbers** (code-lead's). One row of controls now fits down to a 486px player; before, it
+needed about 672px. The one-row bar is 89px, and D32's width cap subtracts that constant (it was
+140px, then 103px after the now-line went). At 1280x600 at DPR 1.5 the video went from 533px
+wide (eaceeb5) to 599px (482f7eb) to 624px (1605098). Bar height at 1400, 560, 400 and 320px
+wide: 89, 89, 121 and 153px, against 140, 222, 312 and 393px with the now-line's reserved space.
+<!-- TODO(verify-lead): independent re-measure. -->
+
+**Still open.**
+- Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32 has
+  the unmeasured question of whether that makes the page scroll.
+- 2.5.5 AAA is given up, as above. If testing with motor-impaired or high-zoom users shows the
+  28px targets are a problem, that is the decision to revisit.
