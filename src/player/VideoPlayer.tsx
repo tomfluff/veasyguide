@@ -221,6 +221,8 @@ const VideoPlayer = (props: Props) => {
   const chromeTimeRef = useRef(-1);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [volumeOpen, setVolumeOpen] = useState(false);
+  // Tracked only so the resume card knows when to step under the bar (see .resume-slot).
+  const [speedOpen, setSpeedOpen] = useState(false);
   const [previewJumped, setPreviewJumped] = useState(false);
   // For the "Magnifier on · 1.7×" chip; same 1 + strength display the Appearance sheet uses.
   const zoomStrength = useMagnificationSettingsStore((s) => s.zoom_strength);
@@ -961,9 +963,14 @@ const VideoPlayer = (props: Props) => {
           picture's box: the whole container less the bar where the bar sits below it
           (windowed), the whole container in fullscreen, where the bar overlays. */}
       <Box
-        className="resume-slot"
+        className={classNames("resume-slot", {
+          // Over the bar only where the bar can cover it (fullscreen), and never while one of the
+          // bar's own popovers is open: those live inside the bar's layer, and a card above it
+          // covered half the Appearance sheet, the volume range and the speed menu at 320px.
+          "over-bar": isFullscreen && !appearanceOpen && !volumeOpen && !speedOpen,
+        })}
         role="status"
-        // Fullscreen: the whole picture, and the card stacks ABOVE the bar (player.css). Under it,
+        // Fullscreen: the whole picture, and the card stacks ABOVE the bar (.over-bar). Under it,
         // a tall expanded bar (1280x720 at 400%: 122px of a 180px screen) covered both buttons;
         // stopping the card's area above the bar instead left 53px, too little for the card at
         // all. Over the bar, the offer is always answerable; at any ordinary size the centred
@@ -1271,7 +1278,13 @@ const VideoPlayer = (props: Props) => {
               it also turns amber. It used to show only off 1×, to keep the bar narrow, but the
               button now holds a fixed width for the widest rate (a width that changed with the
               rate could wrap the row — player.css), so at 1× that room would sit empty. */}
-          <Menu position="top" withinPortal={false} classNames={{ dropdown: "bar-pop" }}>
+          <Menu
+            position="top"
+            withinPortal={false}
+            classNames={{ dropdown: "bar-pop" }}
+            onOpen={() => setSpeedOpen(true)}
+            onClose={() => setSpeedOpen(false)}
+          >
             <Menu.Target>
               <UnstyledButton
                 className={classNames("collapse-end", "bar-speed", { on: playbackRate !== 1 })}

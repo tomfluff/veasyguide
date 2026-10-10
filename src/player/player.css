@@ -949,11 +949,13 @@
 
 /* The resume offer (D33): a card centred on the video, over the picture, so it moves nothing.
    The slot is the always-mounted live region; it takes no clicks itself, so outside the card the
-   video behaves as ever. Above the pinned snapshot (35), the fullscreen moments list (40) AND
-   the control bar (50): in fullscreen the bar overlays the picture, and at 1280x720 and 400% zoom
-   an expanded bar is two-thirds of the screen — under it the card's buttons could not be clicked
-   at all. Windowed the slot ends above the bar, so the two never meet; in fullscreen the card
-   covers part of the bar only at that extreme, and only until it is answered. A near-opaque dark
+   video behaves as ever. Above the pinned snapshot (35) and the fullscreen moments list (40),
+   under the control bar (50) — whose popovers (Appearance, volume, speed) live in its layer and
+   must draw over the card. In FULLSCREEN, though, the bar overlays the picture, and at 1280x720
+   and 400% zoom an expanded bar is two-thirds of the screen: under it the card's buttons could
+   not be clicked at all. So there, and only while none of those popovers is open, the card
+   rises above the bar (.over-bar), covering part of it only at that extreme and only until
+   answered. Windowed the slot ends above the bar, so the two never meet. A near-opaque dark
    card with an amber edge, so it reads the same on a white slide and a black one. At a 320px-wide
    window it may cover much of a 180px-tall picture, but it never leaves it: capped to its area
    and scrolling inside if it must. */
@@ -962,13 +964,14 @@
   top: 0;
   left: 0;
   right: 0; /* bottom: inline, the bar's height when it sits below the picture */
-  z-index: 55;
+  z-index: 45;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 8px;
   pointer-events: none;
 }
+.resume-slot.over-bar { z-index: 55; }
 .resume-card {
   pointer-events: auto;
   max-width: min(26rem, 100%);
