@@ -471,7 +471,7 @@ const VideoPlayer = (props: Props) => {
     // asked for. The Prev/Next BUTTONS reveal it themselves (below) — they live in the bar, so
     // it must not vanish out from under the cursor that is clicking them.
     const seekTo = seekTargetFor(target, props.selectOpts.lead);
-    video.currentTime = seekTo;
+    viewerSeek(video, seekTo);
     // Keep the chrome in step immediately rather than waiting for the next presented frame,
     // so the status and the lit mark move with the key rather than a beat behind it.
     chromeTimeRef.current = seekTo;
@@ -650,6 +650,23 @@ const VideoPlayer = (props: Props) => {
   // showing, jump to the nearest one, and step back to where the viewer was when they close.
   // Never move the playhead while the video is playing: that would be the app yanking them
   // out of the lecture.
+  // Every seek the VIEWER makes goes through here. If the Appearance preview has parked the
+  // playhead on a moment, the viewer moving it is them choosing a place, so the preview lets go
+  // first — synchronously, before the seek. It used to let go on `seeked`, which is too late: a
+  // click on the scrubber is also an outside-click that closes the sheet, the close restored
+  // the pre-preview time before `seeked` arrived, and the viewer's seek was undone (and the
+  // bookmark kept the old place). Same race for ] followed quickly by Escape.
+  const cancelPreview = () => {
+    if (preAppearanceTimeRef.current === null) return;
+    preAppearanceTimeRef.current = null;
+    setPreviewJumped(false);
+    props.onPreviewJump?.(null);
+  };
+  const viewerSeek = (video: HTMLVideoElement, t: number) => {
+    cancelPreview();
+    video.currentTime = t;
+  };
+
   const handleAppearanceOpen = (open: boolean) => {
     const video = videoRef.current;
     setAppearanceOpen(open);
@@ -662,7 +679,15 @@ const VideoPlayer = (props: Props) => {
           stepMoment(props.activities, video.currentTime, props.selectOpts.lead, -1);
         if (target) {
           preAppearanceTimeRef.current = video.currentTime;
-          const t = seekTargetFor(target, props.selectOpts.lead) + props.selectOpts.lead + 0.2;
+          // Clamped inside the moment and the video: a moment in the last fraction of a second
+          // would put the target past the end, the browser would clamp the seek, and the
+          // landing time would no longer match ownSeekRef — the player's own preview jump
+          // would then count as the viewer's, dismissing the resume offer.
+          const end = Math.min(target.end, (video.duration || totalTime) - 0.05);
+          const t = Math.max(
+            target.start,
+            Math.min(end, seekTargetFor(target, props.selectOpts.lead) + props.selectOpts.lead + 0.2)
+          );
           ownSeekRef.current = t;
           video.currentTime = t;
           setPreviewJumped(true);
@@ -791,7 +816,7 @@ const VideoPlayer = (props: Props) => {
     // a seek jumped from wherever the state last was (measured: 30s → 0s).
     const oldValue = video.currentTime;
     const newValue = Math.max(0, Math.min(totalTime, oldValue + shift));
-    video.currentTime = newValue;
+    viewerSeek(video, newValue);
 
     if (oldValue < newValue) {
       clearForwardShiftTimeout();
@@ -811,8 +836,12 @@ const VideoPlayer = (props: Props) => {
     const video = videoRef.current;
     const timeline = timelineContainerRef.current;
     if (!video || !timeline || !props.canPlay) return;
-    const timelineWidth = timeline.clientWidth || 1;
-    video.currentTime = (timelineX / timelineWidth) * video.duration;
+    // From the event, not from useMouse's `timelineX`: that is state, updated on mousemove and
+    // read here from the last render, so a quick move-and-click (or a click with no move over
+    // the strip at all) seeked to wherever the pointer USED to be — 0:00, measured.
+    const rect = timeline.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (event.clientX - rect.left) / (rect.width || 1)));
+    viewerSeek(video, frac * video.duration);
   };
 
   const handleZoom = () => {
@@ -849,7 +878,7 @@ const VideoPlayer = (props: Props) => {
       props.seekFnRef.current = (t: number, play?: boolean) => {
         const v = videoRef.current;
         if (!v) return;
-        v.currentTime = t;
+        viewerSeek(v, t);
         if (play && props.canPlay) void v.play();
       };
     }
@@ -939,10 +968,10 @@ const VideoPlayer = (props: Props) => {
               handleTimeShift(e.key === "ArrowLeft" ? -5 : 5);
             } else if (e.key === "Home") {
               e.preventDefault();
-              video.currentTime = 0;
+              viewerSeek(video, 0);
             } else if (e.key === "End") {
               e.preventDefault();
-              video.currentTime = totalTime;
+              viewerSeek(video, totalTime);
             }
           }}
         >
@@ -1013,7 +1042,7 @@ const VideoPlayer = (props: Props) => {
                   onClick={() => {
                     const v = videoRef.current;
                     if (!v || !props.canPlay) return;
-                    v.currentTime = seekTargetFor(m.activities[0], props.selectOpts.lead);
+                    viewerSeek(v, seekTargetFor(m.activities[0], props.selectOpts.lead));
                     void v.play(); // a jump is "go watch this" — landing paused costs a second click
                   }}
                 />
@@ -1320,11 +1349,10 @@ const VideoPlayer = (props: Props) => {
           // preset button, a click on the lane) has chosen a place: the preview must not drag
           // them back to where they were when they opened the sheet, and a save must record
           // where they went, not that old place.
-          if (!own && preAppearanceTimeRef.current !== null) {
-            preAppearanceTimeRef.current = null;
-            setPreviewJumped(false);
-            props.onPreviewJump?.(null);
-          }
+          // (A backstop only: every viewer seek path already let go of the preview, synchronously,
+          // in viewerSeek. This catches a seek from somewhere that does not — the browser's own
+          // media keys, say.)
+          if (!own) cancelPreview();
           props.onSeeked?.(t, !own);
         }}
         onPlay={() => { handleIsPlaying.open(); props.onPlayingChange?.(true); }}
@@ -1505,7 +1533,7 @@ const VideoPlayer = (props: Props) => {
           onJump={(t) => {
             const v = videoRef.current;
             if (!v || !props.canPlay) return;
-            v.currentTime = t;
+            viewerSeek(v, t);
             void v.play();
           }}
           style={{ bottom: barHeight + 24, maxHeight: `calc(100% - ${barHeight + 48}px)` }}
