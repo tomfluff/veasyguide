@@ -1668,6 +1668,13 @@ itself; near the wrap threshold, a 1.8px narrowing could have tipped the bar int
 stuck. `--bar-one-row` is now read from the DOM at the one-row check itself, and never while in
 fullscreen.
 
+Re-measured independently, frame by frame through a fullscreen round trip with the bar expanded
+to 90px: at 1366x768 the video goes straight from 1366px (fullscreen) to 992, and at 1366x650
+from 1366 to 782.2, with no frame in between, and `--bar-one-row` stays 89px. A case within 1.8px
+of the wrap threshold was not constructed. At a 20px browser font the one width change before the
+first frame (above) is gone too: the video is 970.7px from its first measured frame, with
+`--bar-one-row` at 96px.
+
 **Closed by D35.** The horizontal page scroll at 320px and 800px wide, which predates this entry
 and came from the top bar rather than the player, is fixed there (cb3c512).
 
@@ -1777,7 +1784,8 @@ the 10s start edge working as designed.
 Pressing ] from inside the Appearance sheet was undone when the sheet closed, and leaving then
 saved the position from before the preview (`{t: 30}`) instead of the moment the viewer had
 stepped to (52.8s). A seek by the viewer during a preview now cancels the preview's restore, and
-the stored entry is `{t: 52.8}`.
+the stored entry is `{t: 52.8}`. Re-measured independently: paused at 30s, the preview jumps to
+47.8s, ] goes to 52.8s, and leaving stores `{t: 52.8}`.
 
 **Still open.**
 
@@ -1901,6 +1909,14 @@ and the keys work.
   re-read the whole moment sentence on every Z, and turning the magnifier off said nothing about
   it. It now says "Magnifier on, N times." or "Magnifier off.", and announces strength changes
   only while it is on.
+
+Re-measured independently. Paused, seeking from 87s to 100s and back to 88s gave two moment
+announcements, on entering and on re-entering, both "Moment 8 of 36…". Playing at 4x over 77s
+gave exactly 6 updates for 6 moment starts, windowed and in fullscreen, at least 480ms apart. The
+magnifier's region is a second `role="status"`: Z gave "Magnifier on, 1.5 times.", ↑ gave
+"Magnifier on, 1.6 times.", and Z again "Magnifier off.", with no change at all to the moment
+region throughout. **Not measured:** re-entry while playing, a backfill renumbering staying
+quiet, and strength changes staying silent while the magnifier is off.
 
 **The moment marks stay under 24px, on purpose.** The lane's marks are 8-23px wide by 14px tall,
 under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent exception: every
