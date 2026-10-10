@@ -1619,7 +1619,8 @@ The video and the moments list are now one centred block.
 Video width before (1605098) and after: 1920x960, 1222 to 1333px; 2048x1030, 1222 to 1458;
 1707x840, 1051 to 1120; 1600x700, 802 to 871; 1366x650, 713 to 782; 1280x600 at DPR 1.5, 624 to
 693. The owner's 1333x750 at DPR 1.5 gives 960. In every case the player ends 24px above the
-footer. Over the whole round, at 1366x650: 477px with the loop, 622 after eaceeb5, 688 without
+footer. Over the whole round, at a 1366x650 viewport (what a 1366x768 screen leaves
+after the browser's own chrome): 477px with the loop, 622 after eaceeb5, 688 without
 the now-line, 713 with the 28px bar, and 782 with the measured chrome. These are code-lead's
 numbers; an independent re-measure is pending.
 
