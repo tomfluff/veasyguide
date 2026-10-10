@@ -24,8 +24,12 @@ import { PlayerTipRoot } from "./tipRoot";
 
 type Props = {
   label: string;
-  // The single key that operates this control, as printed on the keycap.
-  hotkey: string;
+  // The key that operates this control, as printed on the keycap; none for a control without
+  // one (collapse/expand).
+  hotkey?: string;
+  // Show the key even with single-key shortcuts off. For Space: it is not a character key, so
+  // the switch never turns it off (WCAG 2.1.4), and hiding it would hide a key that works.
+  alwaysKey?: boolean;
   // While the control's own popover or overlay is open: a tip floating over the thing it
   // describes is in the way of the thing it describes.
   disabled?: boolean;
@@ -37,7 +41,7 @@ type Props = {
   children: ReactElement;
 };
 
-export default function PlayerTip({ label, hotkey, disabled, children }: Props) {
+export default function PlayerTip({ label, hotkey, alwaysKey, disabled, children }: Props) {
   const root = useContext(PlayerTipRoot);
   const letters = useViewSettingsStore((s) => s.letterShortcuts);
   return (
@@ -45,7 +49,7 @@ export default function PlayerTip({ label, hotkey, disabled, children }: Props) 
       label={
         <>
           {label}
-          {letters && <kbd>{hotkey}</kbd>}
+          {hotkey && (letters || alwaysKey) && <kbd>{hotkey}</kbd>}
         </>
       }
       events={{ hover: true, focus: true, touch: false }}

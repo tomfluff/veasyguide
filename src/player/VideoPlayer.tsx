@@ -1309,37 +1309,48 @@ const VideoPlayer = (props: Props) => {
               and a hard disabled would throw keyboard focus somewhere else the moment the
               gate lifts. This way AT hears "dimmed" instead of a button that eats presses
               silently. */}
-          <UnstyledButton
-            onClick={handlePlayPause}
-            onKeyDown={stopPlayerHotkeys}
-            aria-label={isPlaying ? "Pause" : "Play"}
-            aria-disabled={!props.canPlay || undefined}
-          >
-            {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
-          </UnstyledButton>
+          {/* Every control in the bar names itself on hover and focus with the same tip (D31), and
+              none uses the browser's own `title` any more: that one is small system text that
+              ignores zoom, arrives late, never shows on focus, and was reported missing on
+              Windows. The tip's words are where each aria-label starts (WCAG 2.5.3). */}
+          <PlayerTip label={isPlaying ? "Pause" : "Play"} hotkey="Space" alwaysKey disabled={barHidden}>
+            <UnstyledButton
+              onClick={handlePlayPause}
+              onKeyDown={stopPlayerHotkeys}
+              aria-label={isPlaying ? "Pause" : "Play"}
+              aria-keyshortcuts="Space"
+              aria-disabled={!props.canPlay || undefined}
+            >
+              {isPlaying ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
+            </UnstyledButton>
+          </PlayerTip>
           {/* Always rendered, dimmed until there is a moment to step to: two buttons
               appearing mid-analysis could push the row to wrap on a narrow window, which is the
               same resize the lane above no longer causes. */}
-          <UnstyledButton
-            className="collapse-hide"
-            onClick={() => { showControls(); handleStepMoment(-1); }}
-            onKeyDown={stopPlayerHotkeys}
-            disabled={!props.canPlay || props.activities.length === 0}
-            aria-label="Previous moment"
-            title="Previous moment ( [ )"
-          >
-            <IconPlayerTrackPrevFilled />
-          </UnstyledButton>
-          <UnstyledButton
-            className="collapse-hide"
-            onClick={() => { showControls(); handleStepMoment(1); }}
-            onKeyDown={stopPlayerHotkeys}
-            disabled={!props.canPlay || props.activities.length === 0}
-            aria-label="Next moment"
-            title="Next moment ( ] )"
-          >
-            <IconPlayerTrackNextFilled />
-          </UnstyledButton>
+          <PlayerTip label="Previous moment" hotkey="[" disabled={barHidden}>
+            <UnstyledButton
+              className="collapse-hide"
+              onClick={() => { showControls(); handleStepMoment(-1); }}
+              onKeyDown={stopPlayerHotkeys}
+              disabled={!props.canPlay || props.activities.length === 0}
+              aria-label="Previous moment"
+              aria-keyshortcuts={letterShortcuts ? "[" : undefined}
+            >
+              <IconPlayerTrackPrevFilled />
+            </UnstyledButton>
+          </PlayerTip>
+          <PlayerTip label="Next moment" hotkey="]" disabled={barHidden}>
+            <UnstyledButton
+              className="collapse-hide"
+              onClick={() => { showControls(); handleStepMoment(1); }}
+              onKeyDown={stopPlayerHotkeys}
+              disabled={!props.canPlay || props.activities.length === 0}
+              aria-label="Next moment"
+              aria-keyshortcuts={letterShortcuts ? "]" : undefined}
+            >
+              <IconPlayerTrackNextFilled />
+            </UnstyledButton>
+          </PlayerTip>
           {/* Volume: a button that opens a vertical slider, not a slider always in the row. The
               always-visible horizontal slider cost the row 92px (Yotam asked for it out, D32).
               It once expanded on HOVER, which hid it from keyboard, screen-reader and touch
@@ -1438,17 +1449,20 @@ const VideoPlayer = (props: Props) => {
               refocusIfLost(".bar-speed", ".bar-pop:not(.vol-pop)");
             }}
           >
-            <Menu.Target>
-              <UnstyledButton
-                className={classNames("collapse-end", "bar-speed", { on: playbackRate !== 1 })}
-                onKeyDown={stopPlayerHotkeys}
-                aria-label={`Playback speed: ${playbackRate}×`}
-                title={`Playback speed: ${playbackRate}×`}
-              >
-                <IconGauge />
-                <span className="bar-speed-v">{playbackRate}×</span>
-              </UnstyledButton>
-            </Menu.Target>
+            {/* Outside the Target, as with every popover trigger (PlayerTip on the order). */}
+            <PlayerTip label="Playback speed" hotkey="< >" disabled={speedOpen || barHidden}>
+              <Menu.Target>
+                <UnstyledButton
+                  className={classNames("collapse-end", "bar-speed", { on: playbackRate !== 1 })}
+                  onKeyDown={stopPlayerHotkeys}
+                  aria-label={`Playback speed: ${playbackRate}×`}
+                  aria-keyshortcuts={letterShortcuts ? "Shift+< Shift+>" : undefined}
+                >
+                  <IconGauge />
+                  <span className="bar-speed-v">{playbackRate}×</span>
+                </UnstyledButton>
+              </Menu.Target>
+            </PlayerTip>
             <Menu.Dropdown onKeyDown={stopPlayerHotkeys}>
               {RATES.map((r) => (
                 <Menu.Item
@@ -1466,31 +1480,35 @@ const VideoPlayer = (props: Props) => {
               it unreachable on touch and its STATE invisible — the core user toggled it off
               by accident and diagnosed a black screen for thirty seconds. aria-pressed and
               the amber pressed style are the always-visible answer to "is it on?". */}
-          <UnstyledButton
-            className={classNames("collapse-end", "zoom-toggle", { on: isZoomIn })}
-            onClick={() => { showControls(); handleZoom(); }}
-            onKeyDown={stopPlayerHotkeys}
-            aria-label={isZoomIn ? "Stop magnifying" : "Magnify the highlighted area"}
-            aria-pressed={isZoomIn}
-            aria-disabled={!isZoomIn && !stableActivity ? true : undefined}
-            title={isZoomIn ? "Stop magnifying (Z)" : "Magnify (Z)"}
-          >
-            <IconZoomInAreaFilled />
-          </UnstyledButton>
+          <PlayerTip label={isZoomIn ? "Stop magnifying" : "Magnify"} hotkey="Z" disabled={barHidden}>
+            <UnstyledButton
+              className={classNames("collapse-end", "zoom-toggle", { on: isZoomIn })}
+              onClick={() => { showControls(); handleZoom(); }}
+              onKeyDown={stopPlayerHotkeys}
+              aria-label={isZoomIn ? "Stop magnifying" : "Magnify the highlighted area"}
+              aria-keyshortcuts={letterShortcuts ? "Z" : undefined}
+              aria-pressed={isZoomIn}
+              aria-disabled={!isZoomIn && !stableActivity ? true : undefined}
+            >
+              <IconZoomInAreaFilled />
+            </UnstyledButton>
+          </PlayerTip>
           {/* Pin: keep the last-written ink readable while the lecture moves on. The core
               user reads at a third of normal speed — this is her time to read, decoupled
               from the instructor's time to talk. */}
-          <UnstyledButton
-            className={classNames("collapse-end", "zoom-toggle", { on: !!pinned })}
-            onClick={() => { showControls(); handlePin(); }}
-            onKeyDown={stopPlayerHotkeys}
-            aria-label={pinned ? "Dismiss the pinned snapshot" : "Pin a snapshot of the latest writing"}
-            aria-pressed={!!pinned}
-            aria-disabled={!pinned && !lastEndFrameRef.current && !insideMomentRef.current ? true : undefined}
-            title={pinned ? "Dismiss pinned snapshot (P)" : "Pin the latest writing (P)"}
-          >
-            <IconPinFilled />
-          </UnstyledButton>
+          <PlayerTip label={pinned ? "Dismiss snapshot" : "Pin snapshot"} hotkey="P" disabled={barHidden}>
+            <UnstyledButton
+              className={classNames("collapse-end", "zoom-toggle", { on: !!pinned })}
+              onClick={() => { showControls(); handlePin(); }}
+              onKeyDown={stopPlayerHotkeys}
+              aria-label={pinned ? "Dismiss snapshot" : "Pin snapshot of the latest writing"}
+              aria-keyshortcuts={letterShortcuts ? "P" : undefined}
+              aria-pressed={!!pinned}
+              aria-disabled={!pinned && !lastEndFrameRef.current && !insideMomentRef.current ? true : undefined}
+            >
+              <IconPinFilled />
+            </UnstyledButton>
+          </PlayerTip>
           <Popover
             position="top-end"
             withinPortal={false}
@@ -1543,25 +1561,30 @@ const VideoPlayer = (props: Props) => {
           )}
           {/* collapse-end: the controls that stay to the RIGHT of the scrubber when the bar
               collapses to a single line. See the Collapsed block in player.css. */}
-          <UnstyledButton
-            className="collapse-end"
-            onClick={handleFullscreen}
-            aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-          >
-            {isFullscreen ? <IconMaximizeOff /> : <IconMaximize />}
-          </UnstyledButton>
+          <PlayerTip label={isFullscreen ? "Exit fullscreen" : "Fullscreen"} hotkey="F" disabled={barHidden}>
+            <UnstyledButton
+              className="collapse-end"
+              onClick={handleFullscreen}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              aria-keyshortcuts={letterShortcuts ? "F" : undefined}
+            >
+              {isFullscreen ? <IconMaximizeOff /> : <IconMaximize />}
+            </UnstyledButton>
+          </PlayerTip>
           {/* Fullscreen only, like collapsing itself (D32): windowed, a shorter bar meant a
               resized player. */}
           {isFullscreen && (
-            <UnstyledButton
-              className="collapse-end"
-              onClick={() => handleCollapsed.toggle()}
-              onKeyDown={stopPlayerHotkeys}
-              aria-label={collapsed ? "Expand controls" : "Collapse controls"}
-              aria-expanded={!collapsed}
-            >
-              {collapsed ? <IconChevronUp /> : <IconChevronDown />}
-            </UnstyledButton>
+            <PlayerTip label={collapsed ? "Expand controls" : "Collapse controls"} disabled={barHidden}>
+              <UnstyledButton
+                className="collapse-end"
+                onClick={() => handleCollapsed.toggle()}
+                onKeyDown={stopPlayerHotkeys}
+                aria-label={collapsed ? "Expand controls" : "Collapse controls"}
+                aria-expanded={!collapsed}
+              >
+                {collapsed ? <IconChevronUp /> : <IconChevronDown />}
+              </UnstyledButton>
+            </PlayerTip>
           )}
         </Group>
       </Box>
@@ -1762,9 +1785,16 @@ const VideoPlayer = (props: Props) => {
                 <IconLayoutDistributeHorizontal size={20} />
               </UnstyledButton>
             </PlayerTip>
-            <UnstyledButton aria-label="Dismiss pinned snapshot" onClick={handleUnpin} onKeyDown={stopPlayerHotkeys}>
-              <IconX size={20} />
-            </UnstyledButton>
+            <PlayerTip label="Dismiss snapshot" hotkey="P">
+              <UnstyledButton
+                aria-label="Dismiss snapshot"
+                aria-keyshortcuts={letterShortcuts ? "P" : undefined}
+                onClick={handleUnpin}
+                onKeyDown={stopPlayerHotkeys}
+              >
+                <IconX size={20} />
+              </UnstyledButton>
+            </PlayerTip>
           </Box>
         </Box>
       )}
