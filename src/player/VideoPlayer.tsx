@@ -703,14 +703,15 @@ const VideoPlayer = (props: Props) => {
   // later, after the click that closed it has moved focus wherever it was going. If the trigger
   // is not on screen (the collapsed fullscreen bar drops some buttons), the first visible bar
   // control takes it instead.
-  const refocusIfLost = (selector: string) => {
+  const refocusIfLost = (selector: string, dropdown: string) => {
     requestAnimationFrame(() => {
       const a = document.activeElement;
-      // Lost = on <body>, detached, or still inside a bar dropdown — Mantine keeps a closing
-      // dropdown mounted for its exit transition, so a frame later focus can still be in it,
-      // about to vanish with it.
-      const lost =
-        !a || a === document.body || !a.isConnected || !!a.closest(".ap-pop, .bar-pop, .vol-pop");
+      // Lost = on <body>, detached, or still inside THIS popover's dropdown — Mantine keeps a
+      // closing dropdown mounted for its exit transition, so a frame later focus can still be
+      // in it, about to vanish with it. Only this one: focus in ANOTHER open popover (speed
+      // menu open, then A opens the Appearance sheet, which closes the menu) is where the
+      // viewer is working, and pulling it back to the speed button threw them out of the sheet.
+      const lost = !a || a === document.body || !a.isConnected || !!a.closest(dropdown);
       if (!lost) return;
       const bar = barSizeRef.current;
       const trigger = containerRef.current?.querySelector<HTMLElement>(selector);
@@ -763,7 +764,7 @@ const VideoPlayer = (props: Props) => {
   const handleAppearanceOpen = (open: boolean) => {
     const video = videoRef.current;
     setAppearanceOpen(open);
-    if (!open) refocusIfLost('button[aria-label^="Appearance"]');
+    if (!open) refocusIfLost('button[aria-label^="Appearance"]', ".ap-pop");
     if (!video) return;
     // In "sample" mode (the default) nothing moves: the sample highlight shows the changes.
     if (open && useViewSettingsStore.getState().tuningPreview === "jump") startPreviewJump(video);
@@ -1336,7 +1337,7 @@ const VideoPlayer = (props: Props) => {
               opened={volumeOpen}
               onChange={(o) => {
                 setVolumeOpen(o);
-                if (!o) refocusIfLost('button[aria-label^="Volume"]');
+                if (!o) refocusIfLost('button[aria-label^="Volume"]', ".vol-pop");
               }}
               trapFocus
             >
@@ -1416,7 +1417,7 @@ const VideoPlayer = (props: Props) => {
             onOpen={() => setSpeedOpen(true)}
             onClose={() => {
               setSpeedOpen(false);
-              refocusIfLost(".bar-speed");
+              refocusIfLost(".bar-speed", ".bar-pop:not(.vol-pop)");
             }}
           >
             <Menu.Target>
@@ -1604,7 +1605,11 @@ const VideoPlayer = (props: Props) => {
           videoRef={videoRef}
           scaleRatio={scaleRatio}
           activity={zoomActivity ? toPlayerActivity(zoomActivity, props.meta) : null}
-          zoomIn={isZoomIn}
+          // Paused while the sample highlight shows: the magnifier fills the frame with the last
+          // moment's region, so the sample — the thing being tuned — was not visible at all. It
+          // stays switched on (the button keeps its pressed state) and comes back the moment the
+          // sample goes. Not aimed AT the sample: a magnified stand-in previews nothing real.
+          zoomIn={isZoomIn && !sampleActivity}
         />
       </Box>
       <Box
@@ -1622,7 +1627,8 @@ const VideoPlayer = (props: Props) => {
         <Box className="time-shift forward-shift" opacity={forwardShiftRequest ? 1 : 0}>
           <IconArrowBigRightLineFilled />
         </Box>
-        <Box className="overlay-item zoom-indicator" opacity={isZoomIn ? 1 : 0}>
+        {/* Follows the magnifier's EFFECTIVE state: paused while the sample highlight shows. */}
+        <Box className="overlay-item zoom-indicator" opacity={isZoomIn && !sampleActivity ? 1 : 0}>
           <IconZoom />
         </Box>
         <Box className="overlay-end" hidden={!isEnded}></Box>
