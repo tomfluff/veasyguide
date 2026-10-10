@@ -92,9 +92,12 @@ export function TopBar({
   // And when the window widens past the breakpoint (App.css, "Narrow top bar"): the trigger is
   // hidden by CSS there, but a menu opened before would stay open, portalled and holding focus.
   useEffect(() => {
-    const mq = window.matchMedia(file ? "(min-width: 62.5em)" : "(min-width: 42em)");
+    // The SAME query the CSS uses to show the compact bar, so the two flip at the same pixel
+    // (a min-width twin is already true AT the breakpoint, one pixel early, and so never fires
+    // for a widen from exactly 1000px).
+    const mq = window.matchMedia(file ? "(max-width: 62.5em)" : "(max-width: 42em)");
     const onChange = () => {
-      if (mq.matches) setMenuOpen(false);
+      if (!mq.matches) setMenuOpen(false);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);

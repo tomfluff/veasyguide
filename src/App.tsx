@@ -8,6 +8,15 @@ import { validActivities } from "./analyzer/select";
 import { buildMomentsFile, keyOf, momentsMarkdown, parseMomentsFile, sidecarMatchesFile, videoKey, type MomentsFile } from "./analyzer/momentsFile";
 import { cacheGet, cachePut } from "./utils/analysisCache";
 import { loadPosition, resumeStore, savePosition } from "./player/resume";
+import {
+  initialBookmark,
+  bookmarkTime,
+  bookmarkViewerSeek,
+  bookmarkPlay,
+  bookmarkPreviewStart,
+  bookmarkPreviewEnd,
+  bookmarkToSave,
+} from "./player/bookmark";
 import { stopPlayerHotkeys } from "./player/hotkeys";
 import { thumbRect } from "./analyzer/snippets";
 import { convertSecondsToTimecode } from "./utils/misc";
@@ -264,15 +273,11 @@ export default function App() {
   const resumeKeyRef = useRef<string | null>(null);
   const resumeDurRef = useRef(0);
   const resumeReadForRef = useRef<string | null>(null);
-  const playheadRef = useRef(0);
-  // Set while the Appearance preview has parked the playhead on a moment: where the viewer
-  // really is, and so what a save made mid-preview must record.
-  const previewReturnRef = useRef<number | null>(null);
+  // The place to come back to (player/bookmark.ts): changed only by the viewer's intent —
+  // playing through, their seeks, Resume — never by the player's own preview moves. A ref, so
+  // a save on pagehide reads it synchronously, whatever is in flight.
+  const bookmarkRef = useRef(initialBookmark());
   const lastResumeSaveRef = useRef(0);
-  // Nothing is saved for a video until the viewer has played or seeked in it. Opening a lecture
-  // and closing the tab again is not "I am now at 0:00" — saving that would erase the place
-  // they were actually at, which is the one thing this exists to keep.
-  const resumeTouchedRef = useRef(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   // A parsed, matched sidecar waiting for the viewer's yes. Held rather than applied because
   // applying throws away an analysis they may have been waiting on for twenty minutes.
@@ -635,7 +640,9 @@ export default function App() {
     // The player's own preview jump is neither: it used to dismiss the offer, mark the video
     // touched and then save 0:00 on the way out — erasing the bookmark it never showed them.
     if (byViewer) {
-      resumeTouchedRef.current = true;
+      // Usually already recorded when the seek was REQUESTED (onViewerSeek); this catches seeks
+      // the player did not start itself — the browser's own media keys, say.
+      bookmarkRef.current = bookmarkViewerSeek(bookmarkRef.current, t);
       setResumeAt(null);
     }
     if (done || !workerRef.current) return;
@@ -648,10 +655,10 @@ export default function App() {
   // which only feed the HUD.
   const lastTimeRef = useRef(-1);
   function onTimeChange(t: number) {
-    playheadRef.current = t;
+    bookmarkRef.current = bookmarkTime(bookmarkRef.current, t);
     // Throttled to every ~5s of wall time: a write per presented frame would be pointless
     // churn, and pause, pagehide and a switch all flush the exact position anyway.
-    if (resumeTouchedRef.current && performance.now() - lastResumeSaveRef.current > 5000) flushResume();
+    if (bookmarkRef.current.touched && performance.now() - lastResumeSaveRef.current > 5000) flushResume();
     if (Math.abs(t - lastTimeRef.current) < 0.2) return;
     lastTimeRef.current = t;
     setCurrentTime(t);
@@ -661,9 +668,10 @@ export default function App() {
   const flushResume = useCallback(() => {
     const store = resumeStore();
     const key = resumeKeyRef.current;
-    if (!store || !key || !resumeTouchedRef.current) return;
+    const place = bookmarkToSave(bookmarkRef.current);
+    if (!store || !key || place === null) return;
     lastResumeSaveRef.current = performance.now();
-    savePosition(store, key, previewReturnRef.current ?? playheadRef.current, resumeDurRef.current);
+    savePosition(store, key, place, resumeDurRef.current);
   }, []);
 
   // Before this video goes away: save where the viewer is, then forget the video, so nothing
@@ -672,9 +680,7 @@ export default function App() {
     flushResume();
     resumeKeyRef.current = null;
     resumeReadForRef.current = null;
-    resumeTouchedRef.current = false;
-    playheadRef.current = 0;
-    previewReturnRef.current = null;
+    bookmarkRef.current = initialBookmark();
     setResumeAt(null);
   }
 
@@ -720,7 +726,7 @@ export default function App() {
   function onPlayingChange(playing: boolean) {
     if (playing) {
       // Pressing play IS an answer to the offer: they chose to watch from where they are.
-      resumeTouchedRef.current = true;
+      bookmarkRef.current = bookmarkPlay(bookmarkRef.current);
       setResumeAt(null);
     } else {
       flushResume();
@@ -984,7 +990,9 @@ export default function App() {
                   ? {
                       at: resumeAt,
                       onResume: () => {
-                        resumeTouchedRef.current = true;
+                        // Recorded now, not when the seek lands: leaving in between used to
+                        // save 0:00 and delete the bookmark the viewer had just accepted.
+                        bookmarkRef.current = bookmarkViewerSeek(bookmarkRef.current, resumeAt);
                         seekFnRef.current(resumeAt, true);
                         setResumeAt(null);
                         focusPlayer();
@@ -996,12 +1004,9 @@ export default function App() {
                     }
                   : null
               }
-              onPreviewJump={(returnTo, nowAt) => {
-                previewReturnRef.current = returnTo;
-                // Letting go: the playhead is on its way to `nowAt`, and the time callback will
-                // only say so once the seek lands. A save in between used to record the preview.
-                if (returnTo === null && nowAt !== undefined) playheadRef.current = nowAt;
-              }}
+              onViewerSeek={(t) => { bookmarkRef.current = bookmarkViewerSeek(bookmarkRef.current, t); }}
+              onPreviewStart={() => { bookmarkRef.current = bookmarkPreviewStart(bookmarkRef.current); }}
+              onPreviewEnd={(back) => { bookmarkRef.current = bookmarkPreviewEnd(bookmarkRef.current, back); }}
               onActivityChange={setCurrMoment}
               thumbs={thumbs}
               seekFnRef={seekFnRef}

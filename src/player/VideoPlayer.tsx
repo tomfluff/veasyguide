@@ -101,15 +101,14 @@ type Props = {
   selectOpts: SelectOpts;
   // `byViewer` is false for the seeks the player makes on its own (the Appearance preview jump
   // and the step back from it). Those are not the viewer choosing a place, so App must not
-  // treat them as an answer to the resume offer or as a position worth saving (D33).
+  // treat them as an answer to the resume offer (D33).
   onSeeked?: (t: number, byViewer: boolean) => void;
-  // While the Appearance preview has moved the playhead, where the viewer actually is — the
-  // place it will step back to. null once it has. App saves THIS as the resume position if the
-  // page goes away mid-preview, never the moment it was parked on to show the changes.
-  // When it lets go (returnTo null), `nowAt` is where the playhead is going — the restore, or
-  // the viewer's own seek — so App's bookmark has the right place even in the moment before
-  // the seek lands and the time callback catches up (a save there used to record the preview).
-  onPreviewJump?: (returnTo: number | null, nowAt?: number) => void;
+  // For the resume bookmark (player/bookmark.ts), reported when each happens rather than when
+  // the seek lands: a seek the VIEWER asked for, and the Appearance preview parking the
+  // playhead on a moment and later stepping back to `back`.
+  onViewerSeek?: (t: number) => void;
+  onPreviewStart?: () => void;
+  onPreviewEnd?: (back: number) => void;
   onTimeChange?: (t: number) => void;
   // Play/pause as the element reports it. App needs both edges for the resume position: play
   // is the viewer answering the resume offer by doing something else, and pause is a moment
@@ -673,14 +672,14 @@ const VideoPlayer = (props: Props) => {
   // click on the scrubber is also an outside-click that closes the sheet, the close restored
   // the pre-preview time before `seeked` arrived, and the viewer's seek was undone (and the
   // bookmark kept the old place). Same race for ] followed quickly by Escape.
-  const cancelPreview = (nowAt?: number) => {
+  const cancelPreview = () => {
     if (preAppearanceTimeRef.current === null) return;
     preAppearanceTimeRef.current = null;
     setPreviewJumped(false);
-    props.onPreviewJump?.(null, nowAt);
   };
   const viewerSeek = (video: HTMLVideoElement, t: number) => {
-    cancelPreview(t);
+    cancelPreview();
+    props.onViewerSeek?.(t);
     // And forget a preview jump still in flight: ownership is matched by landing time, so a
     // viewer seek landing within 0.05s of that target before its `seeked` would otherwise be
     // taken for the player's own and leave the resume offer and the bookmark untouched.
@@ -712,7 +711,7 @@ const VideoPlayer = (props: Props) => {
           ownSeekRef.current = t;
           video.currentTime = t;
           setPreviewJumped(true);
-          props.onPreviewJump?.(preAppearanceTimeRef.current);
+          props.onPreviewStart?.();
         }
       }
     } else if (preAppearanceTimeRef.current !== null) {
@@ -721,7 +720,7 @@ const VideoPlayer = (props: Props) => {
       video.currentTime = back;
       preAppearanceTimeRef.current = null;
       setPreviewJumped(false);
-      props.onPreviewJump?.(null, back);
+      props.onPreviewEnd?.(back);
     }
   };
 
@@ -1285,6 +1284,7 @@ const VideoPlayer = (props: Props) => {
             classNames={{ dropdown: "bar-pop" }}
             onOpen={() => setSpeedOpen(true)}
             onClose={() => setSpeedOpen(false)}
+            returnFocus
           >
             <Menu.Target>
               <UnstyledButton
@@ -1346,6 +1346,11 @@ const VideoPlayer = (props: Props) => {
             opened={appearanceOpen}
             onChange={handleAppearanceOpen}
             trapFocus
+            // Every popover in the bar hands focus back on close (the volume one and the speed
+            // menu too). Without it, closing dropped focus on <body>: a keyboard user who
+            // opened the sheet with A from the resume card came back to nothing, and the next
+            // Space played from 0:00 and threw the offer away.
+            returnFocus
           >
             {/* The name says what is IN the sheet. "Appearance" alone read as the app's theme,
                 and the sparkles glyph says nothing at all. */}
@@ -1438,7 +1443,7 @@ const VideoPlayer = (props: Props) => {
           // (A backstop only: every viewer seek path already let go of the preview, synchronously,
           // in viewerSeek. This catches a seek from somewhere that does not — the browser's own
           // media keys, say.)
-          if (!own) cancelPreview(t);
+          if (!own) cancelPreview();
           props.onSeeked?.(t, !own);
         }}
         onPlay={() => { handleIsPlaying.open(); props.onPlayingChange?.(true); }}
