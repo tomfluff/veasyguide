@@ -1070,7 +1070,7 @@ is not ready yet, rather than commenting on the lecture — and it stays uncondi
 
 ## D29 — "Change" opens a file picker, and only a running analysis asks before it goes
 
-**Decision.** The top bar's Change button no longer calls `reset()`. It opens a file picker
+**Decision** (747b91f). The top bar's Change button no longer calls `reset()`. It opens a file picker
 that feeds the same `loadFiles` a drop does, so dismissing the picker changes nothing and
 picking a file is the decision. Loading a different video while an analysis is still running
 goes through a confirm first (`ConfirmSwitch`). Dropping a video on the player screen goes
@@ -1143,7 +1143,7 @@ analysis in 923ms, where a fresh analysis of it takes about 4s or more.
 
 ## D30 — The fill pair reads Fill / Opacity, and the magnifier gets its own way in
 
-**Decision.** In the Appearance sheet's box group, the fill colour comes first, labelled
+**Decision** (03c963e). In the Appearance sheet's box group, the fill colour comes first, labelled
 "Fill", with the slider under it labelled "Opacity". The sheet's root has two rows where it had
 one: "Fine-tune the highlight" (showing the active preset) and "Fine-tune the magnifier"
 (showing the current zoom, e.g. "2.0×"). The tab and the screen title say "Magnifier" rather
