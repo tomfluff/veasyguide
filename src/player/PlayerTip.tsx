@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // The name of an icon-only player control, shown on hover and on keyboard focus, with its key.
+// docs/decisions.md D31.
 //
 // It replaces the native `title` these buttons had (or did not have at all). A title is the
 // browser's own tooltip: small system text that ignores the page's zoom and font size, arrives
@@ -32,7 +33,7 @@ type Props = {
   // its props (ref, aria-expanded, handlers) to its child, and Tooltip spreads any prop it does
   // not know onto its FLOATING box — so with the Tooltip inside, the popover's anchor ref and
   // ARIA land on the tip instead of the button. Outside, the Tooltip clones Popover.Target,
-  // which passes everything through to the button as it should.
+  // which passes everything through to the button as it should. (D31)
   children: ReactElement;
 };
 

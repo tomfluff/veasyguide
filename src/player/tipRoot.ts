@@ -7,7 +7,7 @@ import { createContext } from "react";
 // is the Tooltip's default — in fullscreen only the fullscreened element and its descendants
 // are drawn, so a tip portalled to body exists in the DOM and is never seen. And not inline
 // beside its button either: the pin panel is `overflow: hidden`, so a tip rendered inside it
-// is clipped to the panel's own rectangle.
+// is clipped to the panel's own rectangle. (D31)
 //
 // Its own file because a module that exports a component and a context trips Fast Refresh.
 export const PlayerTipRoot = createContext<HTMLElement | null>(null);

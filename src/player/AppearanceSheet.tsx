@@ -14,8 +14,10 @@
 // the band of video it occludes never changes. That is the same trade every TV and streaming
 // player makes, for the same reason.
 //
-// Every hint is visible text. No tooltips: a hover tooltip is invisible to a keyboard user, a
-// screen-reader user and anyone driving a magnifier — which is the audience.
+// Every hint in the sheet is visible text, never a tooltip: a hover tooltip is invisible to a
+// keyboard user, a screen-reader user and anyone driving a magnifier — which is the audience.
+// (The bar's icon buttons do have tips, but those only NAME a button whose accessible name
+// already says the same, and they show on keyboard focus as well as hover: see D31.)
 import { useState } from "react";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import {

@@ -73,7 +73,8 @@
    Windowed, the bar sits BELOW the picture, in flow, and never hides: over the picture it
    masked the bottom strip of the slide, which is where the instructor writes last. It comes
    first in the DOM — so first in the tab order, where it has always been — hence `order`.
-   This was the under-520px layout alone (WCAG 1.4.10 reflow); it is now the only windowed one. */
+   This was the under-520px layout alone (WCAG 1.4.10 reflow); it is now the only windowed one.
+   docs/decisions.md D32. */
 .video-controls-container {
   position: relative; /* so its z-index holds: the scrubber's 44px hit zone reaches up over the
                          picture's bottom edge, and must win there over the click-to-play layer */

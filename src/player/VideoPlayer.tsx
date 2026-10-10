@@ -215,7 +215,7 @@ const VideoPlayer = (props: Props) => {
   // the instructor writes last, and viewers reported it masking the writing. Fullscreen has no
   // room below the picture, so there it overlays, and it hides even while paused: a paused
   // frame is a frame someone is READING, and the bar over its bottom strip is the same mask.
-  // Any pointer movement, key or focus brings it back (see the container's handlers).
+  // Any pointer movement, key or focus brings it back (see the container's handlers). D32.
   const barHidden = hideControls && isFullscreen;
   const videoContainerClasses = classNames("video-container", {
     clear: barHidden,
@@ -271,7 +271,7 @@ const VideoPlayer = (props: Props) => {
     showControls();
     fn();
   };
-  // Two tables, because WCAG 2.1.4 draws the line between them. Space and the arrows are not
+  // Two tables, because WCAG 2.1.4 draws the line between them (D31). Space and the arrows are not
   // character keys — a spoken word never produces them — and they are how the player is driven
   // at all without a pointer, so they are always on. Every printable-character key is in the
   // second table, which the viewer can switch off.
@@ -1157,7 +1157,7 @@ const VideoPlayer = (props: Props) => {
           inside size to the video rather than to the container, which also holds the bar.
           (It was 100% of the container while the bar overlaid the video; with the bar in flow
           below, that would have stretched every layer over the bar too.) The bar stays first
-          in the DOM, so it keeps its place in the tab order; CSS orders it below. */}
+          in the DOM, so it keeps its place in the tab order; CSS orders it below. D32. */}
       <Box className="video-stage">
       <video
         ref={videoMergedRef}
