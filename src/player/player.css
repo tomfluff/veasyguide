@@ -947,7 +947,7 @@
   pointer-events: none;
 }
 
-/* The resume offer (D33): a card centred on the video, inside the stage, so it moves nothing.
+/* The resume offer (D33): a card centred on the video, over the picture, so it moves nothing.
    The slot is the always-mounted live region; it takes no clicks itself, so outside the card the
    video behaves as ever. Above the pinned snapshot (35) and the fullscreen moments list (40),
    under the control bar (50). A near-opaque dark card with an amber edge, so it reads the same on
@@ -955,7 +955,9 @@
    picture, but it never leaves it: capped to the stage and scrolling inside if it must. */
 .resume-slot {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0; /* bottom: inline, the bar's height when it sits below the picture */
   z-index: 45;
   display: flex;
   align-items: center;

@@ -667,6 +667,10 @@ const VideoPlayer = (props: Props) => {
   };
   const viewerSeek = (video: HTMLVideoElement, t: number) => {
     cancelPreview();
+    // And forget a preview jump still in flight: ownership is matched by landing time, so a
+    // viewer seek landing within 0.05s of that target before its `seeked` would otherwise be
+    // taken for the player's own and leave the resume offer and the bookmark untouched.
+    ownSeekRef.current = null;
     video.currentTime = t;
   };
 
@@ -925,6 +929,50 @@ const VideoPlayer = (props: Props) => {
       // so this restart is what lets the bar hide again afterwards.
       onBlurCapture={showControls}
     >
+      {/* The resume offer, ON the video. It was a strip above the player, which pushed the whole
+          player down the moment it appeared — the page moving under the viewer, the very thing
+          this round removed everywhere else (Yotam). Centred: clear of the top-centre notices
+          and of every corner the pinned snapshot can take, and over the picture the viewer has
+          not started yet.
+          Still a question the viewer may ignore, not a dialog: nothing takes focus, play or a
+          seek answers it as surely as either button, and both buttons are in the tab order
+          (after the bar's controls, Resume first). The live region stays mounted and the card
+          appears INSIDE it, because a region inserted together with its content is not
+          announced. Space and Enter press its buttons, never the player; and its clicks stop
+          here, so pressing it cannot reach the click-to-pause surface underneath.
+          FIRST in the player's DOM, so first in its tab order, while drawn over the picture:
+          after the bar it sat behind every moment mark in the lane (each a tab stop — 36 on a
+          36-moment lecture) before a keyboard user could reach Resume. Positioned over the
+          picture's box: the whole container less the bar where the bar sits below it
+          (windowed), the whole container in fullscreen, where the bar overlays. */}
+      <Box
+        className="resume-slot"
+        role="status"
+        style={{ bottom: isFullscreen ? 0 : barHeight }}
+      >
+        {props.resumeOffer && (
+          <div
+            className="resume-card"
+            role="group"
+            aria-label="Resume where you left off"
+            onKeyDown={stopPlayerHotkeys}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            <p className="resume-q">
+              Resume at <b>{convertSecondsToTimecode(props.resumeOffer.at)}</b>?
+            </p>
+            <div className="resume-actions">
+              <button type="button" className="resume-yes" onClick={props.resumeOffer.onResume}>
+                Resume
+              </button>
+              <button type="button" className="resume-no" onClick={props.resumeOffer.onRestart}>
+                Start from the beginning
+              </button>
+            </div>
+          </div>
+        )}
+      </Box>
       {/* No py prop: it lands as an inline style and silently overrides the stylesheet's
           padding, so the bar's vertical rhythm ends up owned by two places. CSS owns it. */}
       {/* The keys a focused bar control USES belong to that control — the same rule the
@@ -1542,41 +1590,6 @@ const VideoPlayer = (props: Props) => {
           style={{ bottom: barHeight + 24, maxHeight: `calc(100% - ${barHeight + 48}px)` }}
         />
       )}
-      {/* The resume offer, ON the video. It was a strip above the player, which pushed the whole
-          player down the moment it appeared — the page moving under the viewer, the very thing
-          this round removed everywhere else (Yotam). Centred: clear of the top-centre notices
-          and of every corner the pinned snapshot can take, and over the picture the viewer has
-          not started yet.
-          Still a question the viewer may ignore, not a dialog: nothing takes focus, play or a
-          seek answers it as surely as either button, and both buttons are in the tab order
-          (after the bar's controls, Resume first). The live region stays mounted and the card
-          appears INSIDE it, because a region inserted together with its content is not
-          announced. Space and Enter press its buttons, never the player; and its clicks stop
-          here, so pressing it cannot reach the click-to-pause surface underneath. */}
-      <Box className="resume-slot" role="status">
-        {props.resumeOffer && (
-          <div
-            className="resume-card"
-            role="group"
-            aria-label="Resume where you left off"
-            onKeyDown={stopPlayerHotkeys}
-            onClick={(e) => e.stopPropagation()}
-            onDoubleClick={(e) => e.stopPropagation()}
-          >
-            <p className="resume-q">
-              Resume at <b>{convertSecondsToTimecode(props.resumeOffer.at)}</b>?
-            </p>
-            <div className="resume-actions">
-              <button type="button" className="resume-yes" onClick={props.resumeOffer.onResume}>
-                Resume
-              </button>
-              <button type="button" className="resume-no" onClick={props.resumeOffer.onRestart}>
-                Start from the beginning
-              </button>
-            </div>
-          </div>
-        )}
-      </Box>
       </Box>
       <SVGFilters />
     </Box>
