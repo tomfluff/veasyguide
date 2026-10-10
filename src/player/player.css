@@ -767,6 +767,15 @@
   text-align: center;
   pointer-events: none;
 }
+/* Lifted, not removed, when playback unlocks: a 250ms fade from the panel to the slide instead of
+   a one-frame cut. visibility follows once the fade is done, so the lifted panel takes no
+   clicks and leaves the accessibility tree. */
+.video-overlay .overlay-gate { transition: opacity 250ms ease-out, visibility 0s linear 0s; }
+.video-overlay .overlay-gate.lifted {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 250ms ease-out, visibility 0s linear 250ms;
+}
 .overlay-gate .gate-h { font-size: 1.375rem; font-weight: 650; }
 .overlay-gate .gate-sub { font-size: 0.9375rem; color: #d3d9e2; }
 .overlay-gate .gate-bar {

@@ -1654,8 +1654,14 @@ const VideoPlayer = (props: Props) => {
         {/* The only moment the app makes anyone wait. So it says what it is doing, shows it
             moving, and says when it ends — a bare "Analyzing…" gives a viewer no way to tell
             a slow machine from a hung one. */}
-        {!props.canPlay && (
-          <Box className="overlay-gate" role="status">
+        {/* Mounted throughout and LIFTED (faded out) when playback unlocks, rather than
+            unmounted: it used to vanish in one frame, a hard cut from the dark panel to the
+            slide. Hidden from AT once lifted, so its last numbers are not left lying around. */}
+        <Box
+          className={classNames("overlay-gate", { lifted: props.canPlay })}
+          role={props.canPlay ? undefined : "status"}
+          aria-hidden={props.canPlay || undefined}
+        >
             <div className="gate-h">Finding the moments…</div>
             <div className="gate-sub">
               Playback starts as soon as the first {PLAYBACK_LEAD} seconds are ready.
@@ -1667,8 +1673,7 @@ const VideoPlayer = (props: Props) => {
               {props.xRealtime ? <>running at <b>{props.xRealtime.toFixed(1)}× realtime</b> · </> : null}
               <b>{props.activities.length}</b> moment{props.activities.length === 1 ? "" : "s"} found so far
             </div>
-          </Box>
-        )}
+        </Box>
         {/* The three transient notices stay MOUNTED and toggle their content instead of
             mounting populated: a live region inserted together with its text is not a
             change, and most screen reader/browser pairs never announce it. The :empty
