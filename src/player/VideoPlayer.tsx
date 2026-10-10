@@ -166,7 +166,7 @@ const VideoPlayer = (props: Props) => {
   } = useElementSize<HTMLVideoElement>();
   const videoMergedRef = useMergedRef(videoRef, videoSizeRef);
   // The moments overlay anchors just above the control bar, whose height depends on
-  // collapsed state and which rows (lane, now-line) are present — so it is measured.
+  // collapsed state and the window's width (the controls wrap) — so it is measured.
   const { ref: barSizeRef, height: barHeight } = useElementSize<HTMLDivElement>();
 
   // State
@@ -409,7 +409,7 @@ const VideoPlayer = (props: Props) => {
     const seekTo = seekTargetFor(target, props.selectOpts.lead);
     video.currentTime = seekTo;
     // Keep the chrome in step immediately rather than waiting for the next presented frame,
-    // so the now-line and the lit mark move with the key rather than a beat behind it.
+    // so the status and the lit mark move with the key rather than a beat behind it.
     chromeTimeRef.current = seekTo;
     setCurrTime(seekTo);
   };
@@ -470,7 +470,7 @@ const VideoPlayer = (props: Props) => {
   // Core per-time update: selection, stable activity, scene tracking. Kept in a ref
   // so the rVFC loop always calls the freshest closure.
   const updateAtTime = (t: number) => {
-    // The chrome (scrubber, timecode, now-line, current mark) updates at ~10Hz, not at the
+    // The chrome (scrubber, timecode, status, current mark) updates at ~10Hz, not at the
     // display's frame rate. Only the highlight and the magnifier need frame accuracy — a
     // highlight 100ms behind the pen is the bug the rVFC loop exists to fix; a mark lighting
     // up 100ms late is invisible. This caps React's work on a main thread already shared
@@ -890,11 +890,10 @@ const VideoPlayer = (props: Props) => {
             can click and Tab to, and scrubbing never competes with jumping. Drawing the marks
             INSIDE the track (YouTube-chapter style) is cheaper in space but a mark under the
             playhead becomes invisible and there is nothing separate to focus. */}
-        {/* Rendered from the first frame, empty until the first moment arrives — like the
-            now-line below. Both used to mount when the analysis found something, which grew
-            the bar by ~59px mid-analysis; windowed the bar is in flow and the player's width
-            cap subtracts its height, so the whole player shrank under the viewer (D32). An empty
-            lane is hidden from AT: a group of nothing is noise. */}
+        {/* Rendered from the first frame, empty until the first moment arrives. It used to mount
+            when the analysis found something, which grew the bar mid-analysis and, windowed,
+            resized the player under the viewer (D32). An empty lane is hidden from AT: a group
+            of nothing is noise. */}
         <Box
           className="moment-lane"
           role={markers.length > 0 ? "group" : undefined}
@@ -930,81 +929,34 @@ const VideoPlayer = (props: Props) => {
             })}
         </Box>
 
-        {/* The label is TEXT, in a live region — not a hover tooltip. The lane is a map; a row
-            of identical rectangles tells a viewer nothing, and hover is invisible to a keyboard
-            user, a screen reader, and anyone driving a magnifier.
-            Always present, whatever the analysis has found — the same reason as the lane above:
-            a row that appears, or wraps to another line when its text grows, is a player that
-            resizes mid-lecture (measured at 400px: 259px of bar, then 234px as the text
-            changed). The text is never cut to stop that: a 400px window IS a reader at high
-            zoom, and WCAG 1.4.10 forbids losing content on reflow. Instead the row RESERVES the
-            room its longest possible sentence needs at this width — see .now-slot. */}
-        <Box className="now-slot">
-        <Box className={classNames("now-line", { empty: props.done && props.activities.length === 0 })} role="status">
-            <span className={classNames("now-dot", { on: currIndex >= 0 })} />
-            <Text className="now-text">
-              {props.activities.length === 0 ? (
-                props.done
-                  ? "No moments found"
-                  : "Looking for moments…"
-              ) : currIndex >= 0 ? (
-                <>
-                  Moment <b>{currIndex + 1}</b>
-                  {props.done ? <> of <b>{props.activities.length}</b></> : null}
-                  {" · "}
-                  {/* The worded geometry (describe.ts): tells you WHERE, not just when —
-                      the same words the screen reader gets. */}
-                  {momentPlace(props.activities[currIndex], props.meta.analysisWidth, props.meta.analysisHeight)}
-                  {" · "}
-                  <b>{convertSecondsToTimecode(props.activities[currIndex].start)}</b>,{" "}
-                  {(props.activities[currIndex].end - props.activities[currIndex].start).toFixed(1)}s
-                </>
-              ) : props.done ? (
-                <>
-                  <b>{props.activities.length}</b> moments in this lecture
-                </>
-              ) : (
-                <>
-                  <b>{props.activities.length}</b> moment{props.activities.length === 1 ? "" : "s"} so far — still looking…
-                </>
-              )}
-            </Text>
-            {/* Mode state as persistent TEXT, not just the transient on-video icon: a
-                low-vision user cannot be asked to notice a subtle glyph to know what mode
-                their player is in. Lives in the status line they already anchor on. */}
-            {isZoomIn && (
-              <Text className="now-zoom">
-                Magnifier on · {(1 + zoomStrength).toFixed(1)}×
-              </Text>
-            )}
-            {upcoming && nextIsKnown && (
-              <Text className="now-next">
-                Next at <b>{convertSecondsToTimecode(upcoming.start)}</b>
-              </Text>
-            )}
-        </Box>
-        {/* The sizer: an invisible copy of the longest thing the line can say, in the same grid
-            cell, so the cell is as tall as the worst case at the current width from the first
-            frame on — one line where it fits, more where it does not. The timecodes use this
-            video's own duration, so an hour-long lecture reserves for its longer timecodes.
-            aria-hidden: it is layout, not content.
-            The moment sentence with both chips IS the longest state: "No moments found",
-            "Looking for moments…" and "888 moments so far — still looking…" (even with both
-            chips beside it) are all shorter. A new, longer state must grow this copy, or the
-            bar starts resizing again. (The empty-video sentence used to be 96 characters and
-            the worst case on its own — two extra reserved lines at 400px for a state most
-            videos never reach. It is now just "No moments found".) */}
-        <Box className="now-line now-sizer" aria-hidden>
-          <span className="now-dot" />
-          <Text className="now-text">
-            Moment <b>888</b> of <b>888</b> · most of the slide ·{" "}
-            <b>{convertSecondsToTimecode(totalTime)}</b>, 88.8s
-          </Text>
-          <Text className="now-zoom">Magnifier on · 8.8×</Text>
-          <Text className="now-next">
-            Next at <b>{convertSecondsToTimecode(totalTime)}</b>
-          </Text>
-        </Box>
+        {/* What is happening, for a screen reader: a visually hidden live region, mounted from
+            the first frame (a region inserted together with its text is not announced) and
+            updated in place as the moment, the magnifier or the analysis changes.
+            It used to be a visible status line here too, "Moment 3 of 36 · top right · 01:23,
+            2.6s … Next at 01:40". Yotam removed it (D32): it cost the bar a row and the picture
+            the height of that row, it made the bar's height depend on how its sentence wrapped
+            (which took reserved-height sizers to keep the player still), and what it said is
+            already on screen — the lit mark in the lane, the current row in the moments list,
+            the timecode, and the magnifier button's amber pressed state. "No moments found"
+            has its visible home in the moments list. */}
+        <Box className="now-status" role="status">
+          {props.activities.length === 0
+            ? props.done
+              ? "No moments found."
+              : "Looking for moments…"
+            : currIndex >= 0
+              ? `Moment ${currIndex + 1}${props.done ? ` of ${props.activities.length}` : ""}, ${momentPlace(
+                  props.activities[currIndex],
+                  props.meta.analysisWidth,
+                  props.meta.analysisHeight
+                )}, ${convertSecondsToTimecode(props.activities[currIndex].start)}, ${(
+                  props.activities[currIndex].end - props.activities[currIndex].start
+                ).toFixed(1)} seconds.`
+              : props.done
+                ? `${props.activities.length} moment${props.activities.length === 1 ? "" : "s"} in this lecture.`
+                : `${props.activities.length} moment${props.activities.length === 1 ? "" : "s"} so far, still looking.`}
+          {isZoomIn ? ` Magnifier on, ${(1 + zoomStrength).toFixed(1)} times.` : ""}
+          {upcoming && nextIsKnown ? ` Next at ${convertSecondsToTimecode(upcoming.start)}.` : ""}
         </Box>
 
         <Group className="controls" gap={3} align="center" mt={4}>
@@ -1022,7 +974,7 @@ const VideoPlayer = (props: Props) => {
           </UnstyledButton>
           {/* Always rendered, dimmed until there is a moment to step to: two 44px buttons
               appearing mid-analysis could push the row to wrap on a narrow window, which is the
-              same resize the lane and now-line above no longer cause. */}
+              same resize the lane above no longer causes. */}
           <UnstyledButton
             className="collapse-hide"
             onClick={() => { showControls(); handleStepMoment(-1); }}

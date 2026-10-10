@@ -14,20 +14,20 @@
      bar under it, is exactly as tall as the space left once the two page bars and the page
      padding are taken.
 
-     The bar's share is a CONSTANT — the one-row expanded bar, 140px at the default font size —
-     never the bar's measured height. It was the measured height once, and that is a feedback
+     The bar's share is a CONSTANT — the one-row expanded bar, 103px (scrubber, moment lane,
+     controls; all fixed-px chrome) — never the bar's measured height. It was the measured height once, and that is a feedback
      loop: the bar's height depends on the player's width (a narrower bar wraps its controls and
      the status line onto more rows), so a tall bar made the player narrower, which made the bar
      taller, which made the player narrower still. On a 1366x768 laptop it settled at a 477px
      video in a 1028px column; on a short window at 150% scaling, at the 20rem floor. A width
      that depends on nothing it causes cannot do that. Where the bar does wrap (narrow windows,
-     high zoom) the page simply grows a little taller and scrolls. The rem part is the status
-     line, whose text scales with the reader's font size; the rest is fixed-px chrome.
+     high zoom) the page simply grows a little taller and scrolls. (It was 108px + 2rem while the
+     bar carried a visible status line, whose text scaled with the font size; that line is gone.)
 
      The 20rem floor is for short windows. Subtracting the bar there could shrink the video to
      a sliver (at 320x320 the formula alone gives a picture under 20px wide); below the floor
      the page scrolls instead, which is what a page is for. */
-  max-width: max(20rem, calc((100vh - 160px - (108px + 2rem)) * 16 / 9));
+  max-width: max(20rem, calc((100vh - 160px - 103px) * 16 / 9));
   display: flex;
   flex-direction: column;
   margin-inline: auto;
@@ -159,13 +159,6 @@
 }
 .video-controls-container .controls > button[aria-disabled="true"] {
   opacity: 0.45;
-}
-
-/* The mode chip in the now-line. Amber on the dark bar: 10.4:1. */
-.now-zoom {
-  color: #ffc233;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 /* Speed / Pace: native selects dressed for the always-dark bar. color-scheme: dark keeps
@@ -827,56 +820,17 @@
 
 .moment-mark:disabled { opacity: 0.45; cursor: default; }
 
-/* --- Now-line ------------------------------------------------------------
-   The label, as text, in a live region. Not a hover tooltip: hover is invisible to a
-   keyboard user, a screen reader, and anyone driving a magnifier — which is the whole
-   audience. */
-.now-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  padding: 1px 6px;
-  border-radius: var(--r-md);
-  background-color: rgba(24, 29, 38, 0.65);
-  border: 1px solid rgba(102, 113, 133, 0.75);
-  color: var(--d-text);
-  font-size: 1rem;
-  font-variant-numeric: tabular-nums; /* DESIGN.md: timecodes must not jitter */
-}
-
-.now-line.empty { color: var(--d-muted); }
-
-/* A constant height without cutting a word (see the now-line comment in VideoPlayer.tsx). The
-   live line and its invisible sizers share one grid cell, so the cell — and the bar — is as
-   tall as the longest thing the line could ever say at this width, from the first frame. The
-   live line stretches to fill it and wraps freely inside. */
-.now-slot {
-  display: grid;
-  margin-top: 8px;
-}
-.now-slot > .now-line {
-  grid-area: 1 / 1;
-  margin-top: 0;
-  flex-wrap: wrap;
-  align-content: center;
-}
-.now-sizer { visibility: hidden; }
-
-.now-dot {
-  width: 9px;
-  height: 9px;
-  flex: none;
-  border-radius: 50%;
-  background-color: #4a5261;
-}
-
-.now-dot.on { background-color: #ffc233; }
-
-.now-next {
-  margin-left: auto;
-  color: var(--d-muted);
-  font-size: 0.9375rem;
+/* --- Status, for screen readers only -------------------------------------
+   The visible status line is gone (D32); this is its announcement, kept. Visually hidden, not
+   display:none — that would drop the live region from the accessibility tree. Absolute, so it
+   takes no room in the bar. */
+.now-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* --- Collapsed (fullscreen only, D32) ------------------------------------
@@ -884,9 +838,8 @@
    bar sits below the picture and collapsing it would only have resized the player.
    The biggest picture, without losing the ability to stop what you are hearing. One line:
    play/pause, timecode, scrubber, then speed, zoom, pin, Appearance, fullscreen, expand.
-   The moment marks, the now-line, volume and the moment steppers belong to the expanded
-   bar. The [ / ] keys still work while collapsed. */
-.video-container.collapsed .now-slot,
+   The moment marks, volume and the moment steppers belong to the expanded bar. The [ / ]
+   keys still work while collapsed. */
 .video-container.collapsed .moment-lane,
 .video-container.collapsed .volume-container,
 .video-container.collapsed .collapse-hide {

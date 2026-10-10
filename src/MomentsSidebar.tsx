@@ -158,12 +158,12 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
       <div className="side-head">
         {/* A real heading: the working screen's structure under the h1 is this list. */}
         <h2 className="side-title">Moments</h2>
-        {/* NOT a live region: the player's now-line announces every moment change with the
+        {/* NOT a live region: the player's status region announces every moment change with the
             richer sentence (worded geometry included), and two role=status regions updating
             together double-speak under NVDA — the blind persona heard both, every 1-2s. */}
         <div className="side-pos">
           {activities.length === 0
-            ? done ? "None found" : "Looking…"
+            ? done ? null : "Looking…"
             : currIndex >= 0
               ? <>Now at <b>{currIndex + 1}</b> of <b>{activities.length}</b>{done ? "" : "+"}</>
               : <><b>{activities.length}</b>{done ? "" : "+"} in this lecture</>}
@@ -248,6 +248,10 @@ export default function MomentsSidebar({ activities, scenes, frameW, frameH, thu
         )}
       </div>
       <div className="side-list" ref={listRef}>
+        {/* The visible "No moments found". It used to be the player's status line, which is
+            gone (D32); the list is where someone looks for moments, so its emptiness is where
+            the answer goes — said once, here, rather than also in the position readout above. */}
+        {done && activities.length === 0 && <p className="side-empty">No moments found</p>}
         {grouped
           ? groups.map((g, gi) => (
               // <details> rather than a hand-rolled disclosure: the open/closed state, the

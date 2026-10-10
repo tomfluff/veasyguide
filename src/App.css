@@ -474,6 +474,13 @@
 .side-view button.on { background: var(--plum); color: #fff; }
 .side-view button:focus-visible { outline: 3px solid var(--ring); outline-offset: -3px; }
 
+.moments-side .side-empty {
+  margin: 1rem 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.moments-side.overlay .side-empty { color: var(--d-muted); }
 .moments-side .side-list {
   flex: 1;
   min-height: 0; /* lets the list shrink to the aside's pinned height instead of its content */
