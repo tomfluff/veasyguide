@@ -1920,6 +1920,14 @@ controls, the volume range, and 4 of the 7 speed items. Nothing was covered at 1
 card is back under the bar (z 45) and rises above it (z 55) only in fullscreen, and only while
 none of the bar's popovers is open.
 
+Re-measured independently. At 320x640 windowed with the card up, none of the 6 Appearance
+controls, the 2 volume controls (range and Mute) or the 7 speed items is covered: the element at
+each one's centre is the control itself, and the slot is z 45. The same at 1366x768 and 1366x650.
+In fullscreen at 320x180 at DPR 4 with the bar expanded, both card buttons are hit with the slot
+at z 55, and at 375x667 and 667x375 at DPR 2 the card does not meet the bar. In fullscreen with
+the Appearance sheet, volume or speed open, the slot drops to z 45 and no popover control is
+covered; after Escape it returns to z 55 with the card's buttons reachable.
+
 **Still open.**
 
 
