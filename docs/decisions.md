@@ -1127,6 +1127,9 @@ right after the video and sidecar load. After a reload, opening the video alone 
 analysis in 923ms, where a fresh analysis of it takes about 4s or more.
 
 **Still open.**
+- Space does nothing on the ConfirmSwitch buttons; Enter works. A keyboard user who activates
+  buttons with Space, as many do, finds the dialog's buttons dead. Found by the Codex review;
+  fix pending.
 - `cachePut` is best-effort and swallows failures (a full quota, storage blocked). If the
   write failed, a finished analysis is gone after a switch, with no confirm.
 - The cache restores the analysis, not the playhead. Reopening a finished video started at
@@ -1298,18 +1301,28 @@ working for everyone. It is recorded in TODOS.md as something to weigh, not done
   **Not pressed with the switch off:** C, S, [, < and >. They go through the same gate, but
   that is read from the code, not measured.
 - Auto-hide in fullscreen with the pointer resting on Appearance: the tip shows from 0 to 1.2s
-  and is gone at 1.6s, the same moment the bar's opacity reaches 0. No tip is left hanging.
+  and is gone at 1.6s, the same moment the bar's opacity reaches 0. This was first reported as
+  a pass ("no tip left hanging"), and the measurement stands, but it is a defect: see Still
+  open.
 - 320x320: the sidebar is 240px, D28's 15rem floor. "Notify scene changes" sits at 713-737px and
   "Single-key shortcuts" at 745-769px, both inside the panel (540 to 780). The page scrolls to
   them (`scrollHeight` 852), and both are reachable. Same at 320x568, 600x400, 899x500 and
   899x700, where the cap is 40vh = 280px.
 - A real screen reader was not run.
 
-**Still open.** Previous moment, Next moment, Playback speed, the Magnify toggle, the Pin
-toggle, the sidebar's Export, and both footer switches still use a native `title`. The
-Single-key shortcuts switch's `title` is where the list of keys it covers lives. Fullscreen,
-Mute and Collapse/Expand have only an `aria-label`, with no visible name at all. All of these
-are the same defect this entry fixed for four buttons. TODOS.md has the plan.
+**Still open.**
+- **The tip fails WCAG 1.4.13 (Content on Hover or Focus)** on two of its three conditions.
+  It is not persistent: in fullscreen it vanishes at 1.6s with the bar while the pointer is
+  still on the button, which is the measurement above, first misread as a pass and caught by an
+  independent Codex review. And it is not hoverable: the tip has `pointer-events: none`, so
+  moving the pointer from the button toward it in 6px steps, it is present up to y=623 and gone
+  from y=617, before the pointer reaches it. A magnifier user, who has to move across a tip to
+  read it, loses it on the way. Fix pending from code-lead; to be re-measured.
+- Previous moment, Next moment, Playback speed, the Magnify toggle, the Pin toggle, the
+  sidebar's Export, and both footer switches still use a native `title`. The Single-key
+  shortcuts switch's `title` is where the list of keys it covers lives. Fullscreen, Mute and
+  Collapse/Expand have only an `aria-label`, with no visible name at all. All of these are the
+  same defect this entry fixed for four buttons. TODOS.md has the plan.
 
 ---
 
@@ -1500,10 +1513,18 @@ load, and the strip is inserted into that existing node at 279-328ms, which is t
 region needs. The accessibility tree shows status, polite, atomic. Resume is 90x44px and "Start
 from the beginning" 213x44px. Focus stays where it was (on `<body>` after a load), as intended.
 After a seek to 124s and a reload, the stored entry held 124 and the strip read "Resume at
-02:04?". The strip is 68px tall at 1366x768. A real screen reader was not run, so "announced"
+02:04?", and Enter on Resume landed at exactly 124.00s. The strip is 68px tall at 1366x768. A real screen reader was not run, so "announced"
 rests on the tree, not on hearing it.
 
 **Still open.**
+- **Space on Resume skips the bookmark.** It plays from 0:00 instead of resuming; Enter works.
+  Pressing play counts as an answer, so the strip goes away with the saved place unused. A
+  keyboard user who presses Space to activate buttons gets the opposite of what they chose.
+  Found by the Codex review; fix pending.
+- **Opening and closing Appearance can erase the saved place.** Paused at 0:00, between
+  moments, opening and closing the sheet turned the stored `{t: 20}` into `{}`. The guard against
+  saving 0:00 over the real place ("nothing is saved until the viewer has played or seeked") does
+  not cover this path. Found by the Codex review; cause and fix pending.
 - At 320x320 the strip wraps to 154px and stacks its buttons, which pushes the video's top to
   237px. The picture starts mostly below the fold until the viewer answers. Answering, or
   pressing play, removes it.
