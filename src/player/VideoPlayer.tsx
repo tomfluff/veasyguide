@@ -401,10 +401,17 @@ const VideoPlayer = (props: Props) => {
   // left alone when it ends, so each moment is one announcement. "Next at" is the moment after
   // THIS one — from the list, not from the playhead, which sits `lead` seconds before the start
   // when the moment is selected and would name the current moment as the next.
+  //
+  // Keyed on ENTERING a moment — the activity object becoming current — not on its index. An
+  // index shifts when a backfill finds an earlier moment while the viewer sits in this one, and
+  // that is not news; going back into the same moment after a gap IS, even though the sentence
+  // is the same — so each entry bumps `momentEntry`, which remounts the text node and makes it
+  // a fresh addition to the live region rather than a no-op rewrite of identical text.
   const [momentSpoken, setMomentSpoken] = useState("");
+  const [momentEntry, setMomentEntry] = useState(0);
   useEffect(() => {
-    if (currIndex < 0) return;
-    const a = props.activities[currIndex];
+    if (!currActivity || currIndex < 0) return;
+    const a = currActivity;
     const next = props.activities[currIndex + 1];
     // "Next at ..." is a lie while the video after this moment is still unanalyzed: the next
     // moment by time may simply not exist yet. Say nothing rather than point at the wrong one.
@@ -415,10 +422,28 @@ const VideoPlayer = (props: Props) => {
         `${convertSecondsToTimecode(a.start)}, ${(a.end - a.start).toFixed(1)} seconds.` +
         (known ? ` Next at ${convertSecondsToTimecode(next.start)}.` : "")
     );
-    // Only on a change of moment: re-announcing because the analysis found another moment,
-    // or the playhead moved, is exactly the churn this exists to stop.
+    setMomentEntry((n) => n + 1);
+    // Only on entering a moment: re-announcing because the analysis found another moment, or
+    // the playhead moved, is exactly the churn this exists to stop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currIndex]);
+  }, [currActivity]);
+
+  // The magnifier's own announcement, in its own live region (below). A role=status region is
+  // atomic, so sharing one with the moment sentence re-read the whole sentence on every Z, and
+  // switching it off just removed the words — silence where "off" should be. Empty until the
+  // first change, so loading a video announces nothing about a magnifier nobody touched.
+  // A strength change counts only while magnifying (↑/↓, or the sheet's slider with the
+  // magnifier on); with it off, moving the slider is not the magnifier changing.
+  const [zoomSpoken, setZoomSpoken] = useState("");
+  const prevZoomRef = useRef(isZoomIn);
+  useEffect(() => {
+    const toggled = prevZoomRef.current !== isZoomIn;
+    prevZoomRef.current = isZoomIn;
+    if (!toggled && !isZoomIn) return;
+    if (!toggled && zoomSpoken === "") return; // first run: nothing has changed yet
+    setZoomSpoken(isZoomIn ? `Magnifier on, ${(1 + zoomStrength).toFixed(1)} times.` : "Magnifier off.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isZoomIn, zoomStrength]);
 
   // Helper functions
   const showControls = () => {
@@ -708,12 +733,21 @@ const VideoPlayer = (props: Props) => {
   // 89px before, true at a 16px root and 7px short at 20px, which scrolled the page.
   useEffect(() => {
     const bar = barSizeRef.current;
-    if (!bar || isFullscreen || barHeight <= 0) return;
+    // The DOM's word, not the state's: `barHeight` (ResizeObserver) and `isFullscreen` (the
+    // fullscreenchange event) settle at different moments, and on leaving fullscreen with the
+    // bar expanded there, the state still held the FULLSCREEN bar's height for a frame — it got
+    // published, the windowed player narrowed by 1.8px, and on a player within that much of the
+    // wrap threshold the row wrapped and the guard below never published the right value again.
+    // So: skip while anything is fullscreen, and measure the bar here, at the moment of the
+    // one-row check, so the two describe the same layout.
+    if (!bar || isFullscreen || document.fullscreenElement) return;
     const tops = [...bar.querySelectorAll<HTMLElement>(".controls > button")]
       .filter((b) => b.getClientRects().length > 0)
       .map((b) => Math.round(b.getBoundingClientRect().top));
     if (new Set(tops).size !== 1) return;
-    document.documentElement.style.setProperty("--bar-one-row", `${Math.ceil(barHeight)}px`);
+    const h = bar.getBoundingClientRect().height;
+    if (h <= 0) return;
+    document.documentElement.style.setProperty("--bar-one-row", `${Math.ceil(h)}px`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barHeight, isFullscreen]);
   useEffect(() => () => {
@@ -1002,14 +1036,16 @@ const VideoPlayer = (props: Props) => {
             the timecode, and the magnifier button's amber pressed state. "No moments found"
             has its visible home in the moments list. */}
         <Box className="now-status" role="status">
-          <span>
+          <span key={momentEntry}>
             {props.activities.length === 0
               ? props.done
                 ? "No moments found."
                 : "Looking for moments…"
               : momentSpoken}
           </span>
-          <span>{isZoomIn ? ` Magnifier on, ${(1 + zoomStrength).toFixed(1)} times.` : ""}</span>
+        </Box>
+        <Box className="now-status" role="status">
+          {zoomSpoken}
         </Box>
 
         <Group className="controls" gap={4} align="center" mt={4}>
@@ -1280,6 +1316,15 @@ const VideoPlayer = (props: Props) => {
           const t = videoRef.current?.currentTime ?? 0;
           const own = ownSeekRef.current !== null && Math.abs(t - ownSeekRef.current) < 0.05;
           if (own) ownSeekRef.current = null;
+          // The viewer navigating while the Appearance preview is parked on a moment (] from a
+          // preset button, a click on the lane) has chosen a place: the preview must not drag
+          // them back to where they were when they opened the sheet, and a save must record
+          // where they went, not that old place.
+          if (!own && preAppearanceTimeRef.current !== null) {
+            preAppearanceTimeRef.current = null;
+            setPreviewJumped(false);
+            props.onPreviewJump?.(null);
+          }
           props.onSeeked?.(t, !own);
         }}
         onPlay={() => { handleIsPlaying.open(); props.onPlayingChange?.(true); }}
