@@ -2334,15 +2334,28 @@ default.
 fill, opacity, shape and filters all show as they will on a real moment. `player/sample.ts`
 places it where the sheet, and in fullscreen the bar, cover it least: inside the picture, clear
 of the notices at the top centre, preferring the upper left. It is re-placed on resize, on
-entering or leaving fullscreen, and when the sheet's height changes between tabs. It carries an
-`aria-hidden` "Sample" tag so a sighted viewer does not take it for a found moment. A real moment
-on screen takes precedence, and the sample goes when the sheet closes. The magnifier does not
-target the sample; that was the simpler of the correct options.
+entering or leaving fullscreen, and when the sheet's height changes between tabs. It first
+carried an `aria-hidden` "Sample" tag, so a sighted viewer would not take it for a found moment;
+the owner had it removed (172fae3): "not needed, it's kind of obvious". A real moment on screen
+takes precedence, and the sample goes when the sheet closes. The magnifier does not target the
+sample; that was the simpler of the correct options.
 
 **The setting.** `tuningPreview` in `ViewSettingsStore`, persisted, and kept out of the preset
 stores for the same reason as D28: a preset must not switch it back. The control replaces the
 hint line on the sheet's root, which is now 327px tall against the drill screens' 349px (it was
 320.8px), so D30's fixed band still holds.
+
+**The choice applies at once** (172fae3). As first shipped, a change to "Preview on" took
+effect only when the sheet was next opened. It now applies while the sheet is open: switching to
+the nearest moment jumps straight away, under the same conditions as on opening, and switching
+to the sample steps straight back. Both are preview moves, so flipping the setting never changes
+the bookmark (D33).
+
+**The "cyan pointer" was not a style.** The owner saw the sample's pointer tinted cyan and took it
+for a styling difference from a real moment. The computed styles are identical; the tint was the
+browser's selection highlight on the pointer's `<img>`. Everything drawn over the picture is now
+`user-select: none` and not draggable, which also stops a stray drag selecting the highlight on a
+real moment.
 
 **Tests.** 141 in total, including the setting's default, a persistence round trip, and 7
 placement tests. These numbers are code-lead's; an independent re-measure is pending.
