@@ -4,6 +4,29 @@ Deferred work, with enough context to pick it up cold. Newest first.
 
 ---
 
+## Arrow keys in the segmented choices
+
+**What:** Make every segmented choice in the app (the `Choice` pattern: the Appearance sheet's
+options, "Preview on", and the others built the same way) a proper radio group: one tab stop,
+with the arrow keys moving the selection.
+
+**Why:** Today each option is its own tab stop and the arrow keys do nothing. The controls
+expose `role="radio"` and `aria-checked`, so a screen-reader user is told they are in a radio
+group and then finds that radio-group keys do not work. A keyboard user tabs through every option
+of every group. Found during the feedback round's final review, on "Preview on" (D36); it
+predates the round.
+
+**Context:** WAI-ARIA's radio group pattern: Tab enters the group on the checked option, the
+arrows move and select, and Space selects. The fix belongs in the shared `Choice` component, not
+per control.
+
+**Pros:** One fix for every group; fewer tab stops in a sheet that is already deep.
+**Cons:** Changes keyboard behaviour viewers may have learned; needs checking against the
+sheet's own key guard, which already takes the arrows (D33).
+**Blocked by:** nothing.
+
+---
+
 ## Keyboard reach for every player control
 
 **What:** Give every control in the player bar the treatment D31 gave the moments list,

@@ -1186,8 +1186,9 @@ The header comment's "a fixed 340x260" is wrong on both axes. The sheet renders 
 (396 plus a 1px border each side) and 351.1px tall on the drill screens. That predates this
 entry and is recorded rather than fixed here.
 
-*Later (D36):* the root screen's hint line became the "Preview on" choice, and the root is now
-327px against the drill screens' 349px, so the fixed band still holds.
+*Later (D36):* the root screen's hint line became the "Preview on" choice. The root is now
+329.4px outer against the drill screens' 351.1px (327 and 349 without the 2px border), so the
+fixed band still holds.
 
 Rendered label widths in the 62px column: Border 37, Colour 37, Fill 17, Opacity 44, Shape 36,
 Size 25. All fit on one line. The five tabs end at 293px of a 372px row (79px spare), with no
@@ -2022,6 +2023,14 @@ click), speed (Escape and picking a rate) and volume (Escape).
   control. That rule also covers a low the same review raised from the code: focus returning
   to a bar control that collapsing the fullscreen bar had hidden.
 
+Re-measured independently. Paused at 30s with the preview at 47.8s, playing on to 62.1s and
+then Escape leaves the time at 62.07s and stores 62.07. A sidebar row clicked with Appearance or
+speed open keeps focus on the row. Escape returns focus to the trigger (Appearance, speed,
+volume), and a speed pick to the speed button. Next moment, A, F, Escape lands on the visible
+Appearance button in fullscreen, where the collapse had hidden Next. Resume, A, Escape lands on
+Appearance with the card and `{t: 20}` kept. Resume then leaving at 0 or 30ms keeps `{t: 20}`,
+and a seek during playback at 3x saves the live place (116.37s).
+
 **Still open.**
 
 
@@ -2342,8 +2351,9 @@ sample; that was the simpler of the correct options.
 
 **The setting.** `tuningPreview` in `ViewSettingsStore`, persisted, and kept out of the preset
 stores for the same reason as D28: a preset must not switch it back. The control replaces the
-hint line on the sheet's root, which is now 327px tall against the drill screens' 349px (it was
-320.8px), so D30's fixed band still holds.
+hint line on the sheet's root, which is now 329.4px tall outside its border against the drill
+screens' 351.1px (327 and 349 inside; the root was 320.8 inside before), so D30's fixed band
+still holds.
 
 **The choice applies at once** (172fae3). As first shipped, a change to "Preview on" took
 effect only when the sheet was next opened. It now applies while the sheet is open: switching to
@@ -2358,9 +2368,42 @@ browser's selection highlight on the pointer's `<img>`. Everything drawn over th
 real moment.
 
 **Tests.** 141 in total, including the setting's default, a persistence round trip, and 7
-placement tests. These numbers are code-lead's; an independent re-measure is pending.
+placement tests.
+
+**Re-measured independently** (at 172fae3).
+- The default is the sample on a fresh profile, and choosing the nearest moment survives a
+  reload. No label wraps anywhere in the sheet.
+- The choice is a radiogroup with correct `aria-checked`, and Space selects. Its accessible name
+  is "Preview while tuning", while the visible label reads "Preview on".
+- The sample is drawn clear of the sheet on every tab, with zero overlap: windowed at 1366x768
+  (a 112px square), 1366x650 (88px), 1920x1080 (174px) and 800x600 (78px); in fullscreen at
+  1366x768 (154px), 1920x1080 (216px) and 667x375 at DPR 2 (75px), clear of the bar too. Square
+  to 0.00px. Each was re-measured after resizing, entering fullscreen and changing tab.
+- A real moment replaces it (at 26s the real 186x62 box shows); back at 2s the sample returns;
+  it is gone after the sheet closes.
+- In sample mode the playhead never moves: it stays at 0 through opening and closing, with the
+  resume card up and `{t: 20}` unchanged.
+- At identical settings, across all four presets, the sample and a real highlight have no
+  computed-style differences, and their crops look identical. No cyan pointer appears in a
+  headless browser; the Windows selection tint itself cannot be tested there.
+- Live switch with the sheet open: nearest moment goes to 25.77s with its notice, the sample
+  returns to 2s, nearest goes to 25.77s again, and closing returns to 2s.
+- Escape in a drill tab closes the sheet, as on d2e19c3.
 
 **Still open.**
-- At 320px wide the 398px sheet covers the whole picture, so the sample cannot be clear of it.
+- Speed open, then A, then Tab sends focus out of the Appearance sheet to the speed button.
+  Found by the eleventh Codex review, confirmed; with code-lead.
+- With the magnifier on, opening Appearance at a gap hides the sample entirely under the
+  magnified picture. Found by the eleventh Codex review, confirmed; with code-lead.
+- Low: at 375px wide and below, the 398px sheet covers the whole picture, so the sample cannot
+  be clear of it. By design.
+- Low: placement uses the moment's square, not the drawn extent, so at Size 200% the sample can
+  be clipped at the picture's top left. Found by the Codex review.
+- Low: a medium or large pin in the top left can cover the sample, because pins are not
+  obstacles to its placement. Found by the Codex review.
+- Low: `placeSample`'s fixed margins and 8px minimum break containment in degenerate, tiny
+  pictures. Found by the Codex review.
+- Low: the "Preview on" radios do not respond to the arrow keys; both are tab stops. The same
+  pattern runs through every segmented choice in the app, so it is in TODOS.md.
 - With "The nearest moment" chosen, every preview interaction in D33 is back in play. They are
   fixed as recorded there, but that mode is where any remaining bug of that class would live.
