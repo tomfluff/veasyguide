@@ -1897,15 +1897,27 @@ That is above 2.5.8's 24px, and below the 44px the strip had.
 **Fixed after the sixth Codex review** (7fc8c45).
 - In fullscreen the bar could cover the card. At 1280x720 at 400% zoom (a 320x180 screen) the
   expanded bar is 122px of the screen's 180, and it overlapped the card by 91.4px, so neither
-  button could be clicked. In fullscreen the card now stacks above the bar (z 55), which
-  reverses "under the bar (z 50)" above for fullscreen only. Rejected: reserving room above the
-  bar, which left 53px, too little for the card. Windowed, the card and the bar never meet.
+  button could be clicked. In fullscreen the card now stacks above the bar (z 55). Rejected: reserving room above the
+  bar, which left 53px, too little for the card. This was described as fullscreen-only, with
+  "windowed, the card and the bar never meet". That was wrong on both counts: the slot is z 55
+  in every mode, and windowed the bar's popovers do meet the card (Still open).
 - Leaving the page about 50ms after closing Appearance stored the preview's position (47.8s)
   instead of the viewer's (30s); at 0ms or 300ms it stored 30s. A save in the window before the
   restore landed read the preview's time. The preview jump now carries the playhead's
   destination, so a save in that window records 30s.
 
+Re-measured independently. At 320x180 at DPR 4 in fullscreen with the bar expanded (bar from
+y 59 to 181, card from y 29.6 to 150.4), the element at each button's centre is the button.
+Leaving at 0, 50 and 300ms after closing Appearance stores `{t: 30}` every time. Geometry, zero
+layout shift, every key, click and dismissal path, the tab order and the preview paths are
+unchanged from 37535ac.
+
 **Still open.**
+- **The card covers the bar's popovers on narrow windows.** Since 7fc8c45 the card's slot is at
+  z 55 in every mode, above the bar (50). At 320x640 windowed, popovers that open under the card
+  are covered: 3 of the Appearance sheet's 6 controls, the volume range, and 4 of the 7 speed
+  items. At 1366px wide nothing is covered. A regression from 7fc8c45; before it the card was
+  z 45, under the bar. Found by the seventh Codex review, reproduced; with code-lead.
 
 
 - The position lives in one browser's `localStorage`. A different browser, a private window or
@@ -2045,11 +2057,21 @@ magnifier on, as on main. That turned out to be a bug, fixed below (5c4bffd).
   moment is now re-selected when the list grows. This is also why "a backfill renumbering stays
   quiet" could not be measured before.
 
+Re-measured independently. ↓ with the magnifier off leaves the strength at 0.5 and the magnifier
+off; main turns it on. ↑ from off still turns it on (0.5 to 0.6 over two presses). Paused at
+268s before the analysis reached it, the highlight and the current sidebar row appear once it
+does, with the time still 268s and no nudge. A backfill renumbering stays quiet: the moment
+region changed twice (cleared, then "Moment 1, bottom right, 04:28, 5.2 seconds.") and not again
+through to the end, at 37 moments.
+
 **The moment marks stay under 24px, on purpose.** The lane's marks are 8-23px wide by 14px tall,
 under 2.5.8's 24px, which predates this round. They rely on 2.5.8's Equivalent exception: every
 moment is also reachable by [ and ], by Previous and Next, and by the sidebar's rows.
 
 **Still open.**
+- Low: after a backfill renumbers the moments, the status region's text still says "Moment 1"
+  for what is now moment 35 of 37. It is not re-announced, which is right, but a screen-reader
+  user reading it in browse mode finds a stale number.
 
 
 - Below about 486px of player the bar still wraps (121px at 400px wide, 153px at 320px). D32
