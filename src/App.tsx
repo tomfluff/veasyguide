@@ -52,7 +52,15 @@ const FORCE_CPU = QUERY.get("cpu") === "1";
 // In-memory cap for stored analyzer frames (~25 KB each => ~150 MB worst case).
 const MAX_DEBUG_FRAMES = 6000;
 
-const isVideoFile = (f: File) => f.type.startsWith("video/") || /\.(mp4|webm|mkv)$/i.test(f.name);
+// Which picked file is the lecture. The MIME type is the browser's guess from the extension, and
+// it is often empty (a .mov or .m4v on some systems, anything with an unusual extension), so a
+// type check alone silently ignored real videos: the picker closed and nothing happened, with
+// no error. A recognised video wins; failing that, any file that is not a moments sidecar is
+// tried as the video, and the analyzer says plainly if it cannot read it.
+const isVideoFile = (f: File) =>
+  f.type.startsWith("video/") || /\.(mp4|m4v|mov|webm|mkv|avi|mpe?g|ts|m2ts|3gp|ogv|wmv)$/i.test(f.name);
+const pickVideo = (files: File[]) =>
+  files.find(isVideoFile) ?? files.find((f) => !/\.json$/i.test(f.name));
 
 type DebugFrame = { t: number; blob: Blob; boxes: Box[] };
 // One completed analysis run, for comparing the cost of the debug instrumentation.
@@ -485,7 +493,7 @@ export default function App() {
   // A sidecar that fails any check degrades to a normal analysis with the reason shown;
   // a wrong file must never mean a broken player.
   function loadFiles(files: File[]) {
-    const video = files.find(isVideoFile);
+    const video = pickVideo(files);
     // A new video replaces the open one. Mid-analysis that costs the viewer every minute the
     // analysis has run, so it asks first; otherwise the pick itself was the decision.
     if (video && fileRef.current && !done && error === null) {
@@ -496,7 +504,7 @@ export default function App() {
   }
 
   function loadFilesNow(files: File[]) {
-    const video = files.find(isVideoFile);
+    const video = pickVideo(files);
     const sidecar = files.find((f) => /\.json$/i.test(f.name));
     if (!video) {
       if (!sidecar) return;
@@ -924,7 +932,7 @@ export default function App() {
         </div>
       )}
       <ConfirmSwitch
-        next={pendingSwitch?.find(isVideoFile)?.name ?? null}
+        next={pendingSwitch ? (pickVideo(pendingSwitch)?.name ?? null) : null}
         current={fileName}
         onCancel={() => setPendingSwitch(null)}
         onConfirm={() => { if (pendingSwitch) loadFilesNow(pendingSwitch); setPendingSwitch(null); }}
